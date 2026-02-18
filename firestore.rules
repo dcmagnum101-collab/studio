@@ -1,10 +1,8 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // For a private, single-user app, allow any authenticated user full access.
-    // This ensures the owner always has permission regardless of path complexity.
     match /{allPaths=**} {
-      allow read, write: if request.auth != null;
+      allow read, write: if true;
     }
   }
 }
