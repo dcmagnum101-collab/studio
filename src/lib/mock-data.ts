@@ -58,11 +58,18 @@ export interface Contact {
   ai_next_best_action: string;
   estimated_commission: number;
   likely_to_list_score?: number;
+  likely_to_lead_score?: number;
+  likely_to_contact_score?: number;
+  loan_to_value?: number;
+  sequence_step: number;
   property_type: PropertyType;
   activityLogs: ActivityLog[];
   created_at: string;
   status: string;
   dnc?: boolean;
+  auction_date?: string;
+  days_since_expired?: number;
+  days_on_market?: number;
 }
 
 export const MOCK_CONTACTS: Contact[] = [
@@ -84,6 +91,10 @@ export const MOCK_CONTACTS: Contact[] = [
     estimated_commission: 14500,
     property_type: 'single_family',
     likely_to_list_score: 85,
+    likely_to_lead_score: 90,
+    likely_to_contact_score: 75,
+    loan_to_value: 45,
+    sequence_step: 1,
     activityLogs: [
       { id: 'a1', type: 'call', date: '2024-03-21T14:30:00Z', outcome: 'Answered', summary: 'Spoke with seller. Interested in a cash offer. Moving in 3 weeks.', sentiment: 'positive', nextAction: 'Send written offer' },
       { id: 'a2', type: 'ai_note', date: '2024-03-22T09:00:00Z', outcome: 'AI Analysis', summary: 'Detected high urgency signal. Recommend 24h follow-up.' }
@@ -108,8 +119,34 @@ export const MOCK_CONTACTS: Contact[] = [
     ai_next_best_action: 'Send handwritten empathy card to the executor.',
     estimated_commission: 18000,
     property_type: 'single_family',
+    likely_to_list_score: 60,
+    loan_to_value: 0,
+    sequence_step: 0,
     activityLogs: [],
     created_at: '2024-03-24T08:00:00Z',
+    status: 'Lead'
+  },
+  {
+    id: '5',
+    name: 'Jessica Miller',
+    email: 'jess.m@example.com',
+    phone: '+1 (555) 222-3333',
+    propertyAddress: '789 Desert Wind Ave, Henderson, NV',
+    motivation: 'Job relocation, needs to sell by end of summer.',
+    icpScore: 88,
+    archagent_source: 'social_capture',
+    archagent_tags: ['mover_upper'],
+    pipeline_stage: 'new_lead',
+    ai_urgency: 'hot',
+    ai_sentiment: 'positive',
+    ai_summary: 'Extracted from Nextdoor post. Very active buyer profile.',
+    ai_next_best_action: 'Send neighborhood market snapshot.',
+    estimated_commission: 12000,
+    property_type: 'single_family',
+    likely_to_list_score: 82,
+    sequence_step: 0,
+    activityLogs: [],
+    created_at: '2024-03-24T12:00:00Z',
     status: 'Lead'
   }
 ];
@@ -124,7 +161,7 @@ export const MOCK_TASKS: Task[] = [
     description: 'Sarah requested a callback to discuss how the divorce impacts the closing date.',
     priority: 'urgent',
     status: 'pending',
-    due_date: '2024-03-23T10:00:00Z',
+    due_date: new Date().toISOString(),
     ai_reason: 'High urgency detected from previous call sentiment.'
   }
 ];
@@ -135,7 +172,7 @@ export const MOCK_APPOINTMENTS: Appointment[] = [
     contact_id: '1',
     contact_name: 'Sarah Johnson',
     title: 'Listing Presentation',
-    date: '2024-03-25T14:00:00Z',
+    date: new Date().toISOString(),
     duration_minutes: 60,
     type: 'In-person',
     status: 'Scheduled',
