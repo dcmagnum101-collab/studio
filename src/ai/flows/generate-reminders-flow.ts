@@ -39,10 +39,10 @@ const generateRemindersPrompt = ai.definePrompt({
   output: {schema: GenerateRemindersOutputSchema},
   config: {
     safetySettings: [
-      { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
-      { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
-      { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
-      { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
+      { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+      { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+      { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+      { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
     ],
   },
   prompt: `You are Monica Selvaggio's AI sales manager. Based on the latest activity with {{{contactName}}}, suggest the ideal follow-up tasks.
@@ -54,9 +54,6 @@ Contact Context:
 - Monica's Notes: {{{notes}}}
 
 Generate a sequence of 1-3 tasks that Monica should complete to keep the deal moving. 
-- If 'hot', ensure tasks are scheduled within 24-48 hours.
-- If 'appointment_set', focus on prep and confirmation tasks.
-- If 'no_answer', suggest a specific callback window.
 `,
 });
 

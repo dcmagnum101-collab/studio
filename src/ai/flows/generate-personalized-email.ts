@@ -40,10 +40,10 @@ const personalizedEmailPrompt = ai.definePrompt({
   output: {schema: GeneratePersonalizedEmailOutputSchema},
   config: {
     safetySettings: [
-      { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
-      { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
-      { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
-      { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
+      { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+      { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+      { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+      { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
     ],
   },
   prompt: `You are an expert sales agent for a company named '{{{companyName}}}' specializing in buying properties directly from sellers.
@@ -61,10 +61,8 @@ Company Name: {{{companyName}}}
 Craft an email that includes a compelling subject line and a persuasive body. The email should:
 - Be friendly and respectful.
 - Briefly mention the property and acknowledge the seller's potential motivation.
-- Offer a clear, no-obligation solution for selling.
-- Include a call to action to discuss further.
+- Offer a call to action to discuss further.
 - Ensure all provided details (name, property, motivation) are seamlessly integrated.
-- The tone should be professional yet approachable.
 
 Subject: Start with a personal touch and a clear value proposition.
 Body: Be concise, clear, and focused on the seller's benefit.
