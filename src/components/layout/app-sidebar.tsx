@@ -5,8 +5,6 @@ import * as React from "react"
 import {
   LayoutDashboard,
   Users,
-  Send,
-  PhoneCall,
   Settings,
   PieChart,
   LogOut,
@@ -14,7 +12,8 @@ import {
   Map,
   Trello,
   CheckSquare,
-  CalendarDays
+  CalendarDays,
+  Home
 } from "lucide-react"
 
 import {
@@ -37,6 +36,7 @@ const navigation = [
   { name: "Tasks", href: "/tasks", icon: CheckSquare },
   { name: "Calendar", href: "/calendar", icon: CalendarDays },
   { name: "Farm Zones", href: "/farm", icon: Map },
+  { name: "Open House", href: "/open-house", icon: Home },
   { name: "Outreach Builder", href: "/outreach", icon: Sparkles },
   { name: "Analytics", href: "/analytics", icon: PieChart },
   { name: "Settings", href: "/settings", icon: Settings },

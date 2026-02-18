@@ -10,11 +10,7 @@
         "name": { "type": "string" },
         "email": { "type": "string", "format": "email" },
         "phone": { "type": "string" },
-        "phone2": { "type": "string" },
         "propertyAddress": { "type": "string" },
-        "city": { "type": "string" },
-        "state": { "type": "string" },
-        "zip": { "type": "string" },
         "motivation": { "type": "string" },
         "icpScore": { "type": "number" },
         "pipeline_stage": {
@@ -23,65 +19,54 @@
         },
         "ai_urgency": { "type": "string", "enum": ["hot", "warm", "cold", "nurture"] },
         "ai_sentiment": { "type": "string", "enum": ["positive", "neutral", "negative"] },
-        "ai_summary": { "type": "string" },
-        "ai_next_best_action": { "type": "string" },
-        "total_calls": { "type": "number" },
-        "total_conversations": { "type": "number" },
-        "last_call_date": { "type": "string", "format": "date-time" },
-        "estimated_commission": { "type": "number" },
         "archagent_source": {
           "type": "string",
-          "enum": ["fsbo", "expired", "frbo", "preforeclosure", "circle_prospect", "recommended", "manual"]
+          "enum": ["fsbo", "expired", "frbo", "preforeclosure", "circle_prospect", "recommended", "manual", "probate", "open_house", "social_capture", "gis_import"]
         },
         "archagent_tags": {
           "type": "array",
           "items": { "type": "string" }
         },
+        "likely_to_list_score": { "type": "number" },
+        "estimated_commission": { "type": "number" },
         "created_at": { "type": "string", "format": "date-time" }
       }
     },
-    "CallLog": {
-      "title": "Call Log",
-      "description": "Historical record of a voice interaction.",
+    "ProbateLead": {
+      "title": "Probate Lead",
+      "description": "Legal lead from court filings.",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
-        "contact_id": { "type": "string" },
-        "date": { "type": "string", "format": "date-time" },
-        "duration_seconds": { "type": "number" },
-        "outcome": { "type": "string" },
-        "transcript": { "type": "string" },
-        "summary": { "type": "string" },
-        "sentiment": { "type": "string" }
-      }
-    },
-    "Task": {
-      "title": "Task",
-      "description": "An actionable item or reminder.",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "contact_id": { "type": "string" },
-        "type": { "type": "string", "enum": ["call", "email", "sms", "appointment", "follow_up", "custom"] },
-        "title": { "type": "string" },
-        "description": { "type": "string" },
-        "priority": { "type": "string", "enum": ["urgent", "high", "normal", "low"] },
-        "status": { "type": "string", "enum": ["pending", "completed", "snoozed"] },
-        "due_date": { "type": "string", "format": "date-time" }
-      }
-    },
-    "Appointment": {
-      "title": "Appointment",
-      "description": "A scheduled meeting or consultation.",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "contact_id": { "type": "string" },
-        "title": { "type": "string" },
-        "date": { "type": "string", "format": "date-time" },
-        "duration_minutes": { "type": "number" },
-        "type": { "type": "string" },
+        "case_number": { "type": "string" },
+        "decedent_name": { "type": "string" },
+        "filing_date": { "type": "string", "format": "date" },
+        "property_address": { "type": "string" },
+        "est_value": { "type": "number" },
         "status": { "type": "string" }
+      }
+    },
+    "OpenHouseEvent": {
+      "title": "Open House Event",
+      "description": "A scheduled real estate event for sign-ins.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "property_address": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "signin_count": { "type": "number" },
+        "seller_count": { "type": "number" }
+      }
+    },
+    "MonicaInsight": {
+      "title": "Monica Insight",
+      "description": "AI-calculated behavioral insights.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "type": "string", "enum": ["call_timing", "objections", "vm_performance"] },
+        "data": { "type": "object" },
+        "generated_at": { "type": "string", "format": "date-time" }
       }
     }
   },
@@ -93,17 +78,17 @@
       "schema": "Contact",
       "description": "CRM Contact records."
     },
-    "/call_logs/{logId}": {
-      "schema": "CallLog",
-      "description": "Call history."
+    "/probate_leads/{leadId}": {
+      "schema": "ProbateLead",
+      "description": "Court-sourced leads."
     },
-    "/tasks/{taskId}": {
-      "schema": "Task",
-      "description": "To-do items."
+    "/open_house_events/{eventId}": {
+      "schema": "OpenHouseEvent",
+      "description": "Open house event registry."
     },
-    "/appointments/{apptId}": {
-      "schema": "Appointment",
-      "description": "Scheduled events."
+    "/monica_insights/{insightId}": {
+      "schema": "MonicaInsight",
+      "description": "AI behavioral intelligence."
     }
   }
 }

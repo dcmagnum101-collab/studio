@@ -18,7 +18,10 @@ import {
   Sparkles,
   ArrowRight,
   Flame,
-  Trello
+  Trello,
+  Smartphone,
+  ShieldCheck,
+  Zap
 } from "lucide-react";
 import { 
   BarChart, 
@@ -51,6 +54,8 @@ export default function DashboardPage() {
     setMounted(true);
   }, []);
 
+  if (!mounted) return null;
+
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full">
@@ -58,7 +63,7 @@ export default function DashboardPage() {
         <SidebarInset>
           <header className="flex h-16 shrink-0 items-center gap-2 border-b px-6 bg-white shadow-sm sticky top-0 z-10">
             <SidebarTrigger className="-ml-1" />
-            <h1 className="text-xl font-bold font-headline text-primary">CRM Overview</h1>
+            <h1 className="text-xl font-bold font-headline text-primary">Monica Executive Dashboard</h1>
           </header>
           
           <main className="flex-1 space-y-8 p-8 max-w-7xl mx-auto w-full">
@@ -89,6 +94,85 @@ export default function DashboardPage() {
               })}
             </div>
 
+            <div className="grid gap-6 lg:grid-cols-3">
+              <Card className="lg:col-span-2 shadow-md border-none bg-white">
+                <CardHeader>
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <CardTitle>Prospecting Intelligence</CardTitle>
+                      <CardDescription>AI-detected lead signals & heatmap patterns</CardDescription>
+                    </div>
+                    <Zap className="h-5 w-5 text-accent animate-pulse" />
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="p-4 bg-primary/5 rounded-xl border border-primary/10">
+                      <p className="text-[10px] font-black text-muted-foreground uppercase mb-2">Best Call Window</p>
+                      <div className="flex items-center gap-3">
+                        <Clock className="h-5 w-5 text-primary" />
+                        <div>
+                          <p className="text-sm font-bold">Now - 11:30 AM</p>
+                          <p className="text-[10px] text-muted-foreground">34% Predict Answer Rate</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="p-4 bg-orange-50 rounded-xl border border-orange-100">
+                      <p className="text-[10px] font-black text-orange-600 uppercase mb-2">Almost Leads Detected</p>
+                      <div className="flex items-center gap-3">
+                        <Smartphone className="h-5 w-5 text-orange-600" />
+                        <div>
+                          <p className="text-sm font-bold">4 Follow-ups Ready</p>
+                          <p className="text-[10px] text-orange-700">Implied timeline reached</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <h4 className="text-xs font-bold text-slate-700 uppercase tracking-widest">Active Intelligence Engines</h4>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { label: 'Probate Monitor', status: 'Live', color: 'text-green-600' },
+                        { label: 'Craigslist Parser', status: 'Scanning', color: 'text-blue-600' },
+                        { label: 'GIS Equity Miner', status: 'Refresh Soon', color: 'text-slate-600' },
+                        { label: 'Ghost Win-Back', status: 'Active', color: 'text-green-600' },
+                      ].map((engine) => (
+                        <div key={engine.label} className="flex items-center justify-between p-2 rounded-lg bg-slate-50 text-[10px]">
+                          <span className="font-bold">{engine.label}</span>
+                          <span className={engine.color}>{engine.status}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="shadow-md border-none bg-slate-50/50">
+                <CardHeader>
+                  <CardTitle className="text-sm font-bold flex items-center gap-2">
+                    <ShieldCheck className="h-4 w-4 text-accent" />
+                    Compliance & Safety
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-muted-foreground">DNC Registries Matched</span>
+                    <span className="font-bold">4,281</span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-muted-foreground">Safe Call Windows</span>
+                    <span className="font-bold">8am - 8pm</span>
+                  </div>
+                  <Separator />
+                  <div className="space-y-2">
+                    <p className="text-[10px] text-muted-foreground font-medium">Automatic DNC scrubbing is active for all ArchAgent data streams.</p>
+                    <Button variant="outline" className="w-full text-xs h-8">View DNC Policy</Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
               <Card className="lg:col-span-3 shadow-md border-none bg-slate-50/50">
                 <CardHeader>
@@ -116,7 +200,7 @@ export default function DashboardPage() {
                         <div className="flex-1 min-w-0">
                           <p className="text-xs font-bold truncate text-primary">{task.title}</p>
                           <p className="text-[10px] text-muted-foreground">
-                            {task.contact_name} • {mounted ? format(new Date(task.due_date), 'h:mm a') : '...'}
+                            {task.contact_name} • {format(new Date(task.due_date), 'h:mm a')}
                           </p>
                         </div>
                         <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-400">
@@ -167,82 +251,13 @@ export default function DashboardPage() {
                 </CardContent>
               </Card>
             </div>
-
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              <Card className="shadow-md">
-                <CardHeader>
-                  <CardTitle className="text-sm font-bold flex items-center gap-2">
-                    <Calendar className="h-4 w-4 text-accent" />
-                    Upcoming Appointments
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {MOCK_APPOINTMENTS.map(appt => (
-                    <div key={appt.id} className="p-3 border rounded-xl space-y-2">
-                      <div className="flex justify-between items-start">
-                        <div className="font-bold text-xs">{appt.title}</div>
-                        <Badge variant="outline" className="text-[9px] h-4">{appt.status}</Badge>
-                      </div>
-                      <div className="text-[10px] text-muted-foreground flex items-center gap-1">
-                        <Users className="h-3 w-3" /> {appt.contact_name}
-                      </div>
-                      <div className="text-[10px] text-muted-foreground flex items-center gap-1">
-                        <Clock className="h-3 w-3" /> {mounted ? format(new Date(appt.date), 'MMM d, h:mm a') : '...'}
-                      </div>
-                      <Button size="sm" className="w-full h-7 text-[10px] bg-slate-50 text-primary border-slate-200" variant="outline">View Prep Brief</Button>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-
-              <Card className="shadow-md">
-                <CardHeader>
-                  <CardTitle className="text-sm font-bold flex items-center gap-2">
-                    <Flame className="h-4 w-4 text-red-500" />
-                    Hot Pipeline
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {MOCK_CONTACTS.filter(c => c.ai_urgency === 'hot').map(contact => (
-                    <div key={contact.id} className="flex items-center justify-between p-2 hover:bg-slate-50 rounded-lg transition-colors cursor-pointer">
-                      <div className="flex items-center gap-3">
-                        <div className="h-8 w-8 rounded-full bg-accent/10 flex items-center justify-center text-accent font-bold text-xs">
-                          {contact.name[0]}
-                        </div>
-                        <div>
-                          <div className="text-xs font-bold text-primary">{contact.name}</div>
-                          <div className="text-[9px] text-muted-foreground">{contact.pipeline_stage.replace('_', ' ')}</div>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-[10px] font-bold">${(contact.estimated_commission / 1000).toFixed(1)}k</div>
-                        <Badge className="bg-accent text-white h-4 text-[8px]">{contact.icpScore}</Badge>
-                      </div>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-
-              <Card className="shadow-md bg-accent text-white">
-                <CardHeader>
-                  <CardTitle className="text-sm font-bold flex items-center gap-2">
-                    <Sparkles className="h-4 w-4" />
-                    AI Intelligence
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="bg-white/10 p-3 rounded-xl border border-white/10 text-xs italic">
-                    "Monica, your connect rate is 18% higher when calling Expired leads on Tuesday mornings between 9am and 11am. Adjust your block time for better ROI."
-                  </div>
-                  <div className="bg-white/10 p-3 rounded-xl border border-white/10 text-xs italic">
-                    "Sarah Johnson's sentiment score increased by 40% after the latest SMS. She is ready for a listing presentation ask."
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
           </main>
         </SidebarInset>
       </div>
     </SidebarProvider>
   );
+}
+
+function Separator() {
+  return <div className="h-px bg-slate-200 w-full" />
 }
