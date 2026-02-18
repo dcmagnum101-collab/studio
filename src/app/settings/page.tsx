@@ -122,7 +122,7 @@ export default function SettingsPage() {
                           <div className="text-sm font-medium">4,281 Restricted Numbers</div>
                         </div>
                       </div>
-                      <Button variant="ghost" size="sm" className="text-xs font-bold">Update List</Badge>
+                      <Button variant="ghost" size="sm" className="text-xs font-bold">Update List</Button>
                     </div>
                   </CardContent>
                 </Card>
@@ -155,7 +155,7 @@ export default function SettingsPage() {
                         <Label className="text-xs font-bold uppercase">Briefing Time (PST)</Label>
                         <select className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm">
                           <option>07:00 AM</option>
-                          <option selected>08:00 AM</option>
+                          <option defaultValue="08:00 AM">08:00 AM</option>
                           <option>09:00 AM</option>
                         </select>
                       </div>
@@ -164,7 +164,7 @@ export default function SettingsPage() {
                         <select className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm">
                           <option>Email Only</option>
                           <option>SMS Only</option>
-                          <option selected>Email & Dashboard</option>
+                          <option defaultValue="Email & Dashboard">Email & Dashboard</option>
                         </select>
                       </div>
                     </div>
