@@ -8,18 +8,6 @@ service cloud.firestore {
      * Core Philosophy:
      * This ruleset enforces a strict user-ownership model where all data is private by default. 
      * Access is granted based on the user's authenticated UID matching the path's userId wildcard.
-     *
-     * Data Structure:
-     * All data entities (Contacts, LeadSources, and Logs) are hierarchically organized under 
-     * the path /users/{userId}/. This ensures logical and physical segregation of data per user.
-     *
-     * Key Security Decisions:
-     * 1. Authorization Independence: We use denormalized 'ownerId' and parent IDs (e.g., 'contactId') 
-     *    directly on documents. This allows for fast, non-recursive security checks without calling get().
-     * 2. Prototyping Mode: Schema validation (types, required fields) is omitted to allow for rapid 
-     *    frontend iteration, focusing strictly on authorization and relational integrity.
-     * 3. Relational Integrity: On creation, rules enforce that internal fields like 'ownerId' match 
-     *    the path segment. On update, these fields are made immutable to prevent data hijacking.
      */
 
     // --- Helper Functions ---
@@ -49,105 +37,78 @@ service cloud.firestore {
       return request.resource.data.ownerId == resource.data.ownerId;
     }
 
-    /** Validates relational consistency for contacts. */
-    function isValidContactRelation(contactId) {
-      return request.resource.data.contactId == contactId;
-    }
-
-    /** Validates relational consistency for lead sources. */
-    function isValidLeadSourceRelation(leadSourceId) {
-      return request.resource.data.leadSourceId == leadSourceId;
-    }
-
     // --- Collection Rules ---
 
-    /**
-     * @description Rules for the Contact entity.
-     * @path /users/{userId}/contacts/{contactId}
-     * @allow (create) Signed-in user 'abc' creating contact in /users/abc/contacts/def with ownerId: 'abc'.
-     * @deny (list) User 'abc' attempting to list /users/xyz/contacts.
-     * @principle Path-based ownership with relational integrity validation on the denormalized ownerId.
-     */
+    /** Master contact records. */
     match /users/{userId}/contacts/{contactId} {
       allow get, list: if isOwner(userId);
       allow create: if isOwner(userId) && isValidOwnerField(userId);
       allow update: if isExistingOwner(userId) && isOwnerImmutable();
       allow delete: if isExistingOwner(userId);
 
-      /**
-       * @description Records details of voice calls for a specific contact.
-       * @path /users/{userId}/contacts/{contactId}/callLogs/{callLogId}
-       * @allow (update) Owner updating a log while preserving ownerId and contactId.
-       * @deny (create) User 'abc' creating log with contactId: 'mismatch'.
-       * @principle Ensures nested data remains linked to the correct parent and user.
-       */
-      match /callLogs/{callLogId} {
+      /** Interaction history for a contact. */
+      match /activityLogs/{logId} {
         allow get, list: if isOwner(userId);
-        allow create: if isOwner(userId) && isValidOwnerField(userId) && isValidContactRelation(contactId);
-        allow update: if isExistingOwner(userId) && isOwnerImmutable() && request.resource.data.contactId == resource.data.contactId;
+        allow create: if isOwner(userId) && isValidOwnerField(userId);
+        allow update: if isExistingOwner(userId) && isOwnerImmutable();
         allow delete: if isExistingOwner(userId);
       }
-
-      /**
-       * @description Records details of outreach emails for a specific contact.
-       * @path /users/{userId}/contacts/{contactId}/emailLogs/{emailLogId}
-       * @allow (get) Owner retrieving a specific email record.
-       * @deny (update) Attempting to change the contactId associated with the log.
-       * @principle Enforces immutability of parent relationships for audit integrity.
-       */
-      match /emailLogs/{emailLogId} {
-        allow get, list: if isOwner(userId);
-        allow create: if isOwner(userId) && isValidOwnerField(userId) && isValidContactRelation(contactId);
-        allow update: if isExistingOwner(userId) && isOwnerImmutable() && request.resource.data.contactId == resource.data.contactId;
-        allow delete: if isExistingOwner(userId);
-      }
-
-      /**
-       * @description Records details of SMS messages for a specific contact.
-       * @path /users/{userId}/contacts/{contactId}/smsLogs/{smsLogId}
-       * @allow (create) Owner sending/logging a new SMS for their contact.
-       * @deny (delete) Unauthorized user attempting to remove logs from another's tree.
-       */
-      match /smsLogs/{smsLogId} {
-        allow get, list: if isOwner(userId);
-        allow create: if isOwner(userId) && isValidOwnerField(userId) && isValidContactRelation(contactId);
-        allow update: if isExistingOwner(userId) && isOwnerImmutable() && request.resource.data.contactId == resource.data.contactId;
-        allow delete: if isExistingOwner(userId);
-      }
+      
+      // Supporting legacy log paths
+      match /callLogs/{logId} { allow read, write: if isOwner(userId); }
+      match /emailLogs/{logId} { allow read, write: if isOwner(userId); }
+      match /smsLogs/{logId} { allow read, write: if isOwner(userId); }
     }
 
-    /**
-     * @description Rules for the LeadSource entity.
-     * @path /users/{userId}/leadSources/{leadSourceId}
-     * @allow (list) Owner viewing their integrated sources (e.g., Vulcan7).
-     * @deny (create) User 'abc' providing an ownerId of 'xyz'.
-     * @principle Path-based ownership for lead origin management.
-     */
+    /** CRM tasks. */
+    match /users/{userId}/tasks/{taskId} {
+      allow get, list: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidOwnerField(userId);
+      allow update: if isExistingOwner(userId) && isOwnerImmutable();
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /** Scheduled events. */
+    match /users/{userId}/appointments/{appointmentId} {
+      allow get, list: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidOwnerField(userId);
+      allow update: if isExistingOwner(userId) && isOwnerImmutable();
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /** Saved geographic prospecting zones. */
+    match /users/{userId}/farmZones/{zoneId} {
+      allow get, list: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidOwnerField(userId);
+      allow update: if isExistingOwner(userId) && isOwnerImmutable();
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /** Open house event records. */
+    match /users/{userId}/openHouses/{eventId} {
+      allow get, list: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidOwnerField(userId);
+      allow update: if isExistingOwner(userId) && isOwnerImmutable();
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /** Daily AI-generated briefing records. */
+    match /users/{userId}/morningBriefings/{briefingId} {
+      allow get, list: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidOwnerField(userId);
+      allow update: if isExistingOwner(userId) && isOwnerImmutable();
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /** Lead sources integration. */
     match /users/{userId}/leadSources/{leadSourceId} {
       allow get, list: if isOwner(userId);
       allow create: if isOwner(userId) && isValidOwnerField(userId);
       allow update: if isExistingOwner(userId) && isOwnerImmutable();
       allow delete: if isExistingOwner(userId);
-
-      /**
-       * @description Stores integration settings (API keys, webhooks) for a lead source.
-       * @path /users/{userId}/leadSources/{leadSourceId}/configuration/{configId}
-       * @allow (update) Owner updating their webhook URL.
-       * @deny (create) Configuration not containing the correct leadSourceId.
-       * @principle Singleton configuration subcollection with strict parent-linkage.
-       */
-      match /configuration/{configId} {
-        allow get, list: if isOwner(userId);
-        allow create: if isOwner(userId) && isValidOwnerField(userId) && isValidLeadSourceRelation(leadSourceId);
-        allow update: if isExistingOwner(userId) && isOwnerImmutable() && request.resource.data.leadSourceId == resource.data.leadSourceId;
-        allow delete: if isExistingOwner(userId);
-      }
     }
 
-    /**
-     * Global Deny
-     * Ensures any path not explicitly matched above is closed.
-     */
+    /** Global Deny */
     match /{document=**} {
       allow read, write: if false;
     }
