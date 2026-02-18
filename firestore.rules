@@ -39,73 +39,73 @@ service cloud.firestore {
 
     // --- Collection Rules ---
 
-    /** Master contact records. */
-    match /users/{userId}/contacts/{contactId} {
-      allow get, list: if isOwner(userId);
-      allow create: if isOwner(userId) && isValidOwnerField(userId);
-      allow update: if isExistingOwner(userId) && isOwnerImmutable();
-      allow delete: if isExistingOwner(userId);
+    /** User Document */
+    match /users/{userId} {
+      allow get: if isOwner(userId);
 
-      /** Interaction history for a contact. */
-      match /activityLogs/{logId} {
-        allow get, list: if isOwner(userId);
+      /** Master contact records. */
+      match /contacts/{contactId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidOwnerField(userId);
+        allow update: if isExistingOwner(userId) && isOwnerImmutable();
+        allow delete: if isExistingOwner(userId);
+
+        /** Interaction history for a contact. */
+        match /activityLogs/{logId} {
+          allow read: if isOwner(userId);
+          allow create: if isOwner(userId) && isValidOwnerField(userId);
+          allow update: if isExistingOwner(userId) && isOwnerImmutable();
+          allow delete: if isExistingOwner(userId);
+        }
+      }
+
+      /** CRM tasks. */
+      match /tasks/{taskId} {
+        allow read: if isOwner(userId);
         allow create: if isOwner(userId) && isValidOwnerField(userId);
         allow update: if isExistingOwner(userId) && isOwnerImmutable();
         allow delete: if isExistingOwner(userId);
       }
-      
-      // Supporting legacy log paths
-      match /callLogs/{logId} { allow read, write: if isOwner(userId); }
-      match /emailLogs/{logId} { allow read, write: if isOwner(userId); }
-      match /smsLogs/{logId} { allow read, write: if isOwner(userId); }
-    }
 
-    /** CRM tasks. */
-    match /users/{userId}/tasks/{taskId} {
-      allow get, list: if isOwner(userId);
-      allow create: if isOwner(userId) && isValidOwnerField(userId);
-      allow update: if isExistingOwner(userId) && isOwnerImmutable();
-      allow delete: if isExistingOwner(userId);
-    }
+      /** Scheduled events. */
+      match /appointments/{appointmentId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidOwnerField(userId);
+        allow update: if isExistingOwner(userId) && isOwnerImmutable();
+        allow delete: if isExistingOwner(userId);
+      }
 
-    /** Scheduled events. */
-    match /users/{userId}/appointments/{appointmentId} {
-      allow get, list: if isOwner(userId);
-      allow create: if isOwner(userId) && isValidOwnerField(userId);
-      allow update: if isExistingOwner(userId) && isOwnerImmutable();
-      allow delete: if isExistingOwner(userId);
-    }
+      /** Saved geographic prospecting zones. */
+      match /farmZones/{zoneId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidOwnerField(userId);
+        allow update: if isExistingOwner(userId) && isOwnerImmutable();
+        allow delete: if isExistingOwner(userId);
+      }
 
-    /** Saved geographic prospecting zones. */
-    match /users/{userId}/farmZones/{zoneId} {
-      allow get, list: if isOwner(userId);
-      allow create: if isOwner(userId) && isValidOwnerField(userId);
-      allow update: if isExistingOwner(userId) && isOwnerImmutable();
-      allow delete: if isExistingOwner(userId);
-    }
+      /** Open house event records. */
+      match /openHouses/{eventId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidOwnerField(userId);
+        allow update: if isExistingOwner(userId) && isOwnerImmutable();
+        allow delete: if isExistingOwner(userId);
+      }
 
-    /** Open house event records. */
-    match /users/{userId}/openHouses/{eventId} {
-      allow get, list: if isOwner(userId);
-      allow create: if isOwner(userId) && isValidOwnerField(userId);
-      allow update: if isExistingOwner(userId) && isOwnerImmutable();
-      allow delete: if isExistingOwner(userId);
-    }
+      /** Daily AI-generated briefing records. */
+      match /morningBriefings/{briefingId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidOwnerField(userId);
+        allow update: if isExistingOwner(userId) && isOwnerImmutable();
+        allow delete: if isExistingOwner(userId);
+      }
 
-    /** Daily AI-generated briefing records. */
-    match /users/{userId}/morningBriefings/{briefingId} {
-      allow get, list: if isOwner(userId);
-      allow create: if isOwner(userId) && isValidOwnerField(userId);
-      allow update: if isExistingOwner(userId) && isOwnerImmutable();
-      allow delete: if isExistingOwner(userId);
-    }
-
-    /** Lead sources integration. */
-    match /users/{userId}/leadSources/{leadSourceId} {
-      allow get, list: if isOwner(userId);
-      allow create: if isOwner(userId) && isValidOwnerField(userId);
-      allow update: if isExistingOwner(userId) && isOwnerImmutable();
-      allow delete: if isExistingOwner(userId);
+      /** Lead sources integration. */
+      match /leadSources/{leadSourceId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidOwnerField(userId);
+        allow update: if isExistingOwner(userId) && isOwnerImmutable();
+        allow delete: if isExistingOwner(userId);
+      }
     }
 
     /** Global Deny */
