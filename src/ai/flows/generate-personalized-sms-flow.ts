@@ -1,11 +1,6 @@
-
 'use server';
 /**
  * @fileOverview A Genkit flow for generating personalized SMS messages for potential sellers.
- *
- * - generatePersonalizedSMS - A function that handles the generation of personalized SMS messages.
- * - GeneratePersonalizedSMSInput - The input type for the generatePersonalizedSMS function.
- * - GeneratePersonalizedSMSOutput - The return type for the generatePersonalizedSMS function.
  */
 
 import {ai} from '@/ai/genkit';
@@ -49,6 +44,15 @@ const prompt = ai.definePrompt({
   name: 'generatePersonalizedSMSPrompt',
   input: {schema: GeneratePersonalizedSMSInputSchema},
   output: {schema: GeneratePersonalizedSMSOutputSchema},
+  config: {
+    safetySettings: [
+      { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
+      { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
+      { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
+      { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
+      { category: 'HARM_CATEGORY_CIVIC_INTEGRITY', threshold: 'BLOCK_NONE' },
+    ],
+  },
   prompt: `You are a sales agent generating a personalized SMS message for a potential seller.
 Your goal is to create a concise, polite, and effective message that encourages them to engage.
 Address the contact by their name if available.

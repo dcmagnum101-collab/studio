@@ -1,10 +1,6 @@
 'use server';
 /**
  * @fileOverview A Genkit flow for generating personalized outreach emails to potential sellers.
- *
- * - generatePersonalizedEmail - A function that handles the email generation process.
- * - GeneratePersonalizedEmailInput - The input type for the generatePersonalizedEmail function.
- * - GeneratePersonalizedEmailOutput - The return type for the generatePersonalizedEmail function.
  */
 
 import {ai} from '@/ai/genkit';
@@ -42,6 +38,15 @@ const personalizedEmailPrompt = ai.definePrompt({
   name: 'personalizedEmailPrompt',
   input: {schema: GeneratePersonalizedEmailInputSchema},
   output: {schema: GeneratePersonalizedEmailOutputSchema},
+  config: {
+    safetySettings: [
+      { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
+      { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
+      { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
+      { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
+      { category: 'HARM_CATEGORY_CIVIC_INTEGRITY', threshold: 'BLOCK_NONE' },
+    ],
+  },
   prompt: `You are an expert sales agent for a company named '{{{companyName}}}' specializing in buying properties directly from sellers.
 Your goal is to write a highly personalized, warm, and professional outreach email to a potential seller to gauge their interest in selling their property.
 

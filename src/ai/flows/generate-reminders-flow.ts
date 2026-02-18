@@ -1,4 +1,3 @@
-
 'use server';
 /**
  * @fileOverview A Genkit flow for generating automated follow-up tasks based on CRM activity.
@@ -38,6 +37,15 @@ const generateRemindersPrompt = ai.definePrompt({
   name: 'generateRemindersPrompt',
   input: {schema: GenerateRemindersInputSchema},
   output: {schema: GenerateRemindersOutputSchema},
+  config: {
+    safetySettings: [
+      { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
+      { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
+      { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
+      { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
+      { category: 'HARM_CATEGORY_CIVIC_INTEGRITY', threshold: 'BLOCK_NONE' },
+    ],
+  },
   prompt: `You are Monica Selvaggio's AI sales manager. Based on the latest activity with {{{contactName}}}, suggest the ideal follow-up tasks.
 
 Contact Context:
