@@ -1,11 +1,10 @@
-
 "use client"
 
 import React, { useState, useEffect } from "react"
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/layout/app-sidebar"
-import { MOCK_APPOINTMENTS, MOCK_TASKS, Appointment, Task } from "@/lib/mock-data"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { MOCK_APPOINTMENTS, MOCK_TASKS } from "@/lib/mock-data"
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { 
@@ -64,7 +63,7 @@ export default function CalendarPage() {
             <div className="ml-auto flex items-center gap-4">
               <div className="flex items-center bg-slate-100 rounded-lg p-1">
                 <Button 
-                  variant={view === 'month' ? 'white' : 'ghost'} 
+                  variant={view === 'month' ? 'secondary' : 'ghost'} 
                   size="sm" 
                   className={`text-xs h-8 ${view === 'month' ? 'bg-white shadow-sm' : ''}`}
                   onClick={() => setView('month')}
@@ -72,7 +71,7 @@ export default function CalendarPage() {
                   Month
                 </Button>
                 <Button 
-                  variant={view === 'week' ? 'white' : 'ghost'} 
+                  variant={view === 'week' ? 'secondary' : 'ghost'} 
                   size="sm" 
                   className={`text-xs h-8 ${view === 'week' ? 'bg-white shadow-sm' : ''}`}
                   onClick={() => setView('week')}
@@ -80,7 +79,7 @@ export default function CalendarPage() {
                   Week
                 </Button>
                 <Button 
-                  variant={view === 'day' ? 'white' : 'ghost'} 
+                  variant={view === 'day' ? 'secondary' : 'ghost'} 
                   size="sm" 
                   className={`text-xs h-8 ${view === 'day' ? 'bg-white shadow-sm' : ''}`}
                   onClick={() => setView('day')}

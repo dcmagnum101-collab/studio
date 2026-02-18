@@ -1,10 +1,9 @@
-
 "use client"
 
 import { useState, useEffect } from "react";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/app-sidebar";
-import { KPI_STATS, MOCK_TASKS, MOCK_APPOINTMENTS, MOCK_CONTACTS } from "@/lib/mock-data";
+import { KPI_STATS, MOCK_TASKS } from "@/lib/mock-data";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { 
   Users, 
@@ -14,14 +13,12 @@ import {
   Clock, 
   Activity, 
   CheckCircle,
-  Calendar,
   Sparkles,
   ArrowRight,
-  Flame,
-  Trello,
   Smartphone,
   ShieldCheck,
-  Zap
+  Zap,
+  Trello
 } from "lucide-react";
 import { 
   BarChart, 
@@ -79,7 +76,7 @@ export default function DashboardPage() {
                         {stat.label}
                       </CardTitle>
                       <div className="p-2 bg-secondary rounded-lg">
-                        <Icon className="h-4 w-4 text-primary" />
+                        {Icon && <Icon className="h-4 w-4 text-primary" />}
                       </div>
                     </CardHeader>
                     <CardContent>
@@ -164,7 +161,7 @@ export default function DashboardPage() {
                     <span className="text-muted-foreground">Safe Call Windows</span>
                     <span className="font-bold">8am - 8pm</span>
                   </div>
-                  <Separator />
+                  <div className="h-px bg-slate-200 w-full" />
                   <div className="space-y-2">
                     <p className="text-[10px] text-muted-foreground font-medium">Automatic DNC scrubbing is active for all ArchAgent data streams.</p>
                     <Button variant="outline" className="w-full text-xs h-8">View DNC Policy</Button>
@@ -256,8 +253,4 @@ export default function DashboardPage() {
       </div>
     </SidebarProvider>
   );
-}
-
-function Separator() {
-  return <div className="h-px bg-slate-200 w-full" />
 }

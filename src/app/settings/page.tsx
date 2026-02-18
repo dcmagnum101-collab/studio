@@ -1,4 +1,3 @@
-
 "use client"
 
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
@@ -10,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Database, Link2, Globe, FileUp, ShieldCheck, Sparkles, Clock, Mail } from "lucide-react";
+import { Database, Globe, ShieldCheck, Sparkles, Clock, Mail, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function SettingsPage() {
@@ -123,7 +122,7 @@ export default function SettingsPage() {
                           <div className="text-sm font-medium">4,281 Restricted Numbers</div>
                         </div>
                       </div>
-                      <Button variant="ghost" size="sm" className="text-xs font-bold">Update List</Button>
+                      <Button variant="ghost" size="sm" className="text-xs font-bold">Update List</Badge>
                     </div>
                   </CardContent>
                 </Card>
