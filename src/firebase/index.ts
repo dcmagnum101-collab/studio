@@ -5,7 +5,7 @@
  * Exports are structured to avoid circular dependencies during build.
  */
 
-export * from './init';
+export { initializeFirebase } from './init';
 export { 
   FirebaseProvider, 
   useFirebase, 
