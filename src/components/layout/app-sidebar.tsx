@@ -11,7 +11,10 @@ import {
   PieChart,
   LogOut,
   Sparkles,
-  Map
+  Map,
+  Trello,
+  CheckSquare,
+  CalendarDays
 } from "lucide-react"
 
 import {
@@ -30,6 +33,9 @@ import { usePathname } from "next/navigation"
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
   { name: "Prospector", href: "/contacts", icon: Users },
+  { name: "Pipeline", href: "/pipeline", icon: Trello },
+  { name: "Tasks", href: "/tasks", icon: CheckSquare },
+  { name: "Calendar", href: "/calendar", icon: CalendarDays },
   { name: "Farm Zones", href: "/farm", icon: Map },
   { name: "Outreach Builder", href: "/outreach", icon: Sparkles },
   { name: "Analytics", href: "/analytics", icon: PieChart },

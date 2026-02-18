@@ -3,7 +3,7 @@
   "entities": {
     "Contact": {
       "title": "Contact",
-      "description": "A potential real estate seller lead with ArchAgent intelligence.",
+      "description": "A real estate lead with full CRM relationship data.",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
@@ -17,66 +17,71 @@
         "zip": { "type": "string" },
         "motivation": { "type": "string" },
         "icpScore": { "type": "number" },
+        "pipeline_stage": {
+          "type": "string",
+          "enum": ["new_lead", "attempted_contact", "conversation_had", "follow_up_scheduled", "appointment_set", "appointment_completed", "listing_agreement_sent", "listed", "under_contract", "closed", "not_interested", "dnc", "long_term_nurture"]
+        },
+        "ai_urgency": { "type": "string", "enum": ["hot", "warm", "cold", "nurture"] },
+        "ai_sentiment": { "type": "string", "enum": ["positive", "neutral", "negative"] },
+        "ai_summary": { "type": "string" },
+        "ai_next_best_action": { "type": "string" },
+        "total_calls": { "type": "number" },
+        "total_conversations": { "type": "number" },
+        "last_call_date": { "type": "string", "format": "date-time" },
+        "estimated_commission": { "type": "number" },
         "archagent_source": {
           "type": "string",
           "enum": ["fsbo", "expired", "frbo", "preforeclosure", "circle_prospect", "recommended", "manual"]
         },
         "archagent_tags": {
           "type": "array",
-          "items": { "type": "string", "enum": ["absentee_owner", "high_equity", "free_and_clear", "empty_nester", "mover_upper", "out_of_state_owner"] }
+          "items": { "type": "string" }
         },
-        "likely_to_list_score": { "type": "number" },
-        "likely_to_lead_score": { "type": "number" },
-        "likely_to_contact_score": { "type": "number" },
-        "days_on_market": { "type": "number" },
-        "days_since_expired": { "type": "number" },
-        "preforeclosure_status": { "type": "string" },
-        "auction_date": { "type": "string", "format": "date-time" },
-        "property_sqft": { "type": "number" },
-        "property_beds": { "type": "number" },
-        "property_baths": { "type": "number" },
-        "property_type": { "type": "string", "enum": ["single_family", "condo", "multi_family", "townhouse", "other"] },
-        "loan_to_value": { "type": "number" },
-        "outreach_sequence": { "type": "string" },
-        "sequence_step": { "type": "number" },
-        "sequence_next_date": { "type": "string", "format": "date-time" },
-        "status": { "type": "string", "enum": ["Lead", "Contacted", "Meeting Set", "Closed", "Urgent", "DNC"] },
-        "source": { "type": "string" },
         "created_at": { "type": "string", "format": "date-time" }
       }
     },
-    "FarmZone": {
-      "title": "Farm Zone",
-      "description": "A geographic area defined for lead prospecting.",
+    "CallLog": {
+      "title": "Call Log",
+      "description": "Historical record of a voice interaction.",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
-        "name": { "type": "string" },
-        "center_address": { "type": "string" },
-        "radius_miles": { "type": "number" },
-        "zip_codes": { "type": "array", "items": { "type": "string" } },
-        "active": { "type": "boolean" },
-        "total_contacts": { "type": "number" },
-        "last_pulled_at": { "type": "string", "format": "date-time" }
+        "contact_id": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "duration_seconds": { "type": "number" },
+        "outcome": { "type": "string" },
+        "transcript": { "type": "string" },
+        "summary": { "type": "string" },
+        "sentiment": { "type": "string" }
       }
     },
-    "MorningBriefing": {
-      "title": "Morning Briefing",
-      "description": "Daily AI-generated pipeline summary.",
+    "Task": {
+      "title": "Task",
+      "description": "An actionable item or reminder.",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
-        "date": { "type": "string", "format": "date" },
-        "generated_at": { "type": "string", "format": "date-time" },
-        "briefing_text": { "type": "string" },
-        "fresh_expireds_count": { "type": "number" },
-        "fresh_fsbos_count": { "type": "number" },
-        "fresh_frbo_count": { "type": "number" },
-        "preforeclosure_count": { "type": "number" },
-        "recommended_count": { "type": "number" },
-        "circle_prospects_count": { "type": "number" },
-        "top_priority_contact_id": { "type": "string" },
-        "top_priority_reason": { "type": "string" }
+        "contact_id": { "type": "string" },
+        "type": { "type": "string", "enum": ["call", "email", "sms", "appointment", "follow_up", "custom"] },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "priority": { "type": "string", "enum": ["urgent", "high", "normal", "low"] },
+        "status": { "type": "string", "enum": ["pending", "completed", "snoozed"] },
+        "due_date": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Appointment": {
+      "title": "Appointment",
+      "description": "A scheduled meeting or consultation.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "contact_id": { "type": "string" },
+        "title": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "duration_minutes": { "type": "number" },
+        "type": { "type": "string" },
+        "status": { "type": "string" }
       }
     }
   },
@@ -86,15 +91,19 @@
   "firestore": {
     "/contacts/{contactId}": {
       "schema": "Contact",
-      "description": "Individual lead records."
+      "description": "CRM Contact records."
     },
-    "/farm_zones/{zoneId}": {
-      "schema": "FarmZone",
-      "description": "Saved geographic farm zones."
+    "/call_logs/{logId}": {
+      "schema": "CallLog",
+      "description": "Call history."
     },
-    "/morning_briefings/{briefingId}": {
-      "schema": "MorningBriefing",
-      "description": "Daily system briefings."
+    "/tasks/{taskId}": {
+      "schema": "Task",
+      "description": "To-do items."
+    },
+    "/appointments/{apptId}": {
+      "schema": "Appointment",
+      "description": "Scheduled events."
     }
   }
 }
