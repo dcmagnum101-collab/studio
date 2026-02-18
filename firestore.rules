@@ -1,12 +1,14 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Monica AI Hub - COMPLETELY UNRESTRICTED ACCESS
-    // This is a private app for a single user. 
-    // Security is disabled to ensure zero friction for all data operations.
-    // Redeploy Trigger: 2024-05-22T12:00:00Z
+    // Re-establish secure per-user data access
+    match /users/{userId}/{allPaths=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Fallback for general access if needed, though scoped above is preferred
     match /{document=**} {
-      allow read, write: if true;
+      allow read, write: if request.auth != null && request.auth.uid == 'RZ0vqKV5BgZjJmWGwF9npV08TDd2';
     }
   }
 }

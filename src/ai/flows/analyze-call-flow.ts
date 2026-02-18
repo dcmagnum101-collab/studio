@@ -33,15 +33,6 @@ const analyzeCallPrompt = ai.definePrompt({
   name: 'analyzeCallPrompt',
   input: {schema: AnalyzeCallInputSchema},
   output: {schema: AnalyzeCallOutputSchema},
-  config: {
-    safetySettings: [
-      { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
-      { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
-      { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
-      { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
-      { category: 'HARM_CATEGORY_CIVIC_INTEGRITY', threshold: 'BLOCK_NONE' },
-    ],
-  },
   prompt: `You are an expert real estate sales coach analyzing a call made by Monica Selvaggio to a potential seller named {{{contactName}}}.
 
 Call transcript: {{{transcript}}}
