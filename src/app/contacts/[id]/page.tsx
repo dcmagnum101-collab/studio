@@ -1,4 +1,3 @@
-
 "use client"
 
 import React, { useState, useEffect } from "react"
@@ -39,7 +38,7 @@ export default function ContactProfilePage() {
     setMounted(true);
   }, []);
 
-  if (!contact) return <div className="p-8">Contact not found</div>;
+  if (!contact) return <div className="p-8 text-center text-slate-400">Loading contact profile...</div>;
 
   const sentimentColors = {
     positive: 'bg-green-500',

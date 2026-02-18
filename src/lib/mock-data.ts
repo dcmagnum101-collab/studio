@@ -1,4 +1,3 @@
-
 export type ArchAgentSource = "fsbo" | "expired" | "frbo" | "preforeclosure" | "circle_prospect" | "recommended" | "manual" | "probate" | "open_house" | "social_capture" | "gis_import";
 export type ArchAgentTag = "absentee_owner" | "high_equity" | "free_and_clear" | "empty_nester" | "mover_upper" | "out_of_state_owner" | "estate_sale" | "probate_lead" | "almost_lead" | "ghost_lead";
 export type PropertyType = "single_family" | "condo" | "multi_family" | "townhouse" | "other";
