@@ -7,7 +7,7 @@ import { Auth, User, onAuthStateChanged } from 'firebase/auth';
 import { errorEmitter } from './error-emitter';
 import { FirestorePermissionError } from './errors';
 
-// Inline Error Listener to avoid circular dependency with components
+// Inline Error Listener component to handle global permission errors
 function FirebaseErrorListener() {
   const [error, setError] = useState<FirestorePermissionError | null>(null);
 
@@ -17,7 +17,9 @@ function FirebaseErrorListener() {
     return () => errorEmitter.off('permission-error', handleError);
   }, []);
 
-  if (error) throw error;
+  if (error) {
+    throw error;
+  }
   return null;
 }
 
@@ -40,12 +42,12 @@ export interface FirebaseContextState {
 
 export const FirebaseContext = createContext<FirebaseContextState | undefined>(undefined);
 
-export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
+export function FirebaseProvider({
   children,
   firebaseApp,
   firestore,
   auth,
-}) => {
+}: FirebaseProviderProps) {
   const [userState, setUserState] = useState<{ user: User | null; loading: boolean; error: Error | null }>({
     user: null,
     loading: true,
@@ -77,7 +79,7 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
       {children}
     </FirebaseContext.Provider>
   );
-};
+}
 
 export const useFirebase = () => {
   const context = useContext(FirebaseContext);
@@ -85,13 +87,29 @@ export const useFirebase = () => {
   return context;
 };
 
-export const useAuth = () => useFirebase().auth!;
-export const useFirestore = () => useFirebase().firestore!;
-export const useFirebaseApp = () => useFirebase().firebaseApp!;
+export const useAuth = () => {
+  const { auth } = useFirebase();
+  if (!auth) throw new Error('Auth service not available');
+  return auth;
+};
+
+export const useFirestore = () => {
+  const { firestore } = useFirebase();
+  if (!firestore) throw new Error('Firestore service not available');
+  return firestore;
+};
+
+export const useFirebaseApp = () => {
+  const { firebaseApp } = useFirebase();
+  if (!firebaseApp) throw new Error('Firebase app not available');
+  return firebaseApp;
+};
 
 export function useMemoFirebase<T>(factory: () => T, deps: DependencyList): T & { __memo?: boolean } {
   const memoized = useMemo(factory, deps);
-  if (memoized && typeof memoized === 'object') (memoized as any).__memo = true;
+  if (memoized && typeof memoized === 'object') {
+    (memoized as any).__memo = true;
+  }
   return memoized as any;
 }
 
