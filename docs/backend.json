@@ -1,94 +1,475 @@
-
 {
   "entities": {
     "Contact": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Contact",
-      "description": "A real estate lead with full CRM relationship data.",
       "type": "object",
+      "description": "Represents a potential seller or lead in the Monica AI Hub, holding their personal, property, and engagement details.",
       "properties": {
-        "id": { "type": "string" },
-        "name": { "type": "string" },
-        "email": { "type": "string", "format": "email" },
-        "phone": { "type": "string" },
-        "propertyAddress": { "type": "string" },
-        "motivation": { "type": "string" },
-        "icpScore": { "type": "number" },
-        "pipeline_stage": {
+        "id": {
           "type": "string",
-          "enum": ["new_lead", "attempted_contact", "conversation_had", "follow_up_scheduled", "appointment_set", "appointment_completed", "listing_agreement_sent", "listed", "under_contract", "closed", "not_interested", "dnc", "long_term_nurture"]
+          "description": "Unique identifier for the Contact entity."
         },
-        "ai_urgency": { "type": "string", "enum": ["hot", "warm", "cold", "nurture"] },
-        "ai_sentiment": { "type": "string", "enum": ["positive", "neutral", "negative"] },
-        "archagent_source": {
+        "firstName": {
           "type": "string",
-          "enum": ["fsbo", "expired", "frbo", "preforeclosure", "circle_prospect", "recommended", "manual", "probate", "open_house", "social_capture", "gis_import"]
+          "description": "The first name of the contact."
         },
-        "archagent_tags": {
-          "type": "array",
-          "items": { "type": "string" }
+        "lastName": {
+          "type": "string",
+          "description": "The last name of the contact."
         },
-        "likely_to_list_score": { "type": "number" },
-        "estimated_commission": { "type": "number" },
-        "created_at": { "type": "string", "format": "date-time" }
-      }
+        "email": {
+          "type": "string",
+          "description": "The email address of the contact.",
+          "format": "email"
+        },
+        "phone": {
+          "type": "string",
+          "description": "The primary phone number of the contact."
+        },
+        "addressStreet": {
+          "type": "string",
+          "description": "The street address of the contact's mailing address."
+        },
+        "addressCity": {
+          "type": "string",
+          "description": "The city of the contact's mailing address."
+        },
+        "addressState": {
+          "type": "string",
+          "description": "The state or province of the contact's mailing address."
+        },
+        "addressZipCode": {
+          "type": "string",
+          "description": "The postal code of the contact's mailing address."
+        },
+        "addressCountry": {
+          "type": "string",
+          "description": "The country of the contact's mailing address."
+        },
+        "propertyAddressStreet": {
+          "type": "string",
+          "description": "The street address of the property the contact is selling or might sell."
+        },
+        "propertyAddressCity": {
+          "type": "string",
+          "description": "The city of the property the contact is selling or might sell."
+        },
+        "propertyAddressState": {
+          "type": "string",
+          "description": "The state or province of the property the contact is selling or might sell."
+        },
+        "propertyAddressZipCode": {
+          "type": "string",
+          "description": "The postal code of the property the contact is selling or might sell."
+        },
+        "propertyAddressCountry": {
+          "type": "string",
+          "description": "The country of the property the contact is selling or might sell."
+        },
+        "status": {
+          "type": "string",
+          "description": "The current engagement status of the contact (e.g., 'New', 'Engaged', 'Disqualified', 'Converted')."
+        },
+        "icpScore": {
+          "type": "number",
+          "description": "An Ideal Customer Profile (ICP) score, indicating the contact's priority for outreach."
+        },
+        "dncStatus": {
+          "type": "boolean",
+          "description": "Indicates if the contact is on the Do Not Call (DNC) list."
+        },
+        "lastContactedDate": {
+          "type": "string",
+          "description": "Timestamp of the last time this contact was reached out to.",
+          "format": "date-time"
+        },
+        "nextFollowUpDate": {
+          "type": "string",
+          "description": "Timestamp for the planned next follow-up with this contact.",
+          "format": "date-time"
+        },
+        "leadSourceId": {
+          "type": "string",
+          "description": "Reference to the LeadSource entity from which this contact originated. (Relationship: LeadSource 1:N Contact)"
+        },
+        "sellerMotivation": {
+          "type": "string",
+          "description": "Details about the seller's motivation for selling, used by AI for personalized outreach."
+        },
+        "notes": {
+          "type": "string",
+          "description": "General notes or additional information about the contact."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the contact record was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when the contact record was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "firstName",
+        "lastName",
+        "email",
+        "phone",
+        "status",
+        "icpScore",
+        "dncStatus",
+        "leadSourceId",
+        "createdAt"
+      ]
     },
-    "ProbateLead": {
-      "title": "Probate Lead",
-      "description": "Legal lead from court filings.",
+    "LeadSource": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "LeadSource",
       "type": "object",
+      "description": "Defines the origin of contact leads, such as ArchAgent, Vulcan7, or manual entry.",
       "properties": {
-        "id": { "type": "string" },
-        "case_number": { "type": "string" },
-        "decedent_name": { "type": "string" },
-        "filing_date": { "type": "string", "format": "date" },
-        "property_address": { "type": "string" },
-        "est_value": { "type": "number" },
-        "status": { "type": "string" }
-      }
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the LeadSource entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "The human-readable name of the lead source (e.g., 'ArchAgent', 'Vulcan7', 'Manual Entry', 'CSV Import')."
+        },
+        "type": {
+          "type": "string",
+          "description": "The technical type of the lead source (e.g., 'Webhook', 'CSV', 'Manual', 'API')."
+        },
+        "description": {
+          "type": "string",
+          "description": "A brief description of the lead source."
+        },
+        "lastSyncTime": {
+          "type": "string",
+          "description": "Timestamp of the last successful data synchronization from this lead source.",
+          "format": "date-time"
+        },
+        "leadCount": {
+          "type": "number",
+          "description": "The total number of leads imported from this source."
+        },
+        "averageIcpScore": {
+          "type": "number",
+          "description": "The average ICP score of contacts originating from this lead source."
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "type",
+        "description"
+      ]
     },
-    "OpenHouseEvent": {
-      "title": "Open House Event",
-      "description": "A scheduled real estate event for sign-ins.",
+    "LeadSourceConfiguration": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "LeadSourceConfiguration",
       "type": "object",
+      "description": "Stores specific integration settings and preferences for each defined lead source.",
       "properties": {
-        "id": { "type": "string" },
-        "property_address": { "type": "string" },
-        "date": { "type": "string", "format": "date" },
-        "signin_count": { "type": "number" },
-        "seller_count": { "type": "number" }
-      }
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the LeadSourceConfiguration entity."
+        },
+        "leadSourceId": {
+          "type": "string",
+          "description": "Reference to the LeadSource entity this configuration applies to. (Relationship: LeadSource 1:1 LeadSourceConfiguration)"
+        },
+        "webhookUrl": {
+          "type": "string",
+          "description": "The webhook URL for receiving lead data from the source (e.g., ArchAgent).",
+          "format": "uri"
+        },
+        "autoImportEnabled": {
+          "type": "boolean",
+          "description": "Indicates if automatic lead import is enabled for this source."
+        },
+        "dncSyncEnabled": {
+          "type": "boolean",
+          "description": "Indicates if Do Not Call (DNC) list synchronization is enabled for this source (e.g., Vulcan7)."
+        },
+        "integrationMethod": {
+          "type": "string",
+          "description": "The method of integration used for the lead source (e.g., 'Zapier', 'CSV Upload', 'Webhook')."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the configuration was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when the configuration was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "leadSourceId",
+        "autoImportEnabled",
+        "dncSyncEnabled",
+        "integrationMethod",
+        "createdAt"
+      ]
     },
-    "MonicaInsight": {
-      "title": "Monica Insight",
-      "description": "AI-calculated behavioral insights.",
+    "CallLog": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "CallLog",
       "type": "object",
+      "description": "Records details of each AI-powered voice call made or received with a contact.",
       "properties": {
-        "id": { "type": "string" },
-        "type": { "type": "string", "enum": ["call_timing", "objections", "vm_performance"] },
-        "data": { "type": "object" },
-        "generated_at": { "type": "string", "format": "date-time" }
-      }
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the CallLog entity."
+        },
+        "contactId": {
+          "type": "string",
+          "description": "Reference to the Contact entity involved in the call. (Relationship: Contact 1:N CallLog)"
+        },
+        "callStartTime": {
+          "type": "string",
+          "description": "Timestamp when the call started.",
+          "format": "date-time"
+        },
+        "callEndTime": {
+          "type": "string",
+          "description": "Timestamp when the call ended.",
+          "format": "date-time"
+        },
+        "durationSeconds": {
+          "type": "number",
+          "description": "The duration of the call in seconds."
+        },
+        "outcome": {
+          "type": "string",
+          "description": "The result of the call (e.g., 'Connected', 'Voicemail', 'No Answer', 'DNC Request')."
+        },
+        "nextAction": {
+          "type": "string",
+          "description": "A description of the next action planned after this call."
+        },
+        "summary": {
+          "type": "string",
+          "description": "An AI-generated summary of the call conversation."
+        },
+        "callRecordingUrl": {
+          "type": "string",
+          "description": "URL to the recording of the call, if available.",
+          "format": "uri"
+        },
+        "transcript": {
+          "type": "string",
+          "description": "The full transcript of the call conversation."
+        },
+        "aiInsights": {
+          "type": "string",
+          "description": "AI-generated insights or sentiment analysis from the call, possibly in a JSON string format."
+        },
+        "voicemailDropped": {
+          "type": "boolean",
+          "description": "Indicates if an automated voicemail was dropped during the call."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the call log was created.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "contactId",
+        "callStartTime",
+        "outcome",
+        "summary",
+        "createdAt"
+      ]
+    },
+    "EmailLog": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "EmailLog",
+      "type": "object",
+      "description": "Records details of each personalized outreach email sent to a contact.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the EmailLog entity."
+        },
+        "contactId": {
+          "type": "string",
+          "description": "Reference to the Contact entity who received the email. (Relationship: Contact 1:N EmailLog)"
+        },
+        "subject": {
+          "type": "string",
+          "description": "The subject line of the email."
+        },
+        "body": {
+          "type": "string",
+          "description": "The full content of the email that was sent."
+        },
+        "sentAt": {
+          "type": "string",
+          "description": "Timestamp when the email was sent.",
+          "format": "date-time"
+        },
+        "status": {
+          "type": "string",
+          "description": "The delivery status of the email (e.g., 'Sent', 'Delivered', 'Opened', 'Bounced')."
+        },
+        "aiGenerated": {
+          "type": "boolean",
+          "description": "Indicates if the email content was generated by AI."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the email log was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when the email log was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "contactId",
+        "subject",
+        "body",
+        "sentAt",
+        "status",
+        "aiGenerated",
+        "createdAt"
+      ]
+    },
+    "SMSLog": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "SMSLog",
+      "type": "object",
+      "description": "Records details of each personalized SMS message sent to a contact.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the SMSLog entity."
+        },
+        "contactId": {
+          "type": "string",
+          "description": "Reference to the Contact entity who received the SMS. (Relationship: Contact 1:N SMSLog)"
+        },
+        "message": {
+          "type": "string",
+          "description": "The full content of the SMS message that was sent."
+        },
+        "sentAt": {
+          "type": "string",
+          "description": "Timestamp when the SMS was sent.",
+          "format": "date-time"
+        },
+        "status": {
+          "type": "string",
+          "description": "The delivery status of the SMS (e.g., 'Sent', 'Delivered', 'Failed')."
+        },
+        "aiGenerated": {
+          "type": "boolean",
+          "description": "Indicates if the SMS content was generated by AI."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the SMS log was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when the SMS log was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "contactId",
+        "message",
+        "sentAt",
+        "status",
+        "aiGenerated",
+        "createdAt"
+      ]
     }
   },
   "auth": {
-    "providers": ["google.com", "password"]
+    "providers": [
+      "password",
+      "anonymous"
+    ]
   },
   "firestore": {
-    "/contacts/{contactId}": {
-      "schema": "Contact",
-      "description": "CRM Contact records."
-    },
-    "/probate_leads/{leadId}": {
-      "schema": "ProbateLead",
-      "description": "Court-sourced leads."
-    },
-    "/open_house_events/{eventId}": {
-      "schema": "OpenHouseEvent",
-      "description": "Open house event registry."
-    },
-    "/monica_insights/{insightId}": {
-      "schema": "MonicaInsight",
-      "description": "AI behavioral intelligence."
-    }
+    "structure": [
+      {
+        "path": "/users/{userId}/contacts/{contactId}",
+        "definition": {
+          "entityName": "Contact",
+          "schema": {
+            "$ref": "#/backend/entities/Contact"
+          },
+          "description": "Stores individual contact records. Each document includes denormalized 'ownerId' field (matching 'userId') for authorization independence, and 'leadSourceId' for referencing its origin."
+        }
+      },
+      {
+        "path": "/users/{userId}/leadSources/{leadSourceId}",
+        "definition": {
+          "entityName": "LeadSource",
+          "schema": {
+            "$ref": "#/backend/entities/LeadSource"
+          },
+          "description": "Defines the origin of contact leads for a specific user. Each document includes a denormalized 'ownerId' field (matching 'userId') for authorization independence."
+        }
+      },
+      {
+        "path": "/users/{userId}/leadSources/{leadSourceId}/configuration",
+        "definition": {
+          "entityName": "LeadSourceConfiguration",
+          "schema": {
+            "$ref": "#/backend/entities/LeadSourceConfiguration"
+          },
+          "description": "Stores specific integration settings for a user's lead source. This is a singleton subcollection. Each document includes a denormalized 'ownerId' field (matching 'userId') and 'leadSourceId' for authorization independence."
+        }
+      },
+      {
+        "path": "/users/{userId}/contacts/{contactId}/callLogs/{callLogId}",
+        "definition": {
+          "entityName": "CallLog",
+          "schema": {
+            "$ref": "#/backend/entities/CallLog"
+          },
+          "description": "Records details of AI-powered voice calls associated with a specific contact. Each document includes denormalized 'ownerId' (matching 'userId') and 'contactId' for authorization independence."
+        }
+      },
+      {
+        "path": "/users/{userId}/contacts/{contactId}/emailLogs/{emailLogId}",
+        "definition": {
+          "entityName": "EmailLog",
+          "schema": {
+            "$ref": "#/backend/entities/EmailLog"
+          },
+          "description": "Records details of personalized outreach emails sent to a specific contact. Each document includes denormalized 'ownerId' (matching 'userId') and 'contactId' for authorization independence."
+        }
+      },
+      {
+        "path": "/users/{userId}/contacts/{contactId}/smsLogs/{smsLogId}",
+        "definition": {
+          "entityName": "SMSLog",
+          "schema": {
+            "$ref": "#/backend/entities/SMSLog"
+          },
+          "description": "Records details of personalized SMS messages sent to a specific contact. Each document includes denormalized 'ownerId' (matching 'userId') and 'contactId' for authorization independence."
+        }
+      }
+    ],
+    "reasoning": "The proposed Firestore structure prioritizes strict user data segregation and authorization independence, adhering to the core design principles. All user-specific data is nested under a top-level `/users/{userId}/` collection. This path-based ownership (`/users/{userId}/contacts/{contactId}`, `/users/{userId}/leadSources/{leadSourceId}`, etc.) inherently ties all records to a specific authenticated user (`request.auth.uid`), making security rules simple and robust.\n\nTo achieve **Authorization Independence**, a critical mandate, every document across all collections will include a denormalized `ownerId` field, which will always match the `userId` in its path segment. For subcollections nested further (e.g., `callLogs` under `contacts`), the `contactId` will also be denormalized within the `CallLog`, `EmailLog`, and `SMSLog` documents. This eliminates the need for `get()` calls in Firestore Security Rules to check parent document ownership or attributes, thus preventing rule complexity and allowing for atomic operations. For example, a `CallLog` document's access can be verified solely by checking `request.auth.uid == resource.data.ownerId` and `request.path[3] == resource.data.ownerId` without needing to fetch the parent `contact` document.\n\n**Querying for Authorized Paths (QAPs)** is fully supported by this structure. Because all user data resides under `/users/{userId}/`, a user's client-side queries for `contacts`, `leadSources`, `callLogs`, etc., will always be scoped by their `uid`. For example, `firestore.collection('users').doc(user.uid).collection('contacts')` will only retrieve contacts owned by `user.uid`. Security rules will simply enforce that `request.auth.uid` matches the `userId` wildcard in the path and the denormalized `ownerId` field, ensuring that unauthorized reads or writes are impossible. This structure eliminates the need for rules to act as filters, as the data a user can *access* is already structurally limited to their own. The consistent `ownerId` field also allows for more flexible querying patterns (e.g., aggregated dashboards that might query across contacts, but still need to filter by `ownerId` in a secure manner at the rule level, although direct `list` queries should primarily leverage the path structure for security). Structural segregation ensures homogeneous security posture within each collection, further simplifying rules."
   }
 }
