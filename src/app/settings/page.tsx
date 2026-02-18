@@ -54,7 +54,7 @@ export default function SettingsPage() {
                           <CardDescription>Configure lead data sync via Webhook.</CardDescription>
                         </div>
                       </div>
-                      <Badge className="bg-green-500 font-bold">Live & Connected</Badge>
+                      <Badge className="bg-green-500 font-bold text-white border-none">Live & Connected</Badge>
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-6 pt-6">
@@ -155,7 +155,7 @@ export default function SettingsPage() {
                         <Label className="text-xs font-bold uppercase">Briefing Time (PST)</Label>
                         <select className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm">
                           <option>07:00 AM</option>
-                          <option defaultValue="08:00 AM">08:00 AM</option>
+                          <option value="08:00 AM">08:00 AM</option>
                           <option>09:00 AM</option>
                         </select>
                       </div>
@@ -164,7 +164,7 @@ export default function SettingsPage() {
                         <select className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm">
                           <option>Email Only</option>
                           <option>SMS Only</option>
-                          <option defaultValue="Email & Dashboard">Email & Dashboard</option>
+                          <option value="Email & Dashboard">Email & Dashboard</option>
                         </select>
                       </div>
                     </div>
