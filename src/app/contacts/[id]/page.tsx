@@ -4,8 +4,7 @@ import React, { useState, useEffect } from "react"
 import { useParams } from "next/navigation"
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/layout/app-sidebar"
-import { MOCK_CONTACTS, Contact } from "@/lib/mock-data"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
@@ -19,7 +18,6 @@ import {
   Sparkles, 
   TrendingUp, 
   Calendar, 
-  Clock, 
   BrainCircuit,
   History,
   ArrowLeft,
@@ -28,17 +26,52 @@ import {
   ArrowRight
 } from "lucide-react"
 import Link from "next/link"
+import { useUser, useFirestore, useDoc, useCollection, useMemoFirebase, addDocumentNonBlocking } from "@/firebase"
+import { collection, query, doc, orderBy } from "firebase/firestore"
+import { format } from "date-fns"
 
 export default function ContactProfilePage() {
   const params = useParams();
-  const contact = MOCK_CONTACTS.find(c => c.id === params.id) as Contact;
+  const { user } = useUser();
+  const firestore = useFirestore();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  if (!contact) return <div className="p-8 text-center text-slate-400">Loading contact profile...</div>;
+  const contactRef = useMemoFirebase(() => {
+    if (!firestore || !user || !params.id) return null;
+    return doc(firestore, 'users', user.uid, 'contacts', params.id as string);
+  }, [firestore, user, params.id]);
+
+  const { data: contact, isLoading: contactLoading } = useDoc(contactRef);
+
+  const logsQuery = useMemoFirebase(() => {
+    if (!firestore || !user || !params.id) return null;
+    return query(
+      collection(firestore, 'users', user.uid, 'contacts', params.id as string, 'activityLogs'),
+      orderBy('date', 'desc')
+    );
+  }, [firestore, user, params.id]);
+
+  const { data: activityLogs } = useCollection(logsQuery);
+
+  const handleLogActivity = (type: 'call' | 'sms' | 'email') => {
+    if (!firestore || !user || !params.id) return;
+    const logsRef = collection(firestore, 'users', user.uid, 'contacts', params.id as string, 'activityLogs');
+    addDocumentNonBlocking(logsRef, {
+      type,
+      date: new Date().toISOString(),
+      outcome: `${type.toUpperCase()} outreach initiated`,
+      summary: `Manually initiated ${type} from CRM profile.`,
+      sentiment: 'neutral',
+      ownerId: user.uid
+    });
+  };
+
+  if (!mounted || contactLoading) return <div className="p-8 text-center text-slate-400">Loading profile...</div>;
+  if (!contact) return <div className="p-8 text-center">Contact not found.</div>;
 
   const sentimentColors = {
     positive: 'bg-green-500',
@@ -64,7 +97,7 @@ export default function ContactProfilePage() {
               <ArrowLeft className="h-5 w-5" />
             </Link>
             <h1 className="text-lg font-bold font-headline text-primary">{contact.name}</h1>
-            <Badge className="ml-2 bg-slate-100 text-slate-600 capitalize">{contact.pipeline_stage.replace('_', ' ')}</Badge>
+            <Badge className="ml-2 bg-slate-100 text-slate-600 capitalize">{contact.pipeline_stage?.replace('_', ' ')}</Badge>
             <div className="ml-auto flex gap-2">
               <Button size="sm" variant="outline" className="gap-2"><User className="h-4 w-4" /> Edit Profile</Button>
               <Button size="icon" variant="ghost" className="h-8 w-8"><MoreVertical className="h-4 w-4" /></Button>
@@ -75,14 +108,14 @@ export default function ContactProfilePage() {
             <aside className="w-80 border-r bg-slate-50/50 p-6 flex flex-col gap-8 overflow-y-auto">
               <div className="flex flex-col items-center text-center gap-4">
                 <div className="h-24 w-24 rounded-full bg-primary flex items-center justify-center text-white text-3xl font-bold relative shadow-xl">
-                  {contact.name.split(' ').map(n => n[0]).join('')}
-                  <div className={`absolute bottom-0 right-0 h-6 w-6 rounded-full border-4 border-white ${sentimentColors[contact.ai_sentiment]}`} />
+                  {contact.name.split(' ').map((n: string) => n[0]).join('')}
+                  <div className={`absolute bottom-0 right-0 h-6 w-6 rounded-full border-4 border-white ${sentimentColors[contact.ai_sentiment as keyof typeof sentimentColors] || 'bg-slate-400'}`} />
                 </div>
                 <div className="space-y-1">
                   <h2 className="text-xl font-black text-primary">{contact.name}</h2>
                   <div className="flex items-center justify-center gap-2">
-                    <Badge variant="outline" className={`text-[10px] font-bold ${urgencyColors[contact.ai_urgency]}`}>
-                      {contact.ai_urgency.toUpperCase()}
+                    <Badge variant="outline" className={`text-[10px] font-bold ${urgencyColors[contact.ai_urgency as keyof typeof urgencyColors]}`}>
+                      {contact.ai_urgency?.toUpperCase() || 'NURTURE'}
                     </Badge>
                     <Badge className="bg-accent text-white font-bold h-5 px-1.5">{contact.icpScore}/99</Badge>
                   </div>
@@ -91,10 +124,10 @@ export default function ContactProfilePage() {
 
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-2">
-                  <Button className="gap-2 bg-primary w-full h-11"><Phone className="h-4 w-4" /> Call</Button>
-                  <Button variant="outline" className="gap-2 w-full h-11"><MessageSquare className="h-4 w-4" /> SMS</Button>
+                  <Button className="gap-2 bg-primary w-full h-11" onClick={() => handleLogActivity('call')}><Phone className="h-4 w-4" /> Call</Button>
+                  <Button variant="outline" className="gap-2 w-full h-11" onClick={() => handleLogActivity('sms')}><MessageSquare className="h-4 w-4" /> SMS</Button>
                 </div>
-                <Button variant="outline" className="w-full gap-2 border-slate-200"><Mail className="h-4 w-4" /> Email</Button>
+                <Button variant="outline" className="w-full gap-2 border-slate-200" onClick={() => handleLogActivity('email')}><Mail className="h-4 w-4" /> Email</Button>
                 <Button variant="secondary" className="w-full gap-2"><Calendar className="h-4 w-4" /> Schedule Appt</Button>
               </div>
 
@@ -121,7 +154,7 @@ export default function ContactProfilePage() {
                   <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Lead Source</p>
                   <div className="flex flex-wrap gap-1">
                     <Badge variant="secondary" className="bg-primary/5 text-primary text-[10px]">{contact.archagent_source}</Badge>
-                    {contact.archagent_tags.map(tag => (
+                    {contact.archagent_tags?.map((tag: string) => (
                       <Badge key={tag} className="bg-slate-100 text-slate-600 text-[10px]">{tag.replace('_', ' ')}</Badge>
                     ))}
                   </div>
@@ -141,7 +174,7 @@ export default function ContactProfilePage() {
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
-                        <p className="text-xs leading-relaxed text-slate-600 italic">"{contact.ai_summary}"</p>
+                        <p className="text-xs leading-relaxed text-slate-600 italic">"{contact.ai_summary || "Intelligence gathering in progress..."}"</p>
                       </CardContent>
                     </Card>
                     <Card className="border-none shadow-md bg-primary text-white">
@@ -152,7 +185,7 @@ export default function ContactProfilePage() {
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
-                        <p className="text-sm font-bold leading-relaxed">{contact.ai_next_best_action}</p>
+                        <p className="text-sm font-bold leading-relaxed">{contact.ai_next_best_action || "Schedule initial discovery call."}</p>
                       </CardContent>
                     </Card>
                   </section>
@@ -163,40 +196,37 @@ export default function ContactProfilePage() {
                         <History className="h-5 w-5 text-accent" />
                         Activity History
                       </h2>
-                      <div className="flex gap-2">
-                        <Button variant="ghost" size="sm" className="text-xs">All</Button>
-                        <Button variant="ghost" size="sm" className="text-xs">Calls</Button>
-                        <Button variant="ghost" size="sm" className="text-xs">Notes</Button>
-                      </div>
                     </div>
 
                     <div className="space-y-8 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-slate-200 before:to-transparent">
-                      {contact.activityLogs.map((log) => (
-                        <div key={log.id} className="relative pl-12">
-                          <div className={`absolute left-0 h-10 w-10 rounded-full border-4 border-white flex items-center justify-center shadow-sm z-10 ${log.type === 'call' ? 'bg-blue-100 text-blue-600' : log.type === 'ai_note' ? 'bg-accent/10 text-accent' : 'bg-slate-100'}`}>
-                            {log.type === 'call' ? <Phone className="h-4 w-4" /> : <BrainCircuit className="h-4 w-4" />}
-                          </div>
-                          <div className="space-y-1 pt-1">
-                            <div className="flex items-center justify-between">
-                              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                                {mounted ? (
-                                  <>
-                                    {new Date(log.date).toLocaleDateString()} at {new Date(log.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                  </>
-                                ) : '...'}
-                              </span>
-                              {log.sentiment && <Badge className={`h-4 text-[8px] ${sentimentColors[log.sentiment]}`}>{log.sentiment.toUpperCase()}</Badge>}
+                      {activityLogs && activityLogs.length > 0 ? (
+                        activityLogs.map((log) => (
+                          <div key={log.id} className="relative pl-12">
+                            <div className={`absolute left-0 h-10 w-10 rounded-full border-4 border-white flex items-center justify-center shadow-sm z-10 ${log.type === 'call' ? 'bg-blue-100 text-blue-600' : log.type === 'ai_note' ? 'bg-accent/10 text-accent' : 'bg-slate-100'}`}>
+                              {log.type === 'call' ? <Phone className="h-4 w-4" /> : <BrainCircuit className="h-4 w-4" />}
                             </div>
-                            <h4 className="font-bold text-slate-800">{log.outcome}</h4>
-                            <p className="text-sm text-slate-600 leading-relaxed bg-slate-50/50 p-3 rounded-xl border border-slate-100">{log.summary}</p>
-                            {log.nextAction && (
-                              <div className="flex items-center gap-2 text-xs text-primary font-bold mt-2">
-                                <ArrowRight className="h-3 w-3" /> Next Action: {log.nextAction}
+                            <div className="space-y-1 pt-1">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                                  {format(new Date(log.date), 'MMM d, yyyy h:mm a')}
+                                </span>
+                                {log.sentiment && <Badge className={`h-4 text-[8px] ${sentimentColors[log.sentiment as keyof typeof sentimentColors]}`}>{log.sentiment.toUpperCase()}</Badge>}
                               </div>
-                            )}
+                              <h4 className="font-bold text-slate-800">{log.outcome}</h4>
+                              <p className="text-sm text-slate-600 leading-relaxed bg-slate-50/50 p-3 rounded-xl border border-slate-100">{log.summary}</p>
+                              {log.nextAction && (
+                                <div className="flex items-center gap-2 text-xs text-primary font-bold mt-2">
+                                  <ArrowRight className="h-3 w-3" /> Next Action: {log.nextAction}
+                                </div>
+                              )}
+                            </div>
                           </div>
+                        ))
+                      ) : (
+                        <div className="text-center py-10 bg-slate-50 rounded-xl border border-dashed">
+                          <p className="text-xs text-muted-foreground">No activities logged yet.</p>
                         </div>
-                      ))}
+                      )}
                     </div>
                   </section>
                 </div>
@@ -209,7 +239,7 @@ export default function ContactProfilePage() {
                 <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 space-y-4">
                   <div className="flex justify-between items-end">
                     <span className="text-[10px] text-muted-foreground uppercase">Est. Commission</span>
-                    <span className="text-lg font-black text-primary">${contact.estimated_commission?.toLocaleString()}</span>
+                    <span className="text-lg font-black text-primary">${contact.estimated_commission?.toLocaleString() || '0'}</span>
                   </div>
                   <Separator />
                   <div className="space-y-2">
@@ -218,9 +248,6 @@ export default function ContactProfilePage() {
                       <span className="text-accent">72%</span>
                     </div>
                     <Progress value={72} className="h-2" />
-                  </div>
-                  <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-                    <Clock className="h-3 w-3" /> Expected Close: June 2024
                   </div>
                 </div>
               </section>
@@ -235,24 +262,7 @@ export default function ContactProfilePage() {
                     </div>
                     <div className="space-y-1 text-right">
                       <span className="text-[9px] text-muted-foreground uppercase">Equity</span>
-                      <div className="text-xs font-bold">High (55%)</div>
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <span className="text-[9px] text-muted-foreground uppercase">Days on Market</span>
-                    <div className="text-xs font-bold">42 (FSBO)</div>
-                  </div>
-                </div>
-              </section>
-
-              <section className="space-y-4">
-                <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Upcoming Tasks</h3>
-                <div className="space-y-2">
-                  <div className="p-3 bg-white rounded-xl border border-slate-100 flex items-center gap-3 shadow-sm">
-                    <div className="h-2 w-2 rounded-full bg-red-500" />
-                    <div className="flex-1 overflow-hidden">
-                      <p className="text-xs font-bold truncate">Call: Divorce discussion</p>
-                      <p className="text-[9px] text-muted-foreground">Today at 10:00 AM</p>
+                      <div className="text-xs font-bold">{contact.loan_to_value ? `${100 - contact.loan_to_value}%` : 'High'}</div>
                     </div>
                   </div>
                 </div>

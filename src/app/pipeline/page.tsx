@@ -1,24 +1,24 @@
 "use client"
 
-import React from "react"
+import React, { useState, useEffect } from "react"
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/layout/app-sidebar"
-import { MOCK_CONTACTS, Contact, PipelineStage } from "@/lib/mock-data"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { PipelineStage } from "@/lib/mock-data"
+import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { 
   Trello, 
-  MoreHorizontal, 
   Phone, 
-  Mail, 
   MessageSquare, 
   Flame, 
   Clock,
-  TrendingUp,
-  DollarSign
+  ArrowRight
 } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { useUser, useFirestore, useCollection, useMemoFirebase, updateDocumentNonBlocking } from "@/firebase"
+import { collection, query, doc } from "firebase/firestore"
+import Link from "next/link"
 
 const STAGES: { id: PipelineStage; label: string; color: string }[] = [
   { id: 'new_lead', label: 'New Lead', color: 'bg-blue-500' },
@@ -30,14 +30,40 @@ const STAGES: { id: PipelineStage; label: string; color: string }[] = [
 ];
 
 export default function PipelinePage() {
+  const { user } = useUser();
+  const firestore = useFirestore();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const contactsQuery = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return query(collection(firestore, 'users', user.uid, 'contacts'));
+  }, [firestore, user]);
+
+  const { data: contacts, isLoading } = useCollection(contactsQuery);
+
   const getContactsInStage = (stageId: PipelineStage) => {
-    return MOCK_CONTACTS.filter(c => c.pipeline_stage === stageId);
+    return (contacts || []).filter(c => c.pipeline_stage === stageId);
   };
 
   const getStageValue = (stageId: PipelineStage) => {
-    const contacts = getContactsInStage(stageId);
-    return contacts.reduce((sum, c) => sum + (c.estimated_commission || 0), 0);
+    const stageContacts = getContactsInStage(stageId);
+    return stageContacts.reduce((sum, c) => sum + (c.estimated_commission || 0), 0);
   };
+
+  const handleMoveStage = (contactId: string, nextStage: PipelineStage) => {
+    if (!firestore || !user) return;
+    const contactRef = doc(firestore, 'users', user.uid, 'contacts', contactId);
+    updateDocumentNonBlocking(contactRef, {
+      pipeline_stage: nextStage,
+      updated_at: new Date().toISOString()
+    });
+  };
+
+  if (!mounted) return null;
 
   return (
     <SidebarProvider>
@@ -50,7 +76,9 @@ export default function PipelinePage() {
             <div className="ml-auto flex items-center gap-4">
               <div className="text-right">
                 <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Total Value</div>
-                <div className="text-sm font-bold text-primary">$1,482,000</div>
+                <div className="text-sm font-bold text-primary">
+                  ${STAGES.reduce((sum, s) => sum + getStageValue(s.id), 0).toLocaleString()}
+                </div>
               </div>
               <Button size="sm" className="bg-accent hover:bg-accent/90">Add Deal</Button>
             </div>
@@ -58,9 +86,10 @@ export default function PipelinePage() {
           
           <main className="p-6 h-[calc(100vh-64px)] bg-slate-50/50">
             <div className="flex gap-6 h-full overflow-x-auto pb-4 custom-scrollbar">
-              {STAGES.map((stage) => {
-                const contacts = getContactsInStage(stage.id);
+              {STAGES.map((stage, index) => {
+                const stageContacts = getContactsInStage(stage.id);
                 const value = getStageValue(stage.id);
+                const nextStage = STAGES[index + 1]?.id;
                 
                 return (
                   <div key={stage.id} className="flex-shrink-0 w-80 flex flex-col gap-4">
@@ -68,7 +97,7 @@ export default function PipelinePage() {
                       <div className="flex items-center gap-2">
                         <div className={`h-2 w-2 rounded-full ${stage.color}`} />
                         <h3 className="font-bold text-slate-700">{stage.label}</h3>
-                        <Badge variant="secondary" className="bg-slate-200 text-slate-600 h-5 px-1.5">{contacts.length}</Badge>
+                        <Badge variant="secondary" className="bg-slate-200 text-slate-600 h-5 px-1.5">{stageContacts.length}</Badge>
                       </div>
                       <div className="text-xs font-bold text-muted-foreground">
                         ${value.toLocaleString()}
@@ -77,19 +106,23 @@ export default function PipelinePage() {
 
                     <ScrollArea className="flex-1 rounded-xl bg-slate-100/50 p-2 border border-slate-200/50">
                       <div className="space-y-3">
-                        {contacts.map((contact) => (
+                        {isLoading ? (
+                          <div className="p-4 text-center text-xs text-muted-foreground">Loading deals...</div>
+                        ) : stageContacts.map((contact) => (
                           <Card key={contact.id} className="border-none shadow-sm hover:shadow-md transition-all cursor-pointer group">
                             <CardContent className="p-4 space-y-3">
-                              <div className="flex justify-between items-start">
-                                <div className="space-y-0.5">
-                                  <div className="font-bold text-sm flex items-center gap-1 text-primary">
-                                    {contact.name}
-                                    {contact.ai_urgency === 'hot' && <Flame className="h-3 w-3 text-red-500 fill-red-500" />}
+                              <Link href={`/contacts/${contact.id}`}>
+                                <div className="flex justify-between items-start mb-2">
+                                  <div className="space-y-0.5">
+                                    <div className="font-bold text-sm flex items-center gap-1 text-primary">
+                                      {contact.name}
+                                      {contact.ai_urgency === 'hot' && <Flame className="h-3 w-3 text-red-500 fill-red-500" />}
+                                    </div>
+                                    <div className="text-[10px] text-muted-foreground truncate w-56">{contact.propertyAddress}</div>
                                   </div>
-                                  <div className="text-[10px] text-muted-foreground truncate w-56">{contact.propertyAddress}</div>
+                                  <Badge className="bg-slate-100 text-slate-600 text-[10px] h-5 px-1 font-bold">{contact.icpScore}</Badge>
                                 </div>
-                                <Badge className="bg-slate-100 text-slate-600 text-[10px] h-5 px-1 font-bold">{contact.icpScore}</Badge>
-                              </div>
+                              </Link>
 
                               <div className="flex flex-wrap gap-1">
                                 <Badge variant="outline" className="text-[9px] h-4 py-0 bg-white capitalize">{contact.archagent_source}</Badge>
@@ -107,14 +140,21 @@ export default function PipelinePage() {
                                     </Button>
                                   </div>
                                 </div>
-                                <div className="text-[9px] text-muted-foreground flex items-center gap-1">
-                                  <Clock className="h-3 w-3" /> 2d ago
-                                </div>
+                                {nextStage && (
+                                  <Button 
+                                    size="sm" 
+                                    variant="ghost" 
+                                    className="h-6 text-[10px] gap-1 px-2"
+                                    onClick={() => handleMoveStage(contact.id, nextStage)}
+                                  >
+                                    Move <ArrowRight className="h-3 w-3" />
+                                  </Button>
+                                )}
                               </div>
                             </CardContent>
                           </Card>
                         ))}
-                        {contacts.length === 0 && (
+                        {!isLoading && stageContacts.length === 0 && (
                           <div className="h-24 border-2 border-dashed border-slate-200 rounded-xl flex items-center justify-center text-xs text-muted-foreground">
                             No deals in this stage
                           </div>

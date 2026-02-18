@@ -1,9 +1,9 @@
 "use client"
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/app-sidebar";
-import { KPI_STATS, MOCK_TASKS } from "@/lib/mock-data";
+import { KPI_STATS } from "@/lib/mock-data";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { 
   Users, 
@@ -35,6 +35,8 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { format } from "date-fns";
 import Link from "next/link";
+import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebase";
+import { collection, query, where, limit, orderBy } from "firebase/firestore";
 
 const iconMap: Record<string, any> = {
   Users,
@@ -45,11 +47,25 @@ const iconMap: Record<string, any> = {
 };
 
 export default function DashboardPage() {
+  const { user } = useUser();
+  const firestore = useFirestore();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  const tasksQuery = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return query(
+      collection(firestore, 'users', user.uid, 'tasks'),
+      where('status', '==', 'pending'),
+      orderBy('due_date', 'asc'),
+      limit(5)
+    );
+  }, [firestore, user]);
+
+  const { data: liveTasks, isLoading: tasksLoading } = useCollection(tasksQuery);
 
   if (!mounted) return null;
 
@@ -178,7 +194,7 @@ export default function DashboardPage() {
                       <CardTitle className="text-lg">Today's Game Plan</CardTitle>
                       <CardDescription>Monica's Top Priorities</CardDescription>
                     </div>
-                    <Badge className="bg-primary">{MOCK_TASKS.length} Actions</Badge>
+                    <Badge className="bg-primary">{liveTasks?.length || 0} Actions</Badge>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -191,20 +207,30 @@ export default function DashboardPage() {
                   </div>
                   
                   <div className="space-y-3">
-                    {MOCK_TASKS.map(task => (
-                      <div key={task.id} className="bg-white p-3 rounded-xl border flex items-center gap-3 shadow-sm">
-                        <div className={`h-2 w-2 rounded-full shrink-0 ${task.priority === 'urgent' ? 'bg-red-500' : 'bg-blue-400'}`} />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-bold truncate text-primary">{task.title}</p>
-                          <p className="text-[10px] text-muted-foreground">
-                            {task.contact_name} • {format(new Date(task.due_date), 'h:mm a')}
-                          </p>
+                    {tasksLoading ? (
+                      <p className="text-center text-xs py-10 text-muted-foreground">Loading actions...</p>
+                    ) : liveTasks && liveTasks.length > 0 ? (
+                      liveTasks.map(task => (
+                        <div key={task.id} className="bg-white p-3 rounded-xl border flex items-center gap-3 shadow-sm">
+                          <div className={`h-2 w-2 rounded-full shrink-0 ${task.priority === 'urgent' ? 'bg-red-500' : 'bg-blue-400'}`} />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-bold truncate text-primary">{task.title}</p>
+                            <p className="text-[10px] text-muted-foreground">
+                              {task.contact_name} • {format(new Date(task.due_date), 'h:mm a')}
+                            </p>
+                          </div>
+                          <Link href={`/contacts/${task.contactId}`}>
+                            <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-400">
+                              <ArrowRight className="h-4 w-4" />
+                            </Button>
+                          </Link>
                         </div>
-                        <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-400">
-                          <ArrowRight className="h-4 w-4" />
-                        </Button>
+                      ))
+                    ) : (
+                      <div className="text-center py-10 border border-dashed rounded-xl">
+                        <p className="text-xs text-muted-foreground">No tasks for today. Power Hour complete! 🎉</p>
                       </div>
-                    ))}
+                    )}
                   </div>
                   <Link href="/tasks">
                     <Button className="w-full bg-primary mt-4" variant="outline">View All Tasks</Button>

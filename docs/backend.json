@@ -7,21 +7,34 @@
       "properties": {
         "firstName": { "type": "string" },
         "lastName": { "type": "string" },
+        "name": { "type": "string" },
         "email": { "type": "string", "format": "email" },
         "phone": { "type": "string" },
         "propertyAddress": { "type": "string" },
+        "property_type": { "type": "string", "enum": ["single_family", "condo", "multi_family", "townhouse", "other"] },
         "pipeline_stage": {
           "type": "string",
-          "enum": ["new_lead", "attempted_contact", "conversation_had", "follow_up_scheduled", "appointment_set", "listed", "closed"]
+          "enum": ["new_lead", "attempted_contact", "conversation_had", "follow_up_scheduled", "appointment_set", "listed", "closed", "long_term_nurture", "dnc"]
         },
         "icpScore": { "type": "number" },
         "archagent_source": { "type": "string" },
+        "archagent_tags": { "type": "array", "items": { "type": "string" } },
         "ai_summary": { "type": "string" },
         "ai_urgency": { "type": "string", "enum": ["hot", "warm", "cold", "nurture"] },
+        "ai_sentiment": { "type": "string", "enum": ["positive", "neutral", "negative"] },
+        "ai_next_best_action": { "type": "string" },
         "estimated_commission": { "type": "number" },
-        "ownerId": { "type": "string" }
+        "loan_to_value": { "type": "number" },
+        "likely_to_list_score": { "type": "number" },
+        "likely_to_lead_score": { "type": "number" },
+        "likely_to_contact_score": { "type": "number" },
+        "motivation": { "type": "string" },
+        "sequence_step": { "type": "number" },
+        "ownerId": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" }
       },
-      "required": ["firstName", "lastName", "ownerId"]
+      "required": ["name", "ownerId"]
     },
     "Task": {
       "title": "Task",
@@ -29,11 +42,14 @@
       "description": "Follow-up actions and reminders.",
       "properties": {
         "contactId": { "type": "string" },
+        "contact_name": { "type": "string" },
         "title": { "type": "string" },
-        "type": { "type": "string", "enum": ["call", "email", "sms", "appointment"] },
-        "status": { "type": "string", "enum": ["pending", "completed"] },
+        "description": { "type": "string" },
+        "type": { "type": "string", "enum": ["call", "email", "sms", "appointment", "follow_up", "custom"] },
+        "status": { "type": "string", "enum": ["pending", "completed", "snoozed"] },
         "priority": { "type": "string", "enum": ["urgent", "high", "normal", "low"] },
         "due_date": { "type": "string", "format": "date-time" },
+        "ai_reason": { "type": "string" },
         "ownerId": { "type": "string" }
       }
     },
@@ -43,9 +59,27 @@
       "description": "Record of a specific outreach attempt.",
       "properties": {
         "contactId": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
         "outcome": { "type": "string" },
         "summary": { "type": "string" },
-        "sentiment": { "type": "string" },
+        "sentiment": { "type": "string", "enum": ["positive", "neutral", "negative"] },
+        "type": { "type": "string", "enum": ["call", "sms", "email", "ai_note"] },
+        "nextAction": { "type": "string" },
+        "ownerId": { "type": "string" }
+      }
+    },
+    "Appointment": {
+      "title": "Appointment",
+      "type": "object",
+      "properties": {
+        "contactId": { "type": "string" },
+        "contact_name": { "type": "string" },
+        "title": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "duration_minutes": { "type": "number" },
+        "type": { "type": "string" },
+        "address": { "type": "string" },
+        "status": { "type": "string" },
         "ownerId": { "type": "string" }
       }
     },
@@ -69,6 +103,24 @@
         "address": { "type": "string" },
         "date": { "type": "string", "format": "date-time" },
         "signin_count": { "type": "number" },
+        "seller_count": { "type": "number" },
+        "status": { "type": "string" },
+        "ownerId": { "type": "string" }
+      }
+    },
+    "MorningBriefing": {
+      "title": "MorningBriefing",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string", "format": "date" },
+        "briefing_text": { "type": "string" },
+        "fresh_expireds": { "type": "number" },
+        "fresh_fsbos": { "type": "number" },
+        "preforeclosure": { "type": "number" },
+        "frbo": { "type": "number" },
+        "recommended": { "type": "number" },
+        "circle": { "type": "number" },
+        "topPriorityId": { "type": "string" },
         "ownerId": { "type": "string" }
       }
     }
@@ -77,27 +129,33 @@
     "providers": ["password", "anonymous"]
   },
   "firestore": {
-    "structure": [
-      {
-        "path": "/users/{userId}/contacts/{contactId}",
-        "definition": { "entityName": "Contact", "schema": { "$ref": "#/backend/entities/Contact" }, "description": "Master contact record." }
-      },
-      {
-        "path": "/users/{userId}/tasks/{taskId}",
-        "definition": { "entityName": "Task", "schema": { "$ref": "#/backend/entities/Task" }, "description": "Global user tasks." }
-      },
-      {
-        "path": "/users/{userId}/contacts/{contactId}/callLogs/{logId}",
-        "definition": { "entityName": "CallLog", "schema": { "$ref": "#/backend/entities/CallLog" }, "description": "Interaction history." }
-      },
-      {
-        "path": "/users/{userId}/farmZones/{zoneId}",
-        "definition": { "entityName": "FarmZone", "schema": { "$ref": "#/backend/entities/FarmZone" }, "description": "Prospecting zones." }
-      },
-      {
-        "path": "/users/{userId}/openHouses/{eventId}",
-        "definition": { "entityName": "OpenHouseEvent", "schema": { "$ref": "#/backend/entities/OpenHouseEvent" }, "description": "Open house events." }
-      }
-    ]
+    "/users/{userId}/contacts/{contactId}": {
+      "schema": { "$ref": "#/backend/entities/Contact" },
+      "description": "Master contact records."
+    },
+    "/users/{userId}/tasks/{taskId}": {
+      "schema": { "$ref": "#/backend/entities/Task" },
+      "description": "CRM tasks."
+    },
+    "/users/{userId}/contacts/{contactId}/activityLogs/{logId}": {
+      "schema": { "$ref": "#/backend/entities/CallLog" },
+      "description": "Interaction history for a contact."
+    },
+    "/users/{userId}/appointments/{appointmentId}": {
+      "schema": { "$ref": "#/backend/entities/Appointment" },
+      "description": "Scheduled events."
+    },
+    "/users/{userId}/farmZones/{zoneId}": {
+      "schema": { "$ref": "#/backend/entities/FarmZone" },
+      "description": "Saved geographic prospecting zones."
+    },
+    "/users/{userId}/openHouses/{eventId}": {
+      "schema": { "$ref": "#/backend/entities/OpenHouseEvent" },
+      "description": "Open house event records."
+    },
+    "/users/{userId}/morningBriefings/{briefingId}": {
+      "schema": { "$ref": "#/backend/entities/MorningBriefing" },
+      "description": "Daily AI-generated briefing records."
+    }
   }
 }
