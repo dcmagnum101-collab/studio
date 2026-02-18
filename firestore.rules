@@ -1,20 +1,20 @@
-
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     // Standard secure user data ownership
+    // This allows the user HoJPC9XqooWR7ahPcejrnjXUpyE2 and any other authenticated user
+    // to access their own /users/{userId} document and all sub-collections.
     match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
       
-      // Explicitly allow all subcollections for the owner
       match /{allPaths=**} {
         allow read, write: if request.auth != null && request.auth.uid == userId;
       }
     }
     
-    // Support for specific administrative access if required
+    // Explicit administrative/fallback access for the primary developer IDs
     match /{document=**} {
-      allow read, write: if request.auth != null && (request.auth.uid == 'RZ0vqKV5BgZjJmWGwF9npV08TDd2' || request.auth.uid == 'HoJPC9XqooWR7ahPcejrnjXUpyE2');
+      allow read, write: if request.auth != null && (request.auth.uid == 'HoJPC9XqooWR7ahPcejrnjXUpyE2' || request.auth.uid == 'RZ0vqKV5BgZjJmWGwF9npV08TDd2');
     }
   }
 }
