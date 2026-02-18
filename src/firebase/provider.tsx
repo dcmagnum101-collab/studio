@@ -7,14 +7,18 @@ import { Auth, User, onAuthStateChanged } from 'firebase/auth';
 import { errorEmitter } from './error-emitter';
 import { FirestorePermissionError } from './errors';
 
-// Inline Error Listener component to handle global permission errors
+// Separate component to handle global permission errors and avoid circular logic in provider
 function FirebaseErrorListener() {
   const [error, setError] = useState<FirestorePermissionError | null>(null);
 
   useEffect(() => {
-    const handleError = (err: FirestorePermissionError) => setError(err);
+    const handleError = (err: FirestorePermissionError) => {
+      setError(err);
+    };
     errorEmitter.on('permission-error', handleError);
-    return () => errorEmitter.off('permission-error', handleError);
+    return () => {
+      errorEmitter.off('permission-error', handleError);
+    };
   }, []);
 
   if (error) {
@@ -57,8 +61,12 @@ export function FirebaseProvider({
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(
       auth,
-      (user) => setUserState({ user, loading: false, error: null }),
-      (error) => setUserState({ user: null, loading: false, error })
+      (user) => {
+        setUserState({ user, loading: false, error: null });
+      },
+      (error) => {
+        setUserState({ user: null, loading: false, error });
+      }
     );
     return () => unsubscribe();
   }, [auth]);
@@ -83,7 +91,9 @@ export function FirebaseProvider({
 
 export const useFirebase = () => {
   const context = useContext(FirebaseContext);
-  if (context === undefined) throw new Error('useFirebase must be used within a FirebaseProvider.');
+  if (context === undefined) {
+    throw new Error('useFirebase must be used within a FirebaseProvider.');
+  }
   return context;
 };
 
