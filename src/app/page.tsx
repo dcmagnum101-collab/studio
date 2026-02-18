@@ -1,6 +1,7 @@
 
 "use client"
 
+import { useState, useEffect } from "react";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { KPI_STATS, MOCK_TASKS, MOCK_APPOINTMENTS, MOCK_CONTACTS } from "@/lib/mock-data";
@@ -44,6 +45,12 @@ const iconMap: Record<string, any> = {
 };
 
 export default function DashboardPage() {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full">
@@ -83,7 +90,6 @@ export default function DashboardPage() {
             </div>
 
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
-              {/* Today's Game Plan */}
               <Card className="lg:col-span-3 shadow-md border-none bg-slate-50/50">
                 <CardHeader>
                   <div className="flex justify-between items-center">
@@ -109,7 +115,9 @@ export default function DashboardPage() {
                         <div className={`h-2 w-2 rounded-full shrink-0 ${task.priority === 'urgent' ? 'bg-red-500' : 'bg-blue-400'}`} />
                         <div className="flex-1 min-w-0">
                           <p className="text-xs font-bold truncate text-primary">{task.title}</p>
-                          <p className="text-[10px] text-muted-foreground">{task.contact_name} • {format(new Date(task.due_date), 'h:mm a')}</p>
+                          <p className="text-[10px] text-muted-foreground">
+                            {task.contact_name} • {mounted ? format(new Date(task.due_date), 'h:mm a') : '...'}
+                          </p>
                         </div>
                         <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-400">
                           <ArrowRight className="h-4 w-4" />
@@ -123,7 +131,6 @@ export default function DashboardPage() {
                 </CardContent>
               </Card>
 
-              {/* Pipeline Funnel */}
               <Card className="lg:col-span-4 shadow-md">
                 <CardHeader>
                   <div className="flex justify-between items-center">
@@ -162,7 +169,6 @@ export default function DashboardPage() {
             </div>
 
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {/* Upcoming Appointments */}
               <Card className="shadow-md">
                 <CardHeader>
                   <CardTitle className="text-sm font-bold flex items-center gap-2">
@@ -181,7 +187,7 @@ export default function DashboardPage() {
                         <Users className="h-3 w-3" /> {appt.contact_name}
                       </div>
                       <div className="text-[10px] text-muted-foreground flex items-center gap-1">
-                        <Clock className="h-3 w-3" /> {format(new Date(appt.date), 'MMM d, h:mm a')}
+                        <Clock className="h-3 w-3" /> {mounted ? format(new Date(appt.date), 'MMM d, h:mm a') : '...'}
                       </div>
                       <Button size="sm" className="w-full h-7 text-[10px] bg-slate-50 text-primary border-slate-200" variant="outline">View Prep Brief</Button>
                     </div>
@@ -189,7 +195,6 @@ export default function DashboardPage() {
                 </CardContent>
               </Card>
 
-              {/* Hot Leads Widget */}
               <Card className="shadow-md">
                 <CardHeader>
                   <CardTitle className="text-sm font-bold flex items-center gap-2">
@@ -218,7 +223,6 @@ export default function DashboardPage() {
                 </CardContent>
               </Card>
 
-              {/* AI Insight Feed */}
               <Card className="shadow-md bg-accent text-white">
                 <CardHeader>
                   <CardTitle className="text-sm font-bold flex items-center gap-2">

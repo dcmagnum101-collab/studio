@@ -1,7 +1,7 @@
 
 "use client"
 
-import React from "react"
+import React, { useState, useEffect } from "react"
 import { useParams } from "next/navigation"
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/layout/app-sidebar"
@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Separator } from "@/components/ui/separator"
 import { 
   Phone, 
   Mail, 
@@ -19,23 +19,25 @@ import {
   MapPin, 
   Sparkles, 
   TrendingUp, 
-  DollarSign, 
   Calendar, 
   Clock, 
   BrainCircuit,
   History,
-  FileText,
-  Activity,
   ArrowLeft,
-  Flame,
   User,
-  MoreVertical
+  MoreVertical,
+  ArrowRight
 } from "lucide-react"
 import Link from "next/link"
 
 export default function ContactProfilePage() {
   const params = useParams();
   const contact = MOCK_CONTACTS.find(c => c.id === params.id) as Contact;
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   if (!contact) return <div className="p-8">Contact not found</div>;
 
@@ -66,12 +68,11 @@ export default function ContactProfilePage() {
             <Badge className="ml-2 bg-slate-100 text-slate-600 capitalize">{contact.pipeline_stage.replace('_', ' ')}</Badge>
             <div className="ml-auto flex gap-2">
               <Button size="sm" variant="outline" className="gap-2"><User className="h-4 w-4" /> Edit Profile</Button>
-              <Button size="sm" variant="ghost" size="icon"><MoreVertical className="h-4 w-4" /></Button>
+              <Button size="icon" variant="ghost" className="h-8 w-8"><MoreVertical className="h-4 w-4" /></Button>
             </div>
           </header>
           
           <main className="flex h-[calc(100vh-64px)] overflow-hidden">
-            {/* Left Sidebar - Summary */}
             <aside className="w-80 border-r bg-slate-50/50 p-6 flex flex-col gap-8 overflow-y-auto">
               <div className="flex flex-col items-center text-center gap-4">
                 <div className="h-24 w-24 rounded-full bg-primary flex items-center justify-center text-white text-3xl font-bold relative shadow-xl">
@@ -129,11 +130,9 @@ export default function ContactProfilePage() {
               </div>
             </aside>
 
-            {/* Center Area - Timeline & Intelligence */}
             <div className="flex-1 flex flex-col bg-white">
               <ScrollArea className="flex-1">
                 <div className="p-8 max-w-4xl mx-auto space-y-10">
-                  {/* AI Intel Panel */}
                   <section className="grid gap-6 md:grid-cols-2">
                     <Card className="border-none shadow-md bg-gradient-to-br from-slate-50 to-white">
                       <CardHeader className="pb-2">
@@ -159,7 +158,6 @@ export default function ContactProfilePage() {
                     </Card>
                   </section>
 
-                  {/* Activity History */}
                   <section className="space-y-6">
                     <div className="flex items-center justify-between">
                       <h2 className="text-lg font-bold flex items-center gap-2">
@@ -181,7 +179,13 @@ export default function ContactProfilePage() {
                           </div>
                           <div className="space-y-1 pt-1">
                             <div className="flex items-center justify-between">
-                              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{new Date(log.date).toLocaleDateString()} at {new Date(log.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                                {mounted ? (
+                                  <>
+                                    {new Date(log.date).toLocaleDateString()} at {new Date(log.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                  </>
+                                ) : '...'}
+                              </span>
                               {log.sentiment && <Badge className={`h-4 text-[8px] ${sentimentColors[log.sentiment]}`}>{log.sentiment.toUpperCase()}</Badge>}
                             </div>
                             <h4 className="font-bold text-slate-800">{log.outcome}</h4>
@@ -200,7 +204,6 @@ export default function ContactProfilePage() {
               </ScrollArea>
             </div>
 
-            {/* Right Sidebar - Intel */}
             <aside className="w-80 border-l bg-slate-50/50 p-6 space-y-8 overflow-y-auto">
               <section className="space-y-4">
                 <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Deal Snapshot</h3>

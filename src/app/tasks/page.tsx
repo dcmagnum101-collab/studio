@@ -1,7 +1,7 @@
 
 "use client"
 
-import React from "react"
+import React, { useState, useEffect } from "react"
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/layout/app-sidebar"
 import { MOCK_TASKS, Task } from "@/lib/mock-data"
@@ -24,7 +24,12 @@ import {
 import { format } from "date-fns"
 
 export default function TasksPage() {
-  const [tasks, setTasks] = React.useState<Task[]>(MOCK_TASKS);
+  const [tasks, setTasks] = useState<Task[]>(MOCK_TASKS);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const toggleTask = (id: string) => {
     setTasks(prev => prev.map(t => t.id === id ? { ...t, status: t.status === 'completed' ? 'pending' : 'completed' } : t));
@@ -51,7 +56,6 @@ export default function TasksPage() {
           </header>
           
           <main className="p-8 max-w-5xl mx-auto w-full space-y-8">
-            {/* AI Insights Bar */}
             <div className="bg-primary/5 border border-primary/10 rounded-2xl p-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-primary text-white rounded-lg">
@@ -100,7 +104,7 @@ export default function TasksPage() {
                             )}
                             <div className="flex items-center gap-4 pt-1">
                               <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground font-bold">
-                                <Calendar className="h-3 w-3" /> {format(new Date(task.due_date), 'h:mm a')}
+                                <Calendar className="h-3 w-3" /> {mounted ? format(new Date(task.due_date), 'h:mm a') : '...'}
                               </div>
                               <div className="flex items-center gap-2">
                                 {task.type === 'call' && <Button size="sm" className="h-7 text-[10px] gap-1 px-2"><Phone className="h-3 w-3" /> Call</Button>}

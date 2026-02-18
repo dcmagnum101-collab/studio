@@ -1,23 +1,20 @@
 
 "use client"
 
+import React, { useState, useEffect } from "react"
 import { Contact } from "@/lib/mock-data"
 import {
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
-  SheetDescription,
 } from "@/components/ui/sheet"
 import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { 
   Phone, 
   Mail, 
-  MapPin, 
   History, 
-  Activity, 
   Calendar, 
   FileText, 
   Home, 
@@ -37,6 +34,12 @@ interface ContactDetailsSheetProps {
 }
 
 export function ContactDetailsSheet({ contact, open, onOpenChange }: ContactDetailsSheetProps) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   if (!contact) return null;
 
   const getUrgencyMessage = () => {
@@ -95,7 +98,6 @@ export function ContactDetailsSheet({ contact, open, onOpenChange }: ContactDeta
 
         <ScrollArea className="flex-1">
           <div className="p-8 space-y-10">
-            {/* Property Intelligence */}
             <section className="space-y-4">
               <div className="flex items-center gap-2 text-sm font-bold text-slate-500 uppercase tracking-widest">
                 <Home className="h-4 w-4" /> Property Intelligence
@@ -123,7 +125,6 @@ export function ContactDetailsSheet({ contact, open, onOpenChange }: ContactDeta
               </div>
             </section>
 
-            {/* ArchAgent AI Insights */}
             <section className="space-y-4">
               <div className="flex items-center gap-2 text-sm font-bold text-slate-500 uppercase tracking-widest">
                 <BrainCircuit className="h-4 w-4" /> AI Predictive Insights
@@ -153,7 +154,6 @@ export function ContactDetailsSheet({ contact, open, onOpenChange }: ContactDeta
               </div>
             </section>
 
-            {/* Outreach Engine */}
             <section className="space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-sm font-bold text-slate-500 uppercase tracking-widest">
@@ -183,7 +183,6 @@ export function ContactDetailsSheet({ contact, open, onOpenChange }: ContactDeta
               </div>
             </section>
 
-            {/* Motivation Box */}
             <section className="space-y-4">
               <div className="flex items-center gap-2 text-sm font-bold text-slate-500 uppercase tracking-widest">
                 <Info className="h-4 w-4" /> Seller Motivation Intelligence
@@ -193,7 +192,6 @@ export function ContactDetailsSheet({ contact, open, onOpenChange }: ContactDeta
               </div>
             </section>
 
-            {/* Activity History */}
             <section className="space-y-4 pb-12">
               <div className="flex items-center gap-2 text-sm font-bold text-slate-500 uppercase tracking-widest">
                 <History className="h-4 w-4" /> Interaction History
@@ -210,7 +208,9 @@ export function ContactDetailsSheet({ contact, open, onOpenChange }: ContactDeta
                           <span className="text-xs font-bold text-primary flex items-center gap-1 uppercase tracking-tighter">
                             {log.type}
                           </span>
-                          <span className="text-[10px] text-muted-foreground font-medium">{new Date(log.date).toLocaleDateString()}</span>
+                          <span className="text-[10px] text-muted-foreground font-medium">
+                            {mounted ? new Date(log.date).toLocaleDateString() : '...'}
+                          </span>
                         </div>
                         <p className="text-sm font-bold text-slate-800">{log.outcome}</p>
                         <p className="text-xs text-muted-foreground italic leading-relaxed">"{log.summary}"</p>
