@@ -1,14 +1,20 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Secure per-user data access: Users can only access documents within their own user folder
-    match /users/{userId}/{allPaths=**} {
+    // Standard secure user data ownership
+    match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
+      
+      // Explicitly allow all subcollections for the owner
+      match /{allPaths=**} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
     }
     
-    // Fallback for general access if needed, though scoped above is preferred
+    // Support for specific administrative access if required
     match /{document=**} {
-      allow read, write: if request.auth != null && request.auth.uid == 'RZ0vqKV5BgZjJmWGwF9npV08TDd2';
+      allow read, write: if request.auth != null && (request.auth.uid == 'RZ0vqKV5BgZjJmWGwF9npV08TDd2' || request.auth.uid == 'HoJPC9XqooWR7ahPcejrnjXUpyE2');
     }
   }
 }
