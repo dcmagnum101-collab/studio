@@ -10,7 +10,8 @@ import {
   Settings,
   PieChart,
   LogOut,
-  Sparkles
+  Sparkles,
+  Map
 } from "lucide-react"
 
 import {
@@ -28,7 +29,8 @@ import { usePathname } from "next/navigation"
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
-  { name: "Contacts", href: "/contacts", icon: Users },
+  { name: "Prospector", href: "/contacts", icon: Users },
+  { name: "Farm Zones", href: "/farm", icon: Map },
   { name: "Outreach Builder", href: "/outreach", icon: Sparkles },
   { name: "Analytics", href: "/analytics", icon: PieChart },
   { name: "Settings", href: "/settings", icon: Settings },

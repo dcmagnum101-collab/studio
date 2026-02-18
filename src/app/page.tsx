@@ -12,7 +12,6 @@ import {
   TrendingUp, 
   Clock, 
   Activity, 
-  ChevronRight,
   Database
 } from "lucide-react";
 import { 
@@ -22,11 +21,10 @@ import {
   YAxis, 
   CartesianGrid, 
   Tooltip as ChartTooltip, 
-  ResponsiveContainer,
-  LineChart,
-  Line
+  ResponsiveContainer
 } from "recharts";
 import { Badge } from "@/components/ui/badge";
+import { MorningBriefingCard } from "@/components/morning-briefing/morning-briefing-card";
 
 const iconMap: Record<string, any> = {
   Users,
@@ -57,6 +55,9 @@ export default function DashboardPage() {
           </header>
           
           <main className="flex-1 space-y-8 p-8 max-w-7xl mx-auto w-full">
+            {/* Morning Briefing Hero */}
+            <MorningBriefingCard />
+
             {/* KPI Cards */}
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
               {KPI_STATS.map((stat) => {
@@ -121,14 +122,19 @@ export default function DashboardPage() {
               <Card className="lg:col-span-3 shadow-md">
                 <CardHeader className="flex flex-row items-center justify-between">
                   <div>
-                    <CardTitle>Lead Sources</CardTitle>
-                    <CardDescription>Performance by data provider.</CardDescription>
+                    <CardTitle>ArchAgent Lead Stream</CardTitle>
+                    <CardDescription>Performance by data source.</CardDescription>
                   </div>
                   <Database className="h-5 w-5 text-accent" />
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-6">
-                    {LEAD_SOURCES_STATS.map((source) => (
+                    {[
+                      { name: 'Expired Listings', count: 145, avgScore: 84, lastSync: '2 hours ago' },
+                      { name: 'FSBO Leads', count: 89, avgScore: 72, lastSync: '5 hours ago' },
+                      { name: 'Preforeclosures', count: 12, avgScore: 92, lastSync: '10 mins ago' },
+                      { name: 'FRBO / Landlords', count: 230, avgScore: 45, lastSync: '2 days ago' },
+                    ].map((source) => (
                       <div key={source.name} className="flex items-center">
                         <div className="flex-1 space-y-1">
                           <p className="text-sm font-semibold leading-none">{source.name}</p>

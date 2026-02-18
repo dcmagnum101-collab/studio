@@ -1,0 +1,100 @@
+
+{
+  "entities": {
+    "Contact": {
+      "title": "Contact",
+      "description": "A potential real estate seller lead with ArchAgent intelligence.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "phone": { "type": "string" },
+        "phone2": { "type": "string" },
+        "propertyAddress": { "type": "string" },
+        "city": { "type": "string" },
+        "state": { "type": "string" },
+        "zip": { "type": "string" },
+        "motivation": { "type": "string" },
+        "icpScore": { "type": "number" },
+        "archagent_source": {
+          "type": "string",
+          "enum": ["fsbo", "expired", "frbo", "preforeclosure", "circle_prospect", "recommended", "manual"]
+        },
+        "archagent_tags": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["absentee_owner", "high_equity", "free_and_clear", "empty_nester", "mover_upper", "out_of_state_owner"] }
+        },
+        "likely_to_list_score": { "type": "number" },
+        "likely_to_lead_score": { "type": "number" },
+        "likely_to_contact_score": { "type": "number" },
+        "days_on_market": { "type": "number" },
+        "days_since_expired": { "type": "number" },
+        "preforeclosure_status": { "type": "string" },
+        "auction_date": { "type": "string", "format": "date-time" },
+        "property_sqft": { "type": "number" },
+        "property_beds": { "type": "number" },
+        "property_baths": { "type": "number" },
+        "property_type": { "type": "string", "enum": ["single_family", "condo", "multi_family", "townhouse", "other"] },
+        "loan_to_value": { "type": "number" },
+        "outreach_sequence": { "type": "string" },
+        "sequence_step": { "type": "number" },
+        "sequence_next_date": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["Lead", "Contacted", "Meeting Set", "Closed", "Urgent", "DNC"] },
+        "source": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "FarmZone": {
+      "title": "Farm Zone",
+      "description": "A geographic area defined for lead prospecting.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "center_address": { "type": "string" },
+        "radius_miles": { "type": "number" },
+        "zip_codes": { "type": "array", "items": { "type": "string" } },
+        "active": { "type": "boolean" },
+        "total_contacts": { "type": "number" },
+        "last_pulled_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "MorningBriefing": {
+      "title": "Morning Briefing",
+      "description": "Daily AI-generated pipeline summary.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "generated_at": { "type": "string", "format": "date-time" },
+        "briefing_text": { "type": "string" },
+        "fresh_expireds_count": { "type": "number" },
+        "fresh_fsbos_count": { "type": "number" },
+        "fresh_frbo_count": { "type": "number" },
+        "preforeclosure_count": { "type": "number" },
+        "recommended_count": { "type": "number" },
+        "circle_prospects_count": { "type": "number" },
+        "top_priority_contact_id": { "type": "string" },
+        "top_priority_reason": { "type": "string" }
+      }
+    }
+  },
+  "auth": {
+    "providers": ["google.com", "password"]
+  },
+  "firestore": {
+    "/contacts/{contactId}": {
+      "schema": "Contact",
+      "description": "Individual lead records."
+    },
+    "/farm_zones/{zoneId}": {
+      "schema": "FarmZone",
+      "description": "Saved geographic farm zones."
+    },
+    "/morning_briefings/{briefingId}": {
+      "schema": "MorningBriefing",
+      "description": "Daily system briefings."
+    }
+  }
+}
