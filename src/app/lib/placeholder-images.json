@@ -1,0 +1,17 @@
+
+{
+  "placeholderImages": [
+    {
+      "id": "hero-dashboard",
+      "description": "Professional clean dashboard overview",
+      "imageUrl": "https://picsum.photos/seed/monica1/1200/800",
+      "imageHint": "business dashboard"
+    },
+    {
+      "id": "avatar-agent",
+      "description": "Professional AI agent avatar",
+      "imageUrl": "https://picsum.photos/seed/agent1/200/200",
+      "imageHint": "professional person"
+    }
+  ]
+}
