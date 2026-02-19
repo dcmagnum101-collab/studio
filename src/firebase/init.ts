@@ -7,7 +7,7 @@ import { firebaseConfig } from './config';
 
 /**
  * Initializes and returns Firebase service instances.
- * Ensures services are only initialized once.
+ * Ensures services are only initialized once and uses real SDK only.
  */
 export function initializeFirebase(): { firebaseApp: FirebaseApp; auth: Auth; firestore: Firestore } {
   let app: FirebaseApp;

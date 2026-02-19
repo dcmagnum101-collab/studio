@@ -5,7 +5,6 @@ import { onSnapshot, Query, DocumentData, QuerySnapshot } from 'firebase/firesto
 
 /**
  * A real-time Firestore collection hook using the real SDK.
- * @param q The Firestore Query to listen to.
  */
 export function useCollection<T = DocumentData>(q: Query<T> | null | undefined) {
   const [data, setData] = useState<T[] | null>(null);
@@ -31,7 +30,6 @@ export function useCollection<T = DocumentData>(q: Query<T> | null | undefined) 
         setLoading(false);
       },
       (err) => {
-        console.error('useCollection error:', err);
         setError(err);
         setLoading(false);
       }

@@ -4,8 +4,7 @@ import { useState, useEffect } from 'react';
 import { onSnapshot, DocumentReference, DocumentData, DocumentSnapshot } from 'firebase/firestore';
 
 /**
- * A real-time Firestore document hook.
- * @param ref The Firestore DocumentReference to listen to.
+ * A real-time Firestore document hook using the real SDK.
  */
 export function useDoc<T = DocumentData>(ref: DocumentReference<T> | null | undefined) {
   const [data, setData] = useState<T | null>(null);
@@ -27,7 +26,6 @@ export function useDoc<T = DocumentData>(ref: DocumentReference<T> | null | unde
         setLoading(false);
       },
       (err) => {
-        console.error('useDoc error:', err);
         setError(err);
         setLoading(false);
       }

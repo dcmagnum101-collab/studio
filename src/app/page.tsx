@@ -36,7 +36,7 @@ import { Progress } from "@/components/ui/progress";
 import { format } from "date-fns";
 import Link from "next/link";
 import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebase";
-import { collection, query, where, limit, orderBy } from "firebase/firestore";
+import { collection, query, limit, orderBy } from "firebase/firestore";
 
 const iconMap: Record<string, any> = {
   Users,
@@ -55,19 +55,19 @@ export default function DashboardPage() {
     setMounted(true);
   }, []);
 
-  // Simplified query to avoid composite index requirement (status + due_date)
+  // Simplified query to avoid composite index requirement
   const tasksQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     return query(
       collection(firestore, 'users', user.uid, 'tasks'),
       orderBy('due_date', 'asc'),
-      limit(20) // Fetch enough to find 5 pending ones in memory
+      limit(20)
     );
   }, [firestore, user]);
 
   const { data: allTasks, isLoading: tasksLoading } = useCollection(tasksQuery);
 
-  // Perform filtering in memory to avoid "missing index" errors
+  // Filter for "pending" status in memory to bypass Firestore Index requirements
   const liveTasks = useMemo(() => {
     if (!allTasks) return [];
     return allTasks.filter(t => t.status === 'pending').slice(0, 5);
