@@ -15,7 +15,7 @@ import {
   CalendarDays,
   Home,
   Database,
-  Search
+  Building2
 } from "lucide-react"
 
 import {
@@ -34,6 +34,7 @@ import { usePathname } from "next/navigation"
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
   { name: "Prospector", href: "/contacts", icon: Users },
+  { name: "MLS Intel", href: "/mls-intelligence", icon: Building2 },
   { name: "Sources Hub", href: "/sources", icon: Database },
   { name: "Pipeline", href: "/pipeline", icon: Trello },
   { name: "Tasks", href: "/tasks", icon: CheckSquare },

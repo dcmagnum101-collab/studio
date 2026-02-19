@@ -33,9 +33,35 @@
         "sequence_step": { "type": "number" },
         "ownerId": { "type": "string" },
         "created_at": { "type": "string", "format": "date-time" },
-        "updated_at": { "type": "string", "format": "date-time" }
+        "updated_at": { "type": "string", "format": "date-time" },
+        "trulia_id": { "type": "string" },
+        "listing_status": { "type": "string" }
       },
       "required": ["name", "ownerId"]
+    },
+    "TruliaListing": {
+      "title": "Trulia Listing",
+      "type": "object",
+      "properties": {
+        "trulia_id": { "type": "string" },
+        "address": { "type": "string" },
+        "city": { "type": "string" },
+        "state": { "type": "string" },
+        "zip": { "type": "string" },
+        "list_price": { "type": "number" },
+        "sold_price": { "type": "number" },
+        "beds": { "type": "number" },
+        "baths": { "type": "number" },
+        "sqft": { "type": "number" },
+        "listing_type": { "type": "string" },
+        "status": { "type": "string" },
+        "days_on_market": { "type": "number" },
+        "is_fsbo": { "type": "boolean" },
+        "is_foreclosure": { "type": "boolean" },
+        "price_reduced": { "type": "boolean" },
+        "market": { "type": "string" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      }
     },
     "Task": {
       "title": "Task",
@@ -95,60 +121,6 @@
         "total_contacts": { "type": "number" },
         "ownerId": { "type": "string" }
       }
-    },
-    "OpenHouseEvent": {
-      "title": "OpenHouseEvent",
-      "type": "object",
-      "description": "Physical event for lead capture.",
-      "properties": {
-        "address": { "type": "string" },
-        "date": { "type": "string", "format": "date-time" },
-        "signin_count": { "type": "number" },
-        "seller_count": { "type": "number" },
-        "status": { "type": "string" },
-        "ownerId": { "type": "string" }
-      }
-    },
-    "MorningBriefing": {
-      "title": "MorningBriefing",
-      "type": "object",
-      "properties": {
-        "date": { "type": "string", "format": "date" },
-        "briefing_text": { "type": "string" },
-        "fresh_expireds": { "type": "number" },
-        "fresh_fsbos": { "type": "number" },
-        "preforeclosure": { "type": "number" },
-        "frbo": { "type": "number" },
-        "recommended": { "type": "number" },
-        "circle": { "type": "number" },
-        "topPriorityId": { "type": "string" },
-        "ownerId": { "type": "string" }
-      }
-    },
-    "TrackedListing": {
-      "title": "TrackedListing",
-      "type": "object",
-      "properties": {
-        "address": { "type": "string" },
-        "list_price": { "type": "number" },
-        "list_date": { "type": "string", "format": "date" },
-        "listing_agent": { "type": "string" },
-        "source": { "type": "string" },
-        "dom": { "type": "number" },
-        "status": { "type": "string" },
-        "ownerId": { "type": "string" }
-      }
-    },
-    "DivorceLead": {
-      "title": "DivorceLead",
-      "type": "object",
-      "properties": {
-        "case_number": { "type": "string" },
-        "filing_date": { "type": "string", "format": "date" },
-        "address": { "type": "string" },
-        "status": { "type": "string" },
-        "ownerId": { "type": "string" }
-      }
     }
   },
   "auth": {
@@ -163,6 +135,18 @@
       "schema": { "$ref": "#/backend/entities/Task" },
       "description": "CRM tasks."
     },
+    "/users/{userId}/trulia_listings/{listingId}": {
+      "schema": { "$ref": "#/backend/entities/TruliaListing" },
+      "description": "Market listings tracked via Trulia API."
+    },
+    "/users/{userId}/trulia_cache/{cacheId}": {
+      "schema": { "type": "object" },
+      "description": "Trulia API response cache."
+    },
+    "/users/{userId}/rapidapi_quota/{month}": {
+      "schema": { "type": "object" },
+      "description": "Usage tracking for RapidAPI."
+    },
     "/users/{userId}/contacts/{contactId}/activityLogs/{logId}": {
       "schema": { "$ref": "#/backend/entities/CallLog" },
       "description": "Interaction history for a contact."
@@ -170,26 +154,6 @@
     "/users/{userId}/appointments/{appointmentId}": {
       "schema": { "$ref": "#/backend/entities/Appointment" },
       "description": "Scheduled events."
-    },
-    "/users/{userId}/farmZones/{zoneId}": {
-      "schema": { "$ref": "#/backend/entities/FarmZone" },
-      "description": "Saved geographic prospecting zones."
-    },
-    "/users/{userId}/openHouses/{eventId}": {
-      "schema": { "$ref": "#/backend/entities/OpenHouseEvent" },
-      "description": "Open house event records."
-    },
-    "/users/{userId}/morningBriefings/{briefingId}": {
-      "schema": { "$ref": "#/backend/entities/MorningBriefing" },
-      "description": "Daily AI-generated briefing records."
-    },
-    "/users/{userId}/trackedListings/{listingId}": {
-      "schema": { "$ref": "#/backend/entities/TrackedListing" },
-      "description": "Market listings being monitored for DOM thresholds."
-    },
-    "/users/{userId}/divorceLeads/{leadId}": {
-      "schema": { "$ref": "#/backend/entities/DivorceLead" },
-      "description": "Public record divorce filings."
     }
   }
 }
