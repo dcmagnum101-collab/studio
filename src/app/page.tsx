@@ -18,7 +18,8 @@ import {
   Smartphone,
   ShieldCheck,
   Zap,
-  Trello
+  Trello,
+  Mail
 } from "lucide-react";
 import { 
   BarChart, 
@@ -35,7 +36,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { format } from "date-fns";
 import Link from "next/link";
-import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebase";
+import { useUser, useFirestore, useCollection, useMemoFirebase, useDoc } from "@/firebase";
 import { collection, query, limit, orderBy } from "firebase/firestore";
 
 const iconMap: Record<string, any> = {
@@ -55,7 +56,6 @@ export default function DashboardPage() {
     setMounted(true);
   }, []);
 
-  // Simplified query to avoid composite index requirement
   const tasksQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     return query(
@@ -67,11 +67,19 @@ export default function DashboardPage() {
 
   const { data: allTasks, isLoading: tasksLoading } = useCollection(tasksQuery);
 
-  // Filter for "pending" status in memory to bypass Firestore Index requirements
   const liveTasks = useMemo(() => {
     if (!allTasks) return [];
     return allTasks.filter(t => t.status === 'pending').slice(0, 5);
   }, [allTasks]);
+
+  // Daily Email Quota Fetch
+  const today = new Date().toISOString().split('T')[0];
+  const quotaRef = useMemoFirebase(() => {
+    return `email_quota/${today}`;
+  }, [today]);
+  const { data: emailQuota } = useDoc(quotaRef);
+  const emailSentToday = emailQuota?.count || 0;
+  const quotaPercentage = (emailSentToday / 500) * 100;
 
   if (!mounted) return null;
 
@@ -148,21 +156,16 @@ export default function DashboardPage() {
                     </div>
                   </div>
 
-                  <div className="space-y-3">
-                    <h4 className="text-xs font-bold text-slate-700 uppercase tracking-widest">Active Intelligence Engines</h4>
-                    <div className="grid grid-cols-2 gap-2">
-                      {[
-                        { label: 'Probate Monitor', status: 'Live', color: 'text-green-600' },
-                        { label: 'Craigslist Parser', status: 'Scanning', color: 'text-blue-600' },
-                        { label: 'GIS Equity Miner', status: 'Refresh Soon', color: 'text-slate-600' },
-                        { label: 'Ghost Win-Back', status: 'Active', color: 'text-green-600' },
-                      ].map((engine) => (
-                        <div key={engine.label} className="flex items-center justify-between p-2 rounded-lg bg-slate-50 text-[10px]">
-                          <span className="font-bold">{engine.label}</span>
-                          <span className={engine.color}>{engine.status}</span>
-                        </div>
-                      ))}
+                  <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+                    <div className="flex justify-between items-center mb-3">
+                      <div className="flex items-center gap-2">
+                        <Mail className="h-4 w-4 text-primary" />
+                        <span className="text-xs font-bold uppercase text-slate-700">Daily Email Outreach Quota</span>
+                      </div>
+                      <Badge variant="outline" className="bg-white">{emailSentToday} / 500</Badge>
                     </div>
+                    <Progress value={quotaPercentage} className={`h-2 ${quotaPercentage > 90 ? 'bg-red-100' : quotaPercentage > 80 ? 'bg-yellow-100' : 'bg-slate-200'}`} />
+                    <p className="text-[10px] text-muted-foreground mt-2 italic">Monica uses Gmail bulk sending with artificial delay to ensure high deliverability.</p>
                   </div>
                 </CardContent>
               </Card>
@@ -185,8 +188,8 @@ export default function DashboardPage() {
                   </div>
                   <div className="h-px bg-slate-200 w-full" />
                   <div className="space-y-2">
-                    <p className="text-[10px] text-muted-foreground font-medium">Automatic DNC scrubbing is active for all ArchAgent data streams.</p>
-                    <Button variant="outline" className="w-full text-xs h-8">View DNC Policy</Button>
+                    <p className="text-[10px] text-muted-foreground font-medium">Automatic DNC scrubbing and Email Unsubscribe tracking are active.</p>
+                    <Button variant="outline" className="w-full text-xs h-8">View Compliance Logs</Button>
                   </div>
                 </CardContent>
               </Card>

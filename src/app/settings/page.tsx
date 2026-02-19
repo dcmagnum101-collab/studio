@@ -1,6 +1,6 @@
-
 "use client"
 
+import React, { useState } from "react";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -20,18 +20,26 @@ import {
   RefreshCw, 
   Search,
   Zap,
-  Youtube
+  Youtube,
+  Key,
+  Smartphone,
+  Building
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function SettingsPage() {
   const { toast } = useToast()
+  const [saving, setSaving] = useState(false);
 
-  const handleTestConnection = () => {
-    toast({
-      title: "ArchAgent Connection Successful",
-      description: "Data stream is active. 47 new leads received today."
-    })
+  const handleSaveSettings = () => {
+    setSaving(true);
+    setTimeout(() => {
+      setSaving(false);
+      toast({
+        title: "Settings Saved",
+        description: "Your Gmail and business configuration has been updated."
+      })
+    }, 800);
   }
 
   const bookmarkletCode = "javascript:(function(){var text=window.getSelection().toString()||document.body.innerText.substring(0,500);var url=window.location.href;window.open('https://monica-ai-hub.vercel.app/quick-capture?url='+encodeURIComponent(url)+'&text='+encodeURIComponent(text),'_blank','width=500,height=600');})();";
@@ -44,19 +52,55 @@ export default function SettingsPage() {
           <header className="flex h-16 shrink-0 items-center gap-2 border-b px-6 bg-white shadow-sm sticky top-0 z-10">
             <SidebarTrigger className="-ml-1" />
             <h1 className="text-xl font-bold font-headline text-primary">System Settings</h1>
+            <Button size="sm" className="ml-auto bg-primary" onClick={handleSaveSettings} disabled={saving}>
+              {saving ? <RefreshCw className="h-4 w-4 animate-spin mr-2" /> : null}
+              Save Changes
+            </Button>
           </header>
           
           <main className="p-8 max-w-4xl mx-auto w-full">
             <Tabs defaultValue="archagent">
               <TabsList className="mb-8 w-full justify-start gap-4 h-auto p-0 bg-transparent overflow-x-auto no-scrollbar">
-                <TabsTrigger value="general" className="data-[state=active]:bg-secondary rounded-lg px-4 py-2">General</TabsTrigger>
+                <TabsTrigger value="general" className="data-[state=active]:bg-secondary rounded-lg px-4 py-2">Business</TabsTrigger>
                 <TabsTrigger value="archagent" className="data-[state=active]:bg-secondary rounded-lg px-4 py-2">ArchAgent</TabsTrigger>
                 <TabsTrigger value="free-sources" className="data-[state=active]:bg-secondary rounded-lg px-4 py-2 flex gap-2">
                   <Database className="h-4 w-4" /> Free Sources
                 </TabsTrigger>
-                <TabsTrigger value="outreach" className="data-[state=active]:bg-secondary rounded-lg px-4 py-2">Outreach</TabsTrigger>
+                <TabsTrigger value="outreach" className="data-[state=active]:bg-secondary rounded-lg px-4 py-2">Gmail API</TabsTrigger>
                 <TabsTrigger value="notifications" className="data-[state=active]:bg-secondary rounded-lg px-4 py-2">Briefings</TabsTrigger>
               </TabsList>
+
+              <TabsContent value="general" className="space-y-6">
+                <Card className="border-none shadow-md">
+                  <CardHeader>
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-primary text-white rounded-lg shadow-sm">
+                        <Building className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <CardTitle>Brokerage & Brand</CardTitle>
+                        <CardDescription>Configuration for branded email templates and signatures.</CardDescription>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4 pt-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label className="text-xs font-bold uppercase">Business Phone</Label>
+                        <Input placeholder="(702) 555-0199" className="bg-slate-50" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs font-bold uppercase">Brokerage Name</Label>
+                        <Input placeholder="Selvaggio Global Real Estate" className="bg-slate-50" />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs font-bold uppercase">Public Calendar Link</Label>
+                      <Input placeholder="https://calendly.com/monica-selvaggio" className="bg-slate-50" />
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
 
               <TabsContent value="free-sources" className="space-y-6">
                 <Card className="border-none shadow-md">
@@ -92,17 +136,17 @@ export default function SettingsPage() {
                         <Database className="h-5 w-5" />
                       </div>
                       <div>
-                        <CardTitle>Free Public Pipelines</CardTitle>
-                        <CardDescription>Manage your automated free data source integrations.</CardDescription>
+                        <CardTitle>Public Data Pipelines</CardTitle>
+                        <CardDescription>Manage automated free data source integrations (Non-SendGrid).</CardDescription>
                       </div>
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-6">
                     <div className="grid md:grid-cols-2 gap-4">
                       {[
-                        { label: 'HUD Foreclosures', active: true },
-                        { label: 'Fannie Mae REO', active: true },
-                        { label: 'Clark County Divorce', active: true },
+                        { label: 'HUD Foreclosures (Direct)', active: true },
+                        { label: 'Fannie Mae REO (Feed)', active: true },
+                        { label: 'Clark County Divorce (Public)', active: true },
                         { label: 'NV Business Closures', active: false },
                         { label: 'USPS Vacancy Tracking', active: true },
                         { label: 'YouTube Comment Intel', active: true },
@@ -117,120 +161,43 @@ export default function SettingsPage() {
                     </div>
                   </CardContent>
                 </Card>
-
-                <Card className="border-none shadow-md">
-                  <CardHeader>
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-secondary text-primary rounded-lg">
-                        <Youtube className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <CardTitle>YouTube Integration</CardTitle>
-                        <CardDescription>Configure intent-monitoring for your YouTube channel.</CardDescription>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="grid gap-4">
-                      <div className="space-y-2">
-                        <Label className="text-xs font-bold uppercase">YouTube Channel ID</Label>
-                        <Input placeholder="UCxxxxxxxxxxxxxxxx" className="bg-slate-50" />
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-xs font-bold uppercase">Google Data API Key</Label>
-                        <Input type="password" placeholder="AIza..." className="bg-slate-50" />
-                      </div>
-                      <Button variant="outline" className="w-full gap-2 font-bold h-11 border-slate-200">
-                        Verify Integration
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
               </TabsContent>
 
-              <TabsContent value="archagent" className="space-y-6">
+              <TabsContent value="outreach" className="space-y-6">
                 <Card className="border-none shadow-md">
                   <CardHeader className="bg-slate-50/50">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 bg-primary text-white rounded-lg shadow-sm">
-                          <Globe className="h-5 w-5" />
-                        </div>
-                        <div>
-                          <CardTitle>ArchAgent Live Integration</CardTitle>
-                          <CardDescription>Configure lead data sync via Webhook.</CardDescription>
-                        </div>
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-primary text-white rounded-lg shadow-sm">
+                        <Mail className="h-5 w-5" />
                       </div>
-                      <Badge className="bg-green-500 font-bold text-white border-none">Live & Connected</Badge>
+                      <div>
+                        <CardTitle>Gmail Integration (Nodemailer)</CardTitle>
+                        <CardDescription>Configure your Gmail account for AI-powered outreach.</CardDescription>
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-6 pt-6">
-                    <div className="grid gap-2">
-                      <Label htmlFor="webhook" className="font-bold">Webhook Endpoint</Label>
-                      <div className="flex gap-2">
-                        <Input id="webhook" value="https://monica-ai.com/api/webhooks/archagent/a88a2a" readOnly className="bg-slate-50 font-mono text-xs" />
-                        <Button variant="outline" size="sm" onClick={() => {
-                          navigator.clipboard.writeText("https://monica-ai.com/api/webhooks/archagent/a88a2a")
-                          toast({ title: "Copied", description: "URL copied to clipboard" })
-                        }}>Copy</Button>
+                    <div className="grid gap-4">
+                      <div className="space-y-2">
+                        <Label className="font-bold flex items-center gap-2"><Mail className="h-3 w-3" /> Gmail User Address</Label>
+                        <Input placeholder="monica@gmail.com" className="bg-slate-50" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="font-bold flex items-center gap-2"><Key className="h-3 w-3" /> App Password</Label>
+                        <Input type="password" placeholder="xxxx xxxx xxxx xxxx" className="bg-slate-50" />
+                        <p className="text-[10px] text-muted-foreground">Generate this in your Google Account security settings under "App Passwords".</p>
                       </div>
                     </div>
-
-                    <div className="space-y-4">
-                      <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500">Active Data Streams</h3>
-                      <div className="grid grid-cols-2 gap-4">
-                        {[
-                          { label: 'FSBO Data', active: true },
-                          { label: 'Expired Listings', active: true },
-                          { label: 'FRBO Data', active: true },
-                          { label: 'Preforeclosure Data', active: true },
-                          { label: 'Neighborhood Data', active: true },
-                          { label: 'Likely to List AI', active: true },
-                        ].map((stream) => (
-                          <div key={stream.label} className="flex items-center justify-between p-3 rounded-xl border bg-slate-50/30">
-                            <span className="text-sm font-medium">{stream.label}</span>
-                            <Switch defaultChecked={stream.active} />
-                          </div>
-                        ))}
+                    <div className="p-4 bg-primary/5 rounded-xl border border-primary/10">
+                      <div className="flex justify-between items-center text-xs font-bold text-primary mb-2">
+                        <span>Daily Outreach Quota</span>
+                        <span>0 / 500 Used</span>
                       </div>
+                      <Progress value={0} className="h-1.5" />
                     </div>
-
-                    <Button className="w-full gap-2 font-bold py-6" variant="secondary" onClick={handleTestConnection}>
-                      <RefreshCw className="h-4 w-4" /> Test Real-time Sync
+                    <Button variant="secondary" className="w-full gap-2 font-bold py-6">
+                      <RefreshCw className="h-4 w-4" /> Verify Connection
                     </Button>
-                  </CardContent>
-                </Card>
-
-                <Card className="border-none shadow-md">
-                  <CardHeader>
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-accent text-white rounded-lg shadow-sm">
-                        <ShieldCheck className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <CardTitle>DNC Compliance Engine</CardTitle>
-                        <CardDescription>Automatic filtering against national registries.</CardDescription>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex items-center justify-between py-2">
-                      <div className="space-y-0.5">
-                        <Label className="font-bold">Auto-Flag DNC Leads</Label>
-                        <p className="text-xs text-muted-foreground">Automatically move DNC-flagged leads to restricted status.</p>
-                      </div>
-                      <Switch defaultChecked />
-                    </div>
-                    <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <Database className="h-5 w-5 text-slate-400" />
-                        <div>
-                          <div className="text-xs font-bold text-slate-700">Protected Registry</div>
-                          <div className="text-sm font-medium">4,281 Restricted Numbers</div>
-                        </div>
-                      </div>
-                      <Button variant="ghost" size="sm" className="text-xs font-bold">Update List</Button>
-                    </div>
                   </CardContent>
                 </Card>
               </TabsContent>
@@ -244,7 +211,7 @@ export default function SettingsPage() {
                       </div>
                       <div>
                         <CardTitle>Morning Pipeline Briefing</CardTitle>
-                        <CardDescription>Daily summary of fresh leads and top priorities.</CardDescription>
+                        <CardDescription>Daily summary of fresh leads and top priorities sent to Monica's Gmail.</CardDescription>
                       </div>
                     </div>
                   </CardHeader>
@@ -252,7 +219,7 @@ export default function SettingsPage() {
                     <div className="flex items-center justify-between">
                       <div className="space-y-0.5">
                         <Label className="font-bold">Send Daily Briefing</Label>
-                        <p className="text-xs text-muted-foreground">Receive a summary at the start of your business day.</p>
+                        <p className="text-xs text-muted-foreground">Receive a summary at the start of your business day via Gmail.</p>
                       </div>
                       <Switch defaultChecked />
                     </div>
@@ -269,47 +236,16 @@ export default function SettingsPage() {
                       <div className="space-y-2">
                         <Label className="text-xs font-bold uppercase">Notification Channel</Label>
                         <select className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm">
+                          <option value="Email & Dashboard">Gmail & Dashboard</option>
                           <option>Email Only</option>
-                          <option>SMS Only</option>
-                          <option value="Email & Dashboard">Email & Dashboard</option>
+                          <option>Dashboard Only</option>
                         </select>
                       </div>
                     </div>
 
                     <Button className="w-full gap-2 font-bold" variant="outline">
-                      <Sparkles className="h-4 w-4" /> Preview Tomorrow's Briefing
+                      <Sparkles className="h-4 w-4" /> Preview Tomorrow's Gmail Briefing
                     </Button>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="outreach" className="space-y-6">
-                <Card className="border-none shadow-md">
-                  <CardHeader>
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-orange-600 text-white rounded-lg shadow-sm">
-                        <Clock className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <CardTitle>Sequence Auto-Assignment</CardTitle>
-                        <CardDescription>Map lead sources to multi-touch outreach plans.</CardDescription>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {[
-                      { source: 'Expired Listings', sequence: 'expired_urgent' },
-                      { source: 'FSBO Leads', sequence: 'fsbo_3touch' },
-                      { source: 'Preforeclosures', sequence: 'preforeclosure_empathy' },
-                      { source: 'FRBO / Landlords', sequence: 'landlord_nurture' },
-                      { source: 'Circle Prospects', sequence: 'circle_prospect' },
-                      { source: 'Recommended', sequence: 'recommended_daily' },
-                    ].map((item) => (
-                      <div key={item.source} className="flex items-center justify-between p-4 rounded-xl border bg-slate-50/30">
-                        <span className="text-sm font-bold">{item.source}</span>
-                        <Badge variant="outline" className="bg-white font-mono text-[10px]">{item.sequence}</Badge>
-                      </div>
-                    ))}
                   </CardContent>
                 </Card>
               </TabsContent>
