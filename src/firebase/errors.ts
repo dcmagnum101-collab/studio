@@ -44,11 +44,11 @@ function buildAuthObject(currentUser: User | null): FirebaseAuthObject | null {
     phone_number: currentUser.phoneNumber,
     sub: currentUser.uid,
     firebase: {
-      identities: currentUser.providerData.reduce((acc, p) => {
+      identities: currentUser.providerData?.reduce((acc, p) => {
         if (p.providerId) acc[p.providerId] = [p.uid];
         return acc;
-      }, {} as Record<string, string[]>),
-      sign_in_provider: currentUser.providerData[0]?.providerId || 'custom',
+      }, {} as Record<string, string[]>) || {},
+      sign_in_provider: currentUser.providerData?.[0]?.providerId || 'custom',
       tenant: currentUser.tenantId,
     },
   };
@@ -59,9 +59,9 @@ function buildAuthObject(currentUser: User | null): FirebaseAuthObject | null {
 function buildRequestObject(context: SecurityRuleContext): SecurityRuleRequest {
   let authObject: FirebaseAuthObject | null = null;
   try {
-    const firebaseAuth = getAuth();
-    if (firebaseAuth.currentUser) {
-      authObject = buildAuthObject(firebaseAuth.currentUser);
+    const auth = getAuth();
+    if (auth.currentUser) {
+      authObject = buildAuthObject(auth.currentUser);
     }
   } catch (e) {
     // Silent catch if Auth is not yet initialized
