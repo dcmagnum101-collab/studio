@@ -26,41 +26,41 @@ import {
   ArrowRight
 } from "lucide-react"
 import Link from "next/link"
-import { useUser } from "@/firebase"
-import { collection, query, orderBy, addDoc } from "firebase/firestore"
+import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase, addDocumentNonBlocking } from "@/firebase"
+import { collection, query, orderBy } from "firebase/firestore"
 import { format } from "date-fns"
-import { db } from "@/lib/firebase"
-import { useDocument } from "@/hooks/use-document"
-import { useCollection } from "@/hooks/use-collection"
 
 export default function ContactProfilePage() {
   const params = useParams();
   const { user } = useUser();
+  const firestore = useFirestore();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  const { data: contact, loading: contactLoading } = useDocument(
-    user ? `users/${user.uid}/contacts` : '',
-    params.id as string
-  );
+  const contactRef = useMemoFirebase(() => {
+    if (!user || !firestore || !params.id) return null;
+    return `users/${user.uid}/contacts/${params.id}`;
+  }, [user, firestore, params.id]);
 
-  const logsQuery = useMemo(() => {
-    if (!user || !params.id) return null;
+  const { data: contact, isLoading: contactLoading } = useDoc(contactRef);
+
+  const logsQuery = useMemoFirebase(() => {
+    if (!user || !firestore || !params.id) return null;
     return query(
-      collection(db, 'users', user.uid, 'contacts', params.id as string, 'activityLogs'),
+      collection(firestore, 'users', user.uid, 'contacts', params.id as string, 'activityLogs'),
       orderBy('date', 'desc')
     );
-  }, [user, params.id]);
+  }, [user, firestore, params.id]);
 
   const { data: activityLogs } = useCollection(logsQuery);
 
   const handleLogActivity = (type: 'call' | 'sms' | 'email') => {
-    if (!user || !params.id) return;
-    const logsRef = collection(db, 'users', user.uid, 'contacts', params.id as string, 'activityLogs');
-    addDoc(logsRef, {
+    if (!user || !firestore || !params.id) return;
+    const logsRef = collection(firestore, 'users', user.uid, 'contacts', params.id as string, 'activityLogs');
+    addDocumentNonBlocking(logsRef, {
       type,
       date: new Date().toISOString(),
       outcome: `${type.toUpperCase()} outreach initiated`,

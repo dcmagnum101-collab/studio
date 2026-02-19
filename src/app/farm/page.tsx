@@ -21,7 +21,8 @@ import {
   RefreshCw,
   Plus,
   Zap,
-  MapPin
+  MapPin,
+  AlertTriangle
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { GoogleMap, useJsApiLoader, DrawingManager, InfoWindow } from "@react-google-maps/api"
@@ -174,11 +175,35 @@ export default function FarmZonePage() {
 
   if (loadError) {
     return (
-      <div className="flex items-center justify-center h-screen p-8 text-center flex-col gap-4">
-        <h2 className="text-xl font-bold text-destructive">Google Maps API Error</h2>
-        <p className="text-muted-foreground max-w-md">The map service could not be loaded. Please ensure the "Maps JavaScript API" is enabled in your Google Cloud Console for the provided API key.</p>
-        <Button variant="outline" onClick={() => window.location.reload()}>Retry</Button>
-      </div>
+      <SidebarProvider>
+        <div className="flex min-h-screen w-full">
+          <AppSidebar />
+          <SidebarInset>
+            <div className="flex flex-col items-center justify-center h-full p-8 text-center bg-slate-50">
+              <div className="bg-white p-10 rounded-3xl shadow-xl border border-red-100 max-w-md space-y-6">
+                <div className="h-20 w-20 bg-red-50 rounded-full flex items-center justify-center mx-auto">
+                  <AlertTriangle className="h-10 w-10 text-red-500" />
+                </div>
+                <h2 className="text-2xl font-black text-primary">Google Maps Activation Required</h2>
+                <p className="text-sm text-slate-600 leading-relaxed">
+                  The Google Maps service returned an <code className="bg-slate-100 px-1 rounded text-red-600">ApiNotActivatedMapError</code>. 
+                  This means your API key is valid, but the <strong>Maps JavaScript API</strong> must be enabled in your Google Cloud Console.
+                </p>
+                <div className="space-y-2 pt-4">
+                  <Button className="w-full bg-primary" asChild>
+                    <a href="https://console.cloud.google.com/google/maps-apis/api-list" target="_blank" rel="noopener noreferrer">
+                      Open Google Cloud Console
+                    </a>
+                  </Button>
+                  <Button variant="ghost" className="w-full" onClick={() => window.location.reload()}>
+                    Refresh After Enabling
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </SidebarInset>
+        </div>
+      </SidebarProvider>
     );
   }
 
@@ -268,7 +293,7 @@ export default function FarmZonePage() {
 
                   {selectedParcel && (
                     <InfoWindow
-                      position={selectedParcel.geometry?.y ? { lat: selectedParcel.geometry.y, lng: selectedParcel.geometry.x } : undefined}
+                      position={selectedParcel.geometry?.y ? { lat: selectedParcel.geometry.y, lng: selectedParcel.geometry.x } : (selectedParcel.geometry?.rings ? { lat: selectedParcel.geometry.rings[0][0][1], lng: selectedParcel.geometry.rings[0][0][0] } : undefined)}
                       onCloseClick={() => setSelectedParcel(null)}
                     >
                       <div className="p-2 max-w-xs space-y-3">

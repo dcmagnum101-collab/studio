@@ -32,10 +32,8 @@ import {
 import { ContactDetailsSheet } from "@/components/contacts/contact-details-sheet";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SocialLeadCapture } from "@/components/prospecting/social-lead-capture";
-import { useUser } from "@/firebase";
+import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebase";
 import { collection, query, orderBy } from "firebase/firestore";
-import { db } from "@/lib/firebase";
-import { useCollection } from "@/hooks/use-collection";
 
 const SOURCE_CONFIG: Record<string, { label: string; color: string }> = {
   expired: { label: 'Expired', color: 'bg-red-500' },
@@ -52,6 +50,7 @@ const SOURCE_CONFIG: Record<string, { label: string; color: string }> = {
 
 export default function ContactsPage() {
   const { user } = useUser();
+  const firestore = useFirestore();
   const [selectedContact, setSelectedContact] = React.useState<any | null>(null);
   const [sheetOpen, setSheetOpen] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState<string>("all");
@@ -62,15 +61,15 @@ export default function ContactsPage() {
     setMounted(true);
   }, []);
 
-  const contactsQuery = useMemo(() => {
-    if (!user) return null;
+  const contactsQuery = useMemoFirebase(() => {
+    if (!user || !firestore) return null;
     return query(
-      collection(db, 'users', user.uid, 'contacts'),
+      collection(firestore, 'users', user.uid, 'contacts'),
       orderBy('name', 'asc')
     );
-  }, [user]);
+  }, [user, firestore]);
 
-  const { data: liveContacts, loading: isLoading } = useCollection(contactsQuery);
+  const { data: liveContacts, isLoading } = useCollection(contactsQuery);
 
   const handleViewDetails = (contact: any) => {
     setSelectedContact(contact);

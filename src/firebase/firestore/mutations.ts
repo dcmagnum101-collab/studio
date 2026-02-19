@@ -18,6 +18,7 @@ import {
  */
 export function addDocumentNonBlocking<T = DocumentData>(ref: CollectionReference<T>, data: WithFieldValue<T>) {
   addDoc(ref, data).catch(err => {
+    // Silently fail or log locally; global error listener handles permissions
     console.error("Non-blocking add failed:", err);
   });
 }
