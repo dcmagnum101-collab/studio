@@ -35,10 +35,8 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { format } from "date-fns";
 import Link from "next/link";
-import { useUser } from "@/firebase";
+import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebase";
 import { collection, query, where, limit, orderBy } from "firebase/firestore";
-import { db } from "@/lib/firebase";
-import { useCollection } from "@/hooks/use-collection";
 
 const iconMap: Record<string, any> = {
   Users,
@@ -50,23 +48,30 @@ const iconMap: Record<string, any> = {
 
 export default function DashboardPage() {
   const { user } = useUser();
+  const firestore = useFirestore();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  const tasksQuery = useMemo(() => {
-    if (!user) return null;
+  // Simplified query to avoid composite index requirement (status + due_date)
+  const tasksQuery = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
     return query(
-      collection(db, 'users', user.uid, 'tasks'),
-      where('status', '==', 'pending'),
+      collection(firestore, 'users', user.uid, 'tasks'),
       orderBy('due_date', 'asc'),
-      limit(5)
+      limit(20) // Fetch enough to find 5 pending ones in memory
     );
-  }, [user]);
+  }, [firestore, user]);
 
-  const { data: liveTasks, loading: tasksLoading } = useCollection(tasksQuery);
+  const { data: allTasks, isLoading: tasksLoading } = useCollection(tasksQuery);
+
+  // Perform filtering in memory to avoid "missing index" errors
+  const liveTasks = useMemo(() => {
+    if (!allTasks) return [];
+    return allTasks.filter(t => t.status === 'pending').slice(0, 5);
+  }, [allTasks]);
 
   if (!mounted) return null;
 
@@ -195,7 +200,7 @@ export default function DashboardPage() {
                       <CardTitle className="text-lg">Today's Game Plan</CardTitle>
                       <CardDescription>Monica's Top Priorities</CardDescription>
                     </div>
-                    <Badge className="bg-primary">{liveTasks?.length || 0} Actions</Badge>
+                    <Badge className="bg-primary">{liveTasks.length} Actions</Badge>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -210,7 +215,7 @@ export default function DashboardPage() {
                   <div className="space-y-3">
                     {tasksLoading ? (
                       <p className="text-center text-xs py-10 text-muted-foreground">Loading actions...</p>
-                    ) : liveTasks && liveTasks.length > 0 ? (
+                    ) : liveTasks.length > 0 ? (
                       liveTasks.map(task => (
                         <div key={task.id} className="bg-white p-3 rounded-xl border flex items-center gap-3 shadow-sm">
                           <div className={`h-2 w-2 rounded-full shrink-0 ${task.priority === 'urgent' ? 'bg-red-500' : 'bg-blue-400'}`} />

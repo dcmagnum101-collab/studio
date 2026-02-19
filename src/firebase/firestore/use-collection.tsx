@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { onSnapshot, Query, DocumentData, QuerySnapshot } from 'firebase/firestore';
 
 /**
- * A real-time Firestore collection hook.
+ * A real-time Firestore collection hook using the real SDK.
  * @param q The Firestore Query to listen to.
  */
 export function useCollection<T = DocumentData>(q: Query<T> | null | undefined) {
