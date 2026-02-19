@@ -1,3 +1,4 @@
+
 "use client"
 
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
@@ -9,7 +10,18 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Database, Globe, ShieldCheck, Sparkles, Clock, Mail, RefreshCw } from "lucide-react";
+import { 
+  Database, 
+  Globe, 
+  ShieldCheck, 
+  Sparkles, 
+  Clock, 
+  Mail, 
+  RefreshCw, 
+  Search,
+  Zap,
+  Youtube
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function SettingsPage() {
@@ -21,6 +33,8 @@ export default function SettingsPage() {
       description: "Data stream is active. 47 new leads received today."
     })
   }
+
+  const bookmarkletCode = "javascript:(function(){var text=window.getSelection().toString()||document.body.innerText.substring(0,500);var url=window.location.href;window.open('https://monica-ai-hub.vercel.app/quick-capture?url='+encodeURIComponent(url)+'&text='+encodeURIComponent(text),'_blank','width=500,height=600');})();";
 
   return (
     <SidebarProvider>
@@ -34,12 +48,105 @@ export default function SettingsPage() {
           
           <main className="p-8 max-w-4xl mx-auto w-full">
             <Tabs defaultValue="archagent">
-              <TabsList className="mb-8 w-full justify-start gap-4 h-auto p-0 bg-transparent">
+              <TabsList className="mb-8 w-full justify-start gap-4 h-auto p-0 bg-transparent overflow-x-auto no-scrollbar">
                 <TabsTrigger value="general" className="data-[state=active]:bg-secondary rounded-lg px-4 py-2">General</TabsTrigger>
-                <TabsTrigger value="archagent" className="data-[state=active]:bg-secondary rounded-lg px-4 py-2">ArchAgent Data</TabsTrigger>
-                <TabsTrigger value="outreach" className="data-[state=active]:bg-secondary rounded-lg px-4 py-2">Outreach Config</TabsTrigger>
+                <TabsTrigger value="archagent" className="data-[state=active]:bg-secondary rounded-lg px-4 py-2">ArchAgent</TabsTrigger>
+                <TabsTrigger value="free-sources" className="data-[state=active]:bg-secondary rounded-lg px-4 py-2 flex gap-2">
+                  <Database className="h-4 w-4" /> Free Sources
+                </TabsTrigger>
+                <TabsTrigger value="outreach" className="data-[state=active]:bg-secondary rounded-lg px-4 py-2">Outreach</TabsTrigger>
                 <TabsTrigger value="notifications" className="data-[state=active]:bg-secondary rounded-lg px-4 py-2">Briefings</TabsTrigger>
               </TabsList>
+
+              <TabsContent value="free-sources" className="space-y-6">
+                <Card className="border-none shadow-md">
+                  <CardHeader className="bg-slate-50/50">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-accent text-white rounded-lg shadow-sm">
+                        <Zap className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <CardTitle>Quick Capture Bookmarklet</CardTitle>
+                        <CardDescription>Install the bookmarklet to capture leads directly from social media.</CardDescription>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-6 space-y-4">
+                    <div className="bg-slate-50 p-4 rounded-xl border border-dashed border-slate-300 flex flex-col items-center gap-4 text-center">
+                      <p className="text-xs text-muted-foreground max-w-sm">Drag the button below to your browser's bookmarks bar. Click it while on Facebook, Nextdoor, or LinkedIn to instantly send leads to Monica.</p>
+                      <a 
+                        href={bookmarkletCode} 
+                        className="px-6 py-3 bg-primary text-white rounded-full font-bold text-sm shadow-lg hover:scale-105 transition-transform inline-flex items-center gap-2"
+                        onClick={(e) => e.preventDefault()}
+                      >
+                        <Sparkles className="h-4 w-4" /> Monica Quick Capture
+                      </a>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-none shadow-md">
+                  <CardHeader>
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-primary text-white rounded-lg">
+                        <Database className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <CardTitle>Free Public Pipelines</CardTitle>
+                        <CardDescription>Manage your automated free data source integrations.</CardDescription>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div className="grid md:grid-cols-2 gap-4">
+                      {[
+                        { label: 'HUD Foreclosures', active: true },
+                        { label: 'Fannie Mae REO', active: true },
+                        { label: 'Clark County Divorce', active: true },
+                        { label: 'NV Business Closures', active: false },
+                        { label: 'USPS Vacancy Tracking', active: true },
+                        { label: 'YouTube Comment Intel', active: true },
+                        { label: 'Realtor Open Houses', active: true },
+                        { label: 'Wayback Machine Sync', active: true },
+                      ].map((source) => (
+                        <div key={source.label} className="flex items-center justify-between p-3 rounded-xl border bg-slate-50/30">
+                          <span className="text-sm font-medium">{source.label}</span>
+                          <Switch defaultChecked={source.active} />
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-none shadow-md">
+                  <CardHeader>
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-secondary text-primary rounded-lg">
+                        <Youtube className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <CardTitle>YouTube Integration</CardTitle>
+                        <CardDescription>Configure intent-monitoring for your YouTube channel.</CardDescription>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid gap-4">
+                      <div className="space-y-2">
+                        <Label className="text-xs font-bold uppercase">YouTube Channel ID</Label>
+                        <Input placeholder="UCxxxxxxxxxxxxxxxx" className="bg-slate-50" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs font-bold uppercase">Google Data API Key</Label>
+                        <Input type="password" placeholder="AIza..." className="bg-slate-50" />
+                      </div>
+                      <Button variant="outline" className="w-full gap-2 font-bold h-11 border-slate-200">
+                        Verify Integration
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
 
               <TabsContent value="archagent" className="space-y-6">
                 <Card className="border-none shadow-md">

@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "Contact": {
@@ -123,6 +124,31 @@
         "topPriorityId": { "type": "string" },
         "ownerId": { "type": "string" }
       }
+    },
+    "TrackedListing": {
+      "title": "TrackedListing",
+      "type": "object",
+      "properties": {
+        "address": { "type": "string" },
+        "list_price": { "type": "number" },
+        "list_date": { "type": "string", "format": "date" },
+        "listing_agent": { "type": "string" },
+        "source": { "type": "string" },
+        "dom": { "type": "number" },
+        "status": { "type": "string" },
+        "ownerId": { "type": "string" }
+      }
+    },
+    "DivorceLead": {
+      "title": "DivorceLead",
+      "type": "object",
+      "properties": {
+        "case_number": { "type": "string" },
+        "filing_date": { "type": "string", "format": "date" },
+        "address": { "type": "string" },
+        "status": { "type": "string" },
+        "ownerId": { "type": "string" }
+      }
     }
   },
   "auth": {
@@ -156,6 +182,14 @@
     "/users/{userId}/morningBriefings/{briefingId}": {
       "schema": { "$ref": "#/backend/entities/MorningBriefing" },
       "description": "Daily AI-generated briefing records."
+    },
+    "/users/{userId}/trackedListings/{listingId}": {
+      "schema": { "$ref": "#/backend/entities/TrackedListing" },
+      "description": "Market listings being monitored for DOM thresholds."
+    },
+    "/users/{userId}/divorceLeads/{leadId}": {
+      "schema": { "$ref": "#/backend/entities/DivorceLead" },
+      "description": "Public record divorce filings."
     }
   }
 }
