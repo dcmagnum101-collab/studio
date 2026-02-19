@@ -1,3 +1,4 @@
+
 "use client"
 
 import React, { useState, useEffect } from "react"
@@ -37,6 +38,7 @@ import { collection } from "firebase/firestore"
 
 export default function MLSIntelligencePage() {
   const { user } = useUser();
+  const firestore = useFirestore();
   const { toast } = useToast();
   const [activeMarket, setActiveMarket] = useState("las_vegas");
   const [listings, setListings] = useState<any[]>([]);
@@ -72,9 +74,8 @@ export default function MLSIntelligencePage() {
   };
 
   const handleCreateLead = (listing: any) => {
-    if (!user) return;
-    const db = useFirestore();
-    const contactsRef = collection(db, 'users', user.uid, 'contacts');
+    if (!user || !firestore) return;
+    const contactsRef = collection(firestore, 'users', user.uid, 'contacts');
     
     let icp = 50;
     if (listing.is_fsbo) icp += 15;

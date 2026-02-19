@@ -27,11 +27,12 @@ import {
   PieChart
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useUser, useDoc, useMemoFirebase, useCollection } from "@/firebase";
+import { useUser, useDoc, useMemoFirebase, useCollection, useFirestore } from "@/firebase";
 import { collection, query, orderBy, limit } from "firebase/firestore";
 
 export default function SettingsPage() {
   const { user } = useUser();
+  const firestore = useFirestore();
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
 
@@ -42,8 +43,9 @@ export default function SettingsPage() {
 
   // AI Usage Data
   const aiUsageQuery = useMemoFirebase(() => {
-    return query(collection(useFirestore(), 'ai_usage'), orderBy('called_at', 'desc'), limit(50));
-  }, []);
+    if (!firestore) return null;
+    return query(collection(firestore, 'ai_usage'), orderBy('called_at', 'desc'), limit(50));
+  }, [firestore]);
   const { data: aiUsage } = useCollection(aiUsageQuery);
 
   const totalTokens = (aiUsage || []).reduce((acc, curr) => acc + (curr.total_tokens || 0), 0);
@@ -198,7 +200,7 @@ export default function SettingsPage() {
                         <Progress value={((quota?.realtor_calls || 0) / 500) * 100} className="h-1" />
                       </div>
                     </CardContent>
-                  </Card>
+                  </div>
                 </div>
               </TabsContent>
 
