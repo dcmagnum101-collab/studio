@@ -1,9 +1,9 @@
 "use client"
 
-import React, { useState, useEffect, useCallback, useMemo } from "react"
+import React, { useState, useEffect, useCallback } from "react"
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/layout/app-sidebar"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -17,21 +17,14 @@ import {
   Square, 
   Circle as CircleIcon, 
   Download, 
-  Layers,
-  Sparkles,
-  Home,
-  Users,
-  Info,
-  TrendingUp,
-  MapPin,
+  Users, 
   RefreshCw,
   Plus,
-  Flame,
   Zap,
-  History
+  MapPin
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { GoogleMap, useJsApiLoader, DrawingManager, Polygon, InfoWindow, Marker } from "@react-google-maps/api"
+import { GoogleMap, useJsApiLoader, DrawingManager, InfoWindow } from "@react-google-maps/api"
 import { searchProperties, fetchParcelAtPoint, pullZoneParcels, calculateICPScore, ClarkParcel } from "@/lib/clark-county"
 import { useUser, useFirestore, addDocumentNonBlocking } from "@/firebase"
 import { collection } from "firebase/firestore"
@@ -60,9 +53,8 @@ export default function FarmZonePage() {
   const [loading, setLoading] = useState(false);
   const [maxContacts, setMaxContacts] = useState([100]);
   const [zoom, setZoom] = useState(12);
-  const [justSoldAddress, setJustSoldAddress] = useState("");
 
-  const { isLoaded } = useJsApiLoader({
+  const { isLoaded, loadError } = useJsApiLoader({
     id: 'google-map-script',
     googleMapsApiKey: "AIzaSyAKHt2xQfi9XvjwpVu9_nC-yiTXYMqmefE",
     libraries: ['drawing', 'geometry', 'places']
@@ -116,10 +108,7 @@ export default function FarmZonePage() {
     
     try {
       if (e.type === 'circle') {
-        const radius = e.overlay.getRadius();
-        const center = e.overlay.getCenter();
         const bounds = e.overlay.getBounds();
-        
         results = await pullZoneParcels({
           xmin: bounds.getSouthWest().lng(),
           ymin: bounds.getSouthWest().lat(),
@@ -182,6 +171,16 @@ export default function FarmZonePage() {
   };
 
   if (!mounted) return null;
+
+  if (loadError) {
+    return (
+      <div className="flex items-center justify-center h-screen p-8 text-center flex-col gap-4">
+        <h2 className="text-xl font-bold text-destructive">Google Maps API Error</h2>
+        <p className="text-muted-foreground max-w-md">The map service could not be loaded. Please ensure the "Maps JavaScript API" is enabled in your Google Cloud Console for the provided API key.</p>
+        <Button variant="outline" onClick={() => window.location.reload()}>Retry</Button>
+      </div>
+    );
+  }
 
   return (
     <SidebarProvider>
