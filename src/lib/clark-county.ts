@@ -1,3 +1,5 @@
+import { HIGH_MOBILITY_ZIPS } from "./census";
+
 export interface ClarkParcel {
   APN: string;
   OWNER_NAME: string;
@@ -44,6 +46,11 @@ export const calculateICPScore = (parcel: ClarkParcel) => {
     if (appreciation > 0.5) {
       score += 15;
     }
+  }
+
+  // Census Mobility Bonus
+  if (parcel.SITUS_ZIP && HIGH_MOBILITY_ZIPS.includes(parcel.SITUS_ZIP)) {
+    score += 6;
   }
   
   // Residential land use
