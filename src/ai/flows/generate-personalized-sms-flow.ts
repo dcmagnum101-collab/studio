@@ -1,85 +1,27 @@
+
 'use server';
 /**
- * @fileOverview A Genkit flow for generating personalized SMS messages for potential sellers.
+ * @fileOverview Refactored to use Grok (xAI) for SMS generation.
  */
 
-import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
-
-const GeneratePersonalizedSMSInputSchema = z.object({
-  contactName: z.string().describe('The name of the potential seller.'),
-  propertyAddress: z
-    .string()
-    .describe('The address of the potential seller\'s property.'),
-  estimateInfo: z
-    .string()
-    .describe(
-      'Details about the free estimate offered, e.g., "We offer a free, no-obligation estimate of your property\'s value."'
-    ),
-  sellerMotivation: z
-    .string()
-    .optional()
-    .describe(
-      'Optional: Information about the seller\'s motivation, if known, to personalize the message further.'
-    ),
-});
-export type GeneratePersonalizedSMSInput = z.infer<
-  typeof GeneratePersonalizedSMSInputSchema
->;
+import { grokJSON } from '@/services/grok-service';
+import { monicaSystemPrompt } from '@/config/monica-system-prompt';
+import { z } from 'zod';
 
 const GeneratePersonalizedSMSOutputSchema = z.object({
-  smsMessage: z.string().describe('The personalized SMS message for the potential seller.'),
+  smsMessage: z.string(),
 });
-export type GeneratePersonalizedSMSOutput = z.infer<
-  typeof GeneratePersonalizedSMSOutputSchema
->;
 
-export async function generatePersonalizedSMS(
-  input: GeneratePersonalizedSMSInput
-): Promise<GeneratePersonalizedSMSOutput> {
-  return generatePersonalizedSMSFlow(input);
+export type GeneratePersonalizedSMSOutput = z.infer<typeof GeneratePersonalizedSMSOutputSchema>;
+
+export async function generatePersonalizedSMS(input: {
+  contactName: string;
+  propertyAddress: string;
+  estimateInfo: string;
+  sellerMotivation?: string;
+}): Promise<GeneratePersonalizedSMSOutput> {
+  const system = `${monicaSystemPrompt}\n\nWrite a short, conversational text message (max 160 chars). No robot-speak. Return JSON only.`;
+  const user = `Write a text to ${input.contactName} about ${input.propertyAddress}. Offer: ${input.estimateInfo}. ${input.sellerMotivation ? `Context: ${input.sellerMotivation}` : ''}`;
+
+  return grokJSON<GeneratePersonalizedSMSOutput>(system, user);
 }
-
-const prompt = ai.definePrompt({
-  name: 'generatePersonalizedSMSPrompt',
-  input: {schema: GeneratePersonalizedSMSInputSchema},
-  output: {schema: GeneratePersonalizedSMSOutputSchema},
-  config: {
-    safetySettings: [
-      { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
-      { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
-      { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
-      { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
-    ],
-  },
-  prompt: `You are a sales agent generating a personalized SMS message for a potential seller.
-Your goal is to create a concise, polite, and effective message that encourages them to engage.
-Address the contact by their name if available.
-Mention the property address and the free estimate offer.
-If seller motivation is provided, use it to make the message more relevant.
-
-Here is the information:
-Contact Name: {{{contactName}}}
-Property Address: {{{propertyAddress}}}
-Free Estimate Information: {{{estimateInfo}}}
-{{#if sellerMotivation}}
-Seller Motivation: {{{sellerMotivation}}}
-{{/if}}
-
-Generated SMS:`,
-});
-
-const generatePersonalizedSMSFlow = ai.defineFlow(
-  {
-    name: 'generatePersonalizedSMSFlow',
-    inputSchema: GeneratePersonalizedSMSInputSchema,
-    outputSchema: GeneratePersonalizedSMSOutputSchema,
-  },
-  async input => {
-    const {output} = await prompt(input);
-    if (!output) {
-      throw new Error('Failed to generate SMS message.');
-    }
-    return output;
-  }
-);

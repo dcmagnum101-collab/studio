@@ -1,85 +1,31 @@
+
 'use server';
 /**
- * @fileOverview A Genkit flow for generating personalized outreach emails to potential sellers.
+ * @fileOverview Refactored to use Grok (xAI) for email generation.
  */
 
-import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
-
-const GeneratePersonalizedEmailInputSchema = z.object({
-  contactName: z.string().describe("The potential seller's name."),
-  contactEmail: z.string().email().describe("The potential seller's email address."),
-  propertyName: z.string().describe('The address or name of the property.'),
-  sellerMotivation: z
-    .string()
-    .describe('The primary motivation for the seller to sell the property.'),
-  companyName: z.string().describe('The name of the company sending the email.'),
-  agentName: z.string().describe('The name of the sales agent sending the email.'),
-});
-export type GeneratePersonalizedEmailInput = z.infer<
-  typeof GeneratePersonalizedEmailInputSchema
->;
+import { grokJSON } from '@/services/grok-service';
+import { monicaSystemPrompt } from '@/config/monica-system-prompt';
+import { z } from 'zod';
 
 const GeneratePersonalizedEmailOutputSchema = z.object({
-  subject: z.string().describe('The subject line of the personalized outreach email.'),
-  body: z.string().describe('The full body of the personalized outreach email.'),
+  subject: z.string(),
+  body: z.string(),
 });
-export type GeneratePersonalizedEmailOutput = z.infer<
-  typeof GeneratePersonalizedEmailOutputSchema
->;
 
-export async function generatePersonalizedEmail(
-  input: GeneratePersonalizedEmailInput
-): Promise<GeneratePersonalizedEmailOutput> {
-  return generatePersonalizedEmailFlow(input);
+export type GeneratePersonalizedEmailOutput = z.infer<typeof GeneratePersonalizedEmailOutputSchema>;
+
+export async function generatePersonalizedEmail(input: {
+  contactName: string;
+  contactEmail: string;
+  propertyName: string;
+  sellerMotivation: string;
+  companyName: string;
+  agentName: string;
+}): Promise<GeneratePersonalizedEmailOutput> {
+  const system = `${monicaSystemPrompt}\n\nWrite a warm, professional, and personalized outreach email. No fluff. Return JSON only with subject and body.`;
+  const user = `Write an outreach email to ${input.contactName} regarding their property at ${input.propertyName}. 
+  Motivation context: ${input.sellerMotivation}`;
+
+  return grokJSON<GeneratePersonalizedEmailOutput>(system, user);
 }
-
-const personalizedEmailPrompt = ai.definePrompt({
-  name: 'personalizedEmailPrompt',
-  input: {schema: GeneratePersonalizedEmailInputSchema},
-  output: {schema: GeneratePersonalizedEmailOutputSchema},
-  config: {
-    safetySettings: [
-      { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
-      { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
-      { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
-      { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
-    ],
-  },
-  prompt: `You are an expert sales agent for a company named '{{{companyName}}}' specializing in buying properties directly from sellers.
-Your goal is to write a highly personalized, warm, and professional outreach email to a potential seller to gauge their interest in selling their property.
-
-Use the following information to craft the email:
-
-Seller's Name: {{{contactName}}}
-Seller's Email: {{{contactEmail}}}
-Property Name/Address: {{{propertyName}}}
-Seller's Motivation: {{{sellerMotivation}}}
-Your Name (Agent): {{{agentName}}}
-Company Name: {{{companyName}}}
-
-Craft an email that includes a compelling subject line and a persuasive body. The email should:
-- Be friendly and respectful.
-- Briefly mention the property and acknowledge the seller's potential motivation.
-- Offer a call to action to discuss further.
-- Ensure all provided details (name, property, motivation) are seamlessly integrated.
-
-Subject: Start with a personal touch and a clear value proposition.
-Body: Be concise, clear, and focused on the seller's benefit.
-`,
-});
-
-const generatePersonalizedEmailFlow = ai.defineFlow(
-  {
-    name: 'generatePersonalizedEmailFlow',
-    inputSchema: GeneratePersonalizedEmailInputSchema,
-    outputSchema: GeneratePersonalizedEmailOutputSchema,
-  },
-  async input => {
-    const {output} = await personalizedEmailPrompt(input);
-    if (!output) {
-      throw new Error('Failed to generate personalized email.');
-    }
-    return output;
-  }
-);
