@@ -49,7 +49,7 @@ export default function FarmZonePage() {
   const { toast } = useToast();
   const [mounted, setMounted] = useState(false);
   const [map, setMap] = useState<google.maps.Map | null>(null);
-  const [drawingMode, setDrawingMode] = useState<google.maps.drawing.OverlayType | null>(null);
+  const [drawingMode, setDrawingMode] = useState<string | null>(null);
   const [selectedParcel, setSelectedParcel] = useState<any>(null);
   const [searchResults, setSearchProperties] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -226,7 +226,7 @@ export default function FarmZonePage() {
                   }}
                 >
                   <DrawingManager
-                    drawingMode={drawingMode}
+                    drawingMode={drawingMode as any}
                     onOverlayComplete={onOverlayComplete}
                     options={{
                       drawingControl: false,
@@ -295,16 +295,16 @@ export default function FarmZonePage() {
                 <Card className="shadow-md border-none p-1">
                   <div className="flex flex-col gap-1">
                     <Button 
-                      variant={drawingMode === google.maps.drawing.OverlayType.CIRCLE ? 'default' : 'ghost'} 
+                      variant={drawingMode === 'circle' ? 'default' : 'ghost'} 
                       size="icon" 
-                      onClick={() => setDrawingMode(google.maps.drawing.OverlayType.CIRCLE)}
+                      onClick={() => setDrawingMode(drawingMode === 'circle' ? null : 'circle')}
                     >
                       <Circle className="h-4 w-4" />
                     </Button>
                     <Button 
-                      variant={drawingMode === google.maps.drawing.OverlayType.POLYGON ? 'default' : 'ghost'} 
+                      variant={drawingMode === 'polygon' ? 'default' : 'ghost'} 
                       size="icon" 
-                      onClick={() => setDrawingMode(google.maps.drawing.OverlayType.POLYGON)}
+                      onClick={() => setDrawingMode(drawingMode === 'polygon' ? null : 'polygon')}
                     >
                       <Square className="h-4 w-4" />
                     </Button>
