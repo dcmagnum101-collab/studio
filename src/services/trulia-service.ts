@@ -9,15 +9,26 @@
 import { db } from '@/lib/firebase';
 import { collection, doc, getDoc, setDoc, increment, serverTimestamp } from 'firebase/firestore';
 
-const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY || 'ed6d68977cmsh6e495cfd7d733afp139b7cjsn2cf809c7813f';
+const RAPIDAPI_KEY = process.env.RAPIDAPI_TRULIA_KEY;
 const RAPIDAPI_HOST = process.env.RAPIDAPI_TRULIA_HOST || 'trulia5.p.rapidapi.com';
 const BASE_URL = `https://${RAPIDAPI_HOST}`;
 
 const headers = {
   'Content-Type': 'application/json',
   'x-rapidapi-host': RAPIDAPI_HOST,
-  'x-rapidapi-key': RAPIDAPI_KEY,
+  'x-rapidapi-key': RAPIDAPI_KEY!,
 };
+
+// ── QUOTA TRACKER ───────────────────────────────
+async function trackApiCall(userId: string, api: 'trulia' | 'realtor') {
+  const month = new Date().toISOString().slice(0, 7);
+  const quotaRef = doc(db, 'users', userId, 'rapidapi_quota', month);
+  await setDoc(quotaRef, { 
+    [`${api}_calls`]: increment(1), 
+    month,
+    updated_at: serverTimestamp()
+  }, { merge: true });
+}
 
 // ── LOCATION HASH GENERATOR ─────────────────────
 export async function generateLocationHash(params: {
@@ -92,12 +103,10 @@ async function cachedPost(
     const result = await response.json();
 
     // Track quota
-    const month = new Date().toISOString().slice(0, 7);
-    const quotaRef = doc(db, 'users', userId, 'rapidapi_quota', month);
-    setDoc(quotaRef, { calls_made: increment(1), month }, { merge: true });
+    await trackApiCall(userId, 'trulia');
 
     // Update cache
-    setDoc(cacheRef, {
+    await setDoc(cacheRef, {
       endpoint,
       body,
       response: result,
@@ -123,20 +132,6 @@ export async function searchTrulia(userId: string, params: {
     encodedHash: params.encodedHash,
     sortBy: "newest",
     filters: params.filters || {},
-  });
-}
-
-export async function getTruliaFSBOs(userId: string, hash: string) {
-  return searchTrulia(userId, {
-    encodedHash: hash,
-    filters: { listingTypes: ["FSBO"], propertyTypes: ["SINGLE_FAMILY_HOME", "TOWNHOUSE"] }
-  });
-}
-
-export async function getTruliaForeclosures(userId: string, hash: string) {
-  return searchTrulia(userId, {
-    encodedHash: hash,
-    filters: { listingTypes: ["FORECLOSURE"] }
   });
 }
 

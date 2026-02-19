@@ -21,7 +21,8 @@ import {
   Key,
   Sparkles,
   Smartphone,
-  Globe
+  Globe,
+  Home
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useUser, useDoc, useMemoFirebase } from "@/firebase";
@@ -61,59 +62,89 @@ export default function SettingsPage() {
           </header>
           
           <main className="p-8 max-w-4xl mx-auto w-full">
-            <Tabs defaultValue="trulia">
+            <Tabs defaultValue="apis">
               <TabsList className="mb-8 w-full justify-start gap-4 h-auto p-0 bg-transparent overflow-x-auto no-scrollbar">
                 <TabsTrigger value="general" className="data-[state=active]:bg-secondary rounded-lg px-4 py-2">Business</TabsTrigger>
-                <TabsTrigger value="trulia" className="data-[state=active]:bg-secondary rounded-lg px-4 py-2 flex gap-2">
-                  <Globe className="h-4 w-4" /> Trulia API
+                <TabsTrigger value="apis" className="data-[state=active]:bg-secondary rounded-lg px-4 py-2 flex gap-2">
+                  <Database className="h-4 w-4" /> Data Pipelines
                 </TabsTrigger>
                 <TabsTrigger value="free-sources" className="data-[state=active]:bg-secondary rounded-lg px-4 py-2">Quick Capture</TabsTrigger>
                 <TabsTrigger value="outreach" className="data-[state=active]:bg-secondary rounded-lg px-4 py-2">Gmail API</TabsTrigger>
               </TabsList>
 
-              <TabsContent value="trulia" className="space-y-6">
-                <Card className="border-none shadow-md">
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
+              <TabsContent value="apis" className="space-y-6">
+                <div className="grid gap-6 md:grid-cols-2">
+                  {/* Trulia API Card */}
+                  <Card className="border-none shadow-md">
+                    <CardHeader className="pb-4">
+                      <div className="flex items-center justify-between">
                         <div className="p-2 bg-primary text-white rounded-lg shadow-sm">
                           <Globe className="h-5 w-5" />
                         </div>
-                        <div>
-                          <CardTitle>Trulia / RapidAPI</CardTitle>
-                          <CardDescription>Real-time MLS data pipeline tracking FSBO and Foreclosures.</CardDescription>
+                        <Badge className="bg-green-500">Connected</Badge>
+                      </div>
+                      <CardTitle className="text-lg mt-4">Trulia API</CardTitle>
+                      <CardDescription className="text-xs">trulia5.p.rapidapi.com</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="p-3 bg-slate-50 rounded-xl border">
+                        <div className="flex justify-between items-center text-[10px] font-bold text-slate-700 mb-1.5 uppercase">
+                          <span>Calls this month</span>
+                          <span>{quota?.trulia_calls || 0}</span>
                         </div>
+                        <Progress value={((quota?.trulia_calls || 0) / 500) * 100} className="h-1" />
                       </div>
-                      <Badge className="bg-green-500">Live</Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-6 pt-4">
-                    <div className="p-4 bg-slate-50 rounded-xl border">
-                      <div className="flex justify-between items-center text-xs font-bold text-slate-700 mb-2">
-                        <span>API Calls This Month</span>
-                        <span>{quota?.calls_made || 0} / 500</span>
+                      <div className="text-[10px] text-muted-foreground flex items-center gap-1.5">
+                        <RefreshCw className="h-3 w-3" />
+                        Last sync: {quota?.updated_at ? new Date(quota.updated_at.toDate()).toLocaleString() : 'Never'}
                       </div>
-                      <Progress value={((quota?.calls_made || 0) / 500) * 100} className="h-1.5" />
-                    </div>
+                    </CardContent>
+                  </Card>
 
-                    <div className="space-y-4">
+                  {/* Realtor API Card */}
+                  <Card className="border-none shadow-md">
+                    <CardHeader className="pb-4">
+                      <div className="flex items-center justify-between">
+                        <div className="p-2 bg-accent text-white rounded-lg shadow-sm">
+                          <Home className="h-5 w-5" />
+                        </div>
+                        <Badge className="bg-green-500">Connected</Badge>
+                      </div>
+                      <CardTitle className="text-lg mt-4">Realtor.com API</CardTitle>
+                      <CardDescription className="text-xs">realtor-stable.p.rapidapi.com</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="p-3 bg-slate-50 rounded-xl border">
+                        <div className="flex justify-between items-center text-[10px] font-bold text-slate-700 mb-1.5 uppercase">
+                          <span>Calls this month</span>
+                          <span>{quota?.realtor_calls || 0}</span>
+                        </div>
+                        <Progress value={((quota?.realtor_calls || 0) / 500) * 100} className="h-1" />
+                      </div>
+                      <div className="text-[10px] text-muted-foreground flex items-center gap-1.5">
+                        <RefreshCw className="h-3 w-3" />
+                        Last sync: {quota?.updated_at ? new Date(quota.updated_at.toDate()).toLocaleString() : 'Never'}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <Card className="border-none shadow-md mt-6">
+                  <CardHeader>
+                    <CardTitle className="text-sm font-bold flex items-center gap-2">
+                      <Key className="h-4 w-4" />
+                      API Configuration
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid gap-4 md:grid-cols-2">
                       <div className="space-y-2">
-                        <Label className="text-xs font-bold uppercase">RapidAPI Key</Label>
+                        <Label className="text-xs font-bold uppercase">Trulia RapidAPI Key</Label>
                         <Input type="password" value="••••••••••••••••" readOnly className="bg-slate-100" />
                       </div>
-                      
-                      <div className="grid grid-cols-2 gap-4">
-                        {[
-                          { label: 'Las Vegas Market', active: true },
-                          { label: 'Henderson Market', active: true },
-                          { label: 'Summerlin Market', active: false },
-                          { label: 'North Las Vegas', active: false },
-                        ].map((m) => (
-                          <div key={m.label} className="flex items-center justify-between p-3 rounded-xl border bg-slate-50/30">
-                            <span className="text-sm font-medium">{m.label}</span>
-                            <Switch defaultChecked={m.active} />
-                          </div>
-                        ))}
+                      <div className="space-y-2">
+                        <Label className="text-xs font-bold uppercase">Realtor RapidAPI Key</Label>
+                        <Input type="password" value="••••••••••••••••" readOnly className="bg-slate-100" />
                       </div>
                     </div>
                   </CardContent>
