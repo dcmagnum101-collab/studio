@@ -21,12 +21,12 @@ export {
   initiateEmailSignIn 
 } from './non-blocking-login';
 
-// Firestore Hooks
+// Firestore Hooks (Real SDK implementations)
 export { useCollection } from './firestore/use-collection';
 export { useDoc } from './firestore/use-doc';
 export { useMemoFirebase } from './utils';
 
-// Mutation Utilities
+// Mutation Utilities (Non-blocking)
 export { 
   addDocumentNonBlocking, 
   updateDocumentNonBlocking, 

@@ -30,7 +30,7 @@ export function updateDocumentNonBlocking<T = DocumentData>(ref: DocumentReferen
  * Initiates a non-blocking Firestore set operation.
  */
 export function setDocumentNonBlocking<T = DocumentData>(ref: DocumentReference<T>, data: WithFieldValue<T>) {
-  setDoc(ref, data).catch(err => console.error("Non-blocking set failed:", err));
+  setDoc(ref, data, { merge: true }).catch(err => console.error("Non-blocking set failed:", err));
 }
 
 /**

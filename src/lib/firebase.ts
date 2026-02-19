@@ -11,7 +11,7 @@ const firebaseConfig = {
   projectId: "studio-7266015203-e5837",
   storageBucket: "studio-7266015203-e5837.firebasestorage.app",
   messagingSenderId: "844077687890",
-  appId: "1:844077687890:web:77b7d168f7a0edf3b86b8b"
+  appId: "1:844077687890:web:0a86215d544557bab86b8b"
 };
 
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];

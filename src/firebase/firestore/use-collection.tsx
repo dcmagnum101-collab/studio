@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { onSnapshot, Query, DocumentData, collection, query, QuerySnapshot } from 'firebase/firestore';
+import { collection, query, onSnapshot, Query, DocumentData, collectionGroup } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
 /**
@@ -20,12 +20,13 @@ export function useCollection<T = DocumentData>(target: string | Query<T> | null
       return;
     }
 
+    // Support both string paths and pre-constructed Query objects
     const q = typeof target === 'string' ? query(collection(db, target)) : target;
 
     setLoading(true);
     const unsubscribe = onSnapshot(
       q as Query<T>,
-      (snapshot: QuerySnapshot<T>) => {
+      (snapshot) => {
         const docs = snapshot.docs.map((doc) => ({
           ...(doc.data() as T),
           id: doc.id,
