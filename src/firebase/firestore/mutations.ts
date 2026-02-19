@@ -14,6 +14,7 @@ import {
 
 /**
  * Initiates a non-blocking Firestore add operation.
+ * Optimized for UI responsiveness by not awaiting the promise.
  */
 export function addDocumentNonBlocking<T = DocumentData>(ref: CollectionReference<T>, data: WithFieldValue<T>) {
   addDoc(ref, data).catch(err => console.error("Non-blocking add failed:", err));
@@ -27,7 +28,7 @@ export function updateDocumentNonBlocking<T = DocumentData>(ref: DocumentReferen
 }
 
 /**
- * Initiates a non-blocking Firestore set operation.
+ * Initiates a non-blocking Firestore set operation with merge.
  */
 export function setDocumentNonBlocking<T = DocumentData>(ref: DocumentReference<T>, data: WithFieldValue<T>) {
   setDoc(ref, data, { merge: true }).catch(err => console.error("Non-blocking set failed:", err));

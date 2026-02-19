@@ -1,27 +1,27 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { collection, query, onSnapshot, Query, DocumentData, collectionGroup } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { collection, query, onSnapshot, Query, DocumentData } from 'firebase/firestore';
+import { useFirestore } from '../provider';
 
 /**
  * A real-time Firestore collection hook using the real SDK.
- * Supports both collection names (strings) and pre-constructed Queries.
+ * Supports both collection path strings and pre-constructed Query objects.
  */
 export function useCollection<T = DocumentData>(target: string | Query<T> | null | undefined) {
   const [data, setData] = useState<T[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const firestore = useFirestore();
 
   useEffect(() => {
-    if (!target) {
+    if (!target || !firestore) {
       setLoading(false);
       setData(null);
       return;
     }
 
-    // Support both string paths and pre-constructed Query objects
-    const q = typeof target === 'string' ? query(collection(db, target)) : target;
+    const q = typeof target === 'string' ? query(collection(firestore, target)) : target;
 
     setLoading(true);
     const unsubscribe = onSnapshot(
@@ -42,7 +42,7 @@ export function useCollection<T = DocumentData>(target: string | Query<T> | null
     );
 
     return () => unsubscribe();
-  }, [target]);
+  }, [target, firestore]);
 
   return { data, loading, error, isLoading: loading };
 }
