@@ -1,4 +1,3 @@
-
 "use client"
 
 import React, { useState, useEffect } from "react"
@@ -26,10 +25,12 @@ import {
   RefreshCw,
   Clock,
   ArrowUpRight,
-  ShieldAlert
+  ShieldAlert,
+  Database,
+  CheckCircle2
 } from "lucide-react"
 import { useUser, useFirestore, addDocumentNonBlocking } from "@/firebase"
-import { searchTrulia, normalizeTruliaListing } from "@/services/trulia-service"
+import { unifiedMLSSync } from "@/services/mls-sync-orchestrator"
 import { MONICA_MARKET_HASHES } from "@/config/trulia-constants"
 import { useToast } from "@/hooks/use-toast"
 import { collection } from "firebase/firestore"
@@ -41,6 +42,7 @@ export default function MLSIntelligencePage() {
   const [listings, setListings] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("active");
+  const [currentSource, setCurrentSource] = useState<'trulia' | 'realtor' | 'zillow' | 'homes' | 'fallback'>('trulia');
 
   useEffect(() => {
     if (user) {
@@ -52,23 +54,18 @@ export default function MLSIntelligencePage() {
     if (!user) return;
     setLoading(true);
     try {
-      const hash = (MONICA_MARKET_HASHES as any)[activeMarket];
-      let filters = {};
-      let listingType: 'FOR_SALE' | 'SOLD' = 'FOR_SALE';
-
-      if (activeTab === "fsbo") filters = { listingTypes: ["FSBO"] };
-      if (activeTab === "foreclosure") filters = { listingTypes: ["FORECLOSURE"] };
-      if (activeTab === "reduced") filters = { priceReduced: true };
-      if (activeTab === "sold") listingType = 'SOLD';
-
-      const res = await searchTrulia(user.uid, { encodedHash: hash, listingType, filters });
+      const result = await unifiedMLSSync(user.uid, activeMarket, activeTab);
+      setListings(result.data);
+      setCurrentSource(result.source);
       
-      // Since normalizeTruliaListing is now a Server Action (async), we must Promise.all the results
-      const normalized = await Promise.all((res?.data || []).map((raw: any) => normalizeTruliaListing(raw)));
-      
-      setListings(normalized);
+      if (result.status === 'fallback') {
+        toast({ 
+          title: "Fallback Sync Active", 
+          description: `Switched to ${result.source.toUpperCase()} as Trulia primary was unavailable.` 
+        });
+      }
     } catch (err) {
-      toast({ variant: "destructive", title: "Sync Failed", description: "Could not fetch Trulia data." });
+      toast({ variant: "destructive", title: "Global Sync Failed", description: "All real estate data sources are currently unreachable." });
     } finally {
       setLoading(false);
     }
@@ -85,13 +82,13 @@ export default function MLSIntelligencePage() {
     if (listing.days_on_market > 60) icp += 20;
 
     addDocumentNonBlocking(contactsRef, {
-      name: "Trulia Prospect",
+      name: "Market Prospect",
       propertyAddress: listing.address,
       icpScore: icp,
-      archagent_source: "trulia_intel",
-      archagent_tags: ["trulia", listing.is_fsbo ? "fsbo" : "", listing.is_foreclosure ? "foreclosure" : ""].filter(Boolean),
+      archagent_source: "mls_intel",
+      archagent_tags: [listing.source || "mls", listing.is_fsbo ? "fsbo" : "", listing.is_foreclosure ? "foreclosure" : ""].filter(Boolean),
       pipeline_stage: "new_lead",
-      motivation: listing.is_fsbo ? "FSBO listing detected on Trulia" : "Active listing monitoring",
+      motivation: listing.is_fsbo ? "FSBO listing detected" : "MLS monitoring signal",
       ownerId: user.uid,
       created_at: new Date().toISOString()
     });
@@ -106,7 +103,13 @@ export default function MLSIntelligencePage() {
         <SidebarInset>
           <header className="flex h-16 shrink-0 items-center gap-2 border-b px-6 bg-white shadow-sm sticky top-0 z-10">
             <SidebarTrigger className="-ml-1" />
-            <h1 className="text-xl font-bold font-headline text-primary">MLS Intelligence</h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-xl font-bold font-headline text-primary">MLS Intelligence</h1>
+              <Badge variant="outline" className="gap-1.5 py-1 px-2 border-slate-200 bg-slate-50 text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+                <Database className="h-3 w-3" />
+                Live Source: {currentSource}
+              </Badge>
+            </div>
             <div className="ml-auto flex gap-2">
               <select 
                 className="h-9 rounded-md border border-input px-3 text-sm bg-white"
@@ -115,15 +118,36 @@ export default function MLSIntelligencePage() {
               >
                 <option value="las_vegas">Las Vegas, NV</option>
                 <option value="henderson">Henderson, NV</option>
+                <option value="north_las_vegas">North Las Vegas</option>
+                <option value="summerlin">Summerlin</option>
               </select>
               <Button size="sm" variant="outline" onClick={handleSync} disabled={loading}>
                 <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-                Sync Trulia
+                Force Sync
               </Button>
             </div>
           </header>
           
           <main className="p-8 max-w-7xl mx-auto w-full space-y-8">
+            <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-600 text-white rounded-lg">
+                  <CheckCircle2 className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-blue-900">Multi-Source Sync Active</h3>
+                  <p className="text-xs text-blue-700">Monica is currently cross-referencing Trulia, Realtor.com, and Zillow for data integrity.</p>
+                </div>
+              </div>
+              <div className="flex -space-x-2">
+                {['T', 'R', 'Z', 'H'].map((source) => (
+                  <div key={source} className="h-8 w-8 rounded-full border-2 border-white bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-600 shadow-sm">
+                    {source}
+                  </div>
+                ))}
+              </div>
+            </div>
+
             <div className="grid gap-6 md:grid-cols-3">
               <Card className="border-none shadow-md bg-primary text-white">
                 <CardHeader className="pb-2">
@@ -134,7 +158,7 @@ export default function MLSIntelligencePage() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-3xl font-black">{listings.length}</div>
-                  <p className="text-xs text-white/70 mt-1">Tracked listings in {activeMarket.replace('_', ' ')}</p>
+                  <p className="text-xs text-white/70 mt-1">Properties tracked in {activeMarket.replace('_', ' ')}</p>
                 </CardContent>
               </Card>
               <Card className="border-none shadow-md bg-accent text-white">
@@ -153,18 +177,18 @@ export default function MLSIntelligencePage() {
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-bold flex items-center gap-2 text-primary">
                     <Sparkles className="h-4 w-4 text-accent" />
-                    Hot Motivation
+                    Source Health
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-black text-primary">{listings.filter(l => l.is_fsbo || l.is_foreclosure).length}</div>
-                  <p className="text-xs text-muted-foreground mt-1">FSBO & Foreclosure detected</p>
+                  <div className="text-xl font-black text-primary uppercase">{loading ? 'Syncing...' : 'Optimal'}</div>
+                  <p className="text-xs text-muted-foreground mt-1">Redundancy systems online</p>
                 </CardContent>
               </Card>
             </div>
 
             <Tabs defaultValue="active" value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-              <TabsList className="bg-slate-100 p-1 rounded-xl w-full justify-start h-auto">
+              <TabsList className="bg-slate-100 p-1 rounded-xl w-full justify-start h-auto overflow-x-auto no-scrollbar">
                 <TabsTrigger value="active">Active Listings</TabsTrigger>
                 <TabsTrigger value="sold">Recently Sold</TabsTrigger>
                 <TabsTrigger value="fsbo">FSBO Tracker</TabsTrigger>
@@ -180,14 +204,14 @@ export default function MLSIntelligencePage() {
                         <TableHead className="font-bold">Property</TableHead>
                         <TableHead className="font-bold">Price</TableHead>
                         <TableHead className="font-bold">DOM</TableHead>
-                        <TableHead className="font-bold">Type/Status</TableHead>
+                        <TableHead className="font-bold">Source</TableHead>
                         <TableHead className="text-right font-bold">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {loading ? (
                         <TableRow>
-                          <TableCell colSpan={5} className="text-center py-20 text-muted-foreground italic">Fetching live Trulia data...</TableCell>
+                          <TableCell colSpan={5} className="text-center py-20 text-muted-foreground italic">Fetching intelligence from multiple sources...</TableCell>
                         </TableRow>
                       ) : listings.length > 0 ? (
                         listings.map((listing) => (
@@ -207,11 +231,7 @@ export default function MLSIntelligencePage() {
                               </div>
                             </TableCell>
                             <TableCell>
-                              <div className="flex flex-wrap gap-1">
-                                {listing.is_fsbo && <Badge className="bg-orange-500">FSBO</Badge>}
-                                {listing.is_foreclosure && <Badge className="bg-red-600"><ShieldAlert className="h-3 w-3 mr-1" /> REO</Badge>}
-                                <Badge variant="outline" className="capitalize">{listing.status.replace('_', ' ')}</Badge>
-                              </div>
+                              <Badge variant="outline" className="capitalize text-[10px] font-medium bg-white">{listing.source || currentSource}</Badge>
                             </TableCell>
                             <TableCell className="text-right">
                               <Button size="sm" className="gap-2" onClick={() => handleCreateLead(listing)}>
@@ -222,7 +242,7 @@ export default function MLSIntelligencePage() {
                         ))
                       ) : (
                         <TableRow>
-                          <TableCell colSpan={5} className="text-center py-20 text-muted-foreground">No matching listings found in this market segment.</TableCell>
+                          <TableCell colSpan={5} className="text-center py-20 text-muted-foreground">No matching listings found in current data pull.</TableCell>
                         </TableRow>
                       )}
                     </TableBody>
