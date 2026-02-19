@@ -10,7 +10,7 @@ import { db } from '@/lib/firebase';
 import { collection, doc, getDoc, setDoc, increment, serverTimestamp } from 'firebase/firestore';
 
 const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY || 'ed6d68977cmsh6e495cfd7d733afp139b7cjsn2cf809c7813f';
-const RAPIDAPI_HOST = 'trulia5.p.rapidapi.com';
+const RAPIDAPI_HOST = process.env.RAPIDAPI_TRULIA_HOST || 'trulia5.p.rapidapi.com';
 const BASE_URL = `https://${RAPIDAPI_HOST}`;
 
 const headers = {
