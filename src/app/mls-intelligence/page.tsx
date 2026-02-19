@@ -1,3 +1,4 @@
+
 "use client"
 
 import React, { useState, useEffect } from "react"
@@ -28,7 +29,8 @@ import {
   ShieldAlert
 } from "lucide-react"
 import { useUser, useFirestore, addDocumentNonBlocking } from "@/firebase"
-import { searchTrulia, MONICA_MARKET_HASHES, normalizeTruliaListing } from "@/services/trulia-service"
+import { searchTrulia, normalizeTruliaListing } from "@/services/trulia-service"
+import { MONICA_MARKET_HASHES } from "@/config/trulia-constants"
 import { useToast } from "@/hooks/use-toast"
 import { collection } from "firebase/firestore"
 

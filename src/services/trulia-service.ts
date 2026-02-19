@@ -1,3 +1,4 @@
+
 'use server';
 
 /**
@@ -53,17 +54,6 @@ export async function generateLocationHash(params: {
   };
   return Buffer.from(JSON.stringify(locationObj)).toString('base64');
 }
-
-export const MONICA_MARKET_HASHES = {
-  las_vegas: Buffer.from(JSON.stringify({
-    type: "address", subtype: "city", name: "Las Vegas, NV", city: "Las Vegas", state: "NV",
-    lat: 36.1699, lon: -115.1398, regionId: "11078", locationId: "11078"
-  })).toString('base64'),
-  henderson: Buffer.from(JSON.stringify({
-    type: "address", subtype: "city", name: "Henderson, NV", city: "Henderson", state: "NV",
-    lat: 36.0395, lon: -114.9817, regionId: "11079", locationId: "11079"
-  })).toString('base64'),
-};
 
 // ── TRULIA API WRAPPER WITH CACHING ──────────────
 async function cachedPost(
