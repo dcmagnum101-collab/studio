@@ -1,4 +1,3 @@
-
 'use server';
 
 /**
@@ -136,7 +135,7 @@ export async function searchTrulia(userId: string, params: {
 }
 
 // ── NORMALIZE LISTING ────────────────────────────
-export function normalizeTruliaListing(raw: any) {
+export async function normalizeTruliaListing(raw: any) {
   return {
     id: raw.id || raw.listingId || Math.random().toString(36).substr(2, 9),
     address: raw.location?.formattedAddress || raw.address || 'Unknown Address',

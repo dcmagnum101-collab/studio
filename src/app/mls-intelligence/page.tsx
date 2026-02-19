@@ -1,4 +1,3 @@
-
 "use client"
 
 import React, { useState, useEffect } from "react"
@@ -61,7 +60,10 @@ export default function MLSIntelligencePage() {
       if (activeTab === "sold") listingType = 'SOLD';
 
       const res = await searchTrulia(user.uid, { encodedHash: hash, listingType, filters });
-      const normalized = (res?.data || []).map(normalizeTruliaListing);
+      
+      // Since normalizeTruliaListing is now a Server Action (async), we must Promise.all the results
+      const normalized = await Promise.all((res?.data || []).map((raw: any) => normalizeTruliaListing(raw)));
+      
       setListings(normalized);
     } catch (err) {
       toast({ variant: "destructive", title: "Sync Failed", description: "Could not fetch Trulia data." });
@@ -72,7 +74,8 @@ export default function MLSIntelligencePage() {
 
   const handleCreateLead = (listing: any) => {
     if (!user) return;
-    const contactsRef = collection(useFirestore(), 'users', user.uid, 'contacts');
+    const db = useFirestore();
+    const contactsRef = collection(db, 'users', user.uid, 'contacts');
     
     let icp = 50;
     if (listing.is_fsbo) icp += 15;
