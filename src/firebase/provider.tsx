@@ -7,8 +7,8 @@ import { Auth, User, onAuthStateChanged } from 'firebase/auth';
 import { errorEmitter } from './error-emitter';
 import { FirestorePermissionError } from './errors';
 
-// Separate component to handle global permission errors and avoid circular logic in provider
-function FirebaseErrorListener() {
+// Internal listener to handle permissions errors and throw them to the Next.js boundary
+function LocalFirebaseErrorListener() {
   const [error, setError] = useState<FirestorePermissionError | null>(null);
 
   useEffect(() => {
@@ -83,7 +83,7 @@ export function FirebaseProvider({
 
   return (
     <FirebaseContext.Provider value={value}>
-      <FirebaseErrorListener />
+      <LocalFirebaseErrorListener />
       {children}
     </FirebaseContext.Provider>
   );
