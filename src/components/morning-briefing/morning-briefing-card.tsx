@@ -24,7 +24,7 @@ export function MorningBriefingCard() {
   }, [firestore, user]);
 
   const { data: briefings, isLoading } = useCollection(briefingQuery);
-  const currentBriefing = briefings?.[0];
+  const currentBriefing = briefings?.[0] as any;
 
   const topPriorityQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
@@ -32,7 +32,7 @@ export function MorningBriefingCard() {
   }, [firestore, user]);
 
   const { data: topContacts } = useCollection(topPriorityQuery);
-  const topPriority = topContacts?.[0];
+  const topPriority = topContacts?.[0] as any;
 
   if (!mounted) return null;
 

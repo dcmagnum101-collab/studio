@@ -15,3 +15,8 @@ export {
   initiateEmailSignUp, 
   initiateEmailSignIn 
 } from './non-blocking-login';
+
+// Firestore Hooks
+export { useCollection } from './firestore/use-collection';
+export { useDoc } from './firestore/use-doc';
+export { useMemoFirebase } from './utils';
