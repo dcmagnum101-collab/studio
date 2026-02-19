@@ -25,3 +25,11 @@ export {
 export { useCollection } from './firestore/use-collection';
 export { useDoc } from './firestore/use-doc';
 export { useMemoFirebase } from './utils';
+
+// Mutation Utilities
+export { 
+  addDocumentNonBlocking, 
+  updateDocumentNonBlocking, 
+  setDocumentNonBlocking, 
+  deleteDocumentNonBlocking 
+} from './firestore/mutations';
