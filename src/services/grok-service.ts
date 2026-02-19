@@ -1,14 +1,13 @@
 
 'use server';
 
-import * as admin from 'firebase-admin';
+/**
+ * @fileOverview Grok (xAI) completion service.
+ * OpenAI-compatible format using native fetch.
+ */
 
-// Initialize Firebase Admin if not already initialized in this process
-if (!admin.apps.length) {
-  admin.initializeApp();
-}
-
-const db = admin.firestore();
+import { db } from '@/lib/firebase';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
 const GROK_API_KEY = process.env.GROK_API_KEY!;
 const GROK_BASE_URL = process.env.GROK_BASE_URL || 'https://api.x.ai/v1';
@@ -27,14 +26,13 @@ interface GrokOptions {
 
 /**
  * Core completion function for Grok (xAI).
- * OpenAI-compatible format.
  */
 export async function grokComplete(
   messages: Message[],
   options: GrokOptions = {}
 ): Promise<string> {
   if (!GROK_API_KEY) {
-    throw new Error('GROK_API_KEY is not configured in environment variables.');
+    throw new Error('GROK_API_KEY is not configured.');
   }
 
   const response = await fetch(`${GROK_BASE_URL}/chat/completions`, {
@@ -61,13 +59,15 @@ export async function grokComplete(
   
   // Log usage to Firestore for the AI Dashboard
   try {
-    await db.collection('ai_usage').add({
+    // Note: We use client-side db here but in server component context
+    // This is fine for server actions.
+    await addDoc(collection(db, 'ai_usage'), {
       model: GROK_MODEL,
       prompt_tokens: data.usage?.prompt_tokens || 0,
       completion_tokens: data.usage?.completion_tokens || 0,
       total_tokens: data.usage?.total_tokens || 0,
-      called_at: admin.firestore.FieldValue.serverTimestamp(),
-      feature: messages[0]?.content.slice(0, 50) || 'unknown', // Hint at which feature was called
+      called_at: serverTimestamp(),
+      feature: messages[0]?.content.slice(0, 50) || 'unknown',
     });
   } catch (e) {
     console.error('Failed to log AI usage:', e);
