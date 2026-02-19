@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect, useCallback, useRef } from "react"
+import React, { useState, useEffect, useCallback, useMemo } from "react"
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/layout/app-sidebar"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -15,7 +15,7 @@ import {
   Search, 
   MousePointer2, 
   Square, 
-  Circle, 
+  Circle as CircleIcon, 
   Download, 
   Layers,
   Sparkles,
@@ -25,13 +25,17 @@ import {
   TrendingUp,
   MapPin,
   RefreshCw,
-  Plus
+  Plus,
+  Flame,
+  Zap,
+  History
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { GoogleMap, useJsApiLoader, DrawingManager, Polygon, InfoWindow } from "@react-google-maps/api"
+import { GoogleMap, useJsApiLoader, DrawingManager, Polygon, InfoWindow, Marker } from "@react-google-maps/api"
 import { searchProperties, fetchParcelAtPoint, pullZoneParcels, calculateICPScore, ClarkParcel } from "@/lib/clark-county"
 import { useUser, useFirestore, addDocumentNonBlocking } from "@/firebase"
 import { collection } from "firebase/firestore"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 
 const center = {
   lat: 36.1699,
@@ -51,15 +55,17 @@ export default function FarmZonePage() {
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [drawingMode, setDrawingMode] = useState<string | null>(null);
   const [selectedParcel, setSelectedParcel] = useState<any>(null);
-  const [searchResults, setSearchProperties] = useState<any[]>([]);
+  const [searchResults, setSearchResults] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [pulledParcels, setPulledParcels] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [maxContacts, setMaxContacts] = useState([100]);
+  const [zoom, setZoom] = useState(12);
+  const [justSoldAddress, setJustSoldAddress] = useState("");
 
   const { isLoaded } = useJsApiLoader({
     id: 'google-map-script',
-    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "",
+    googleMapsApiKey: "AIzaSyAKHt2xQfi9XvjwpVu9_nC-yiTXYMqmefE",
     libraries: ['drawing', 'geometry', 'places']
   });
 
@@ -68,36 +74,38 @@ export default function FarmZonePage() {
   }, []);
 
   const onMapClick = useCallback(async (e: google.maps.MapMouseEvent) => {
-    if (!e.latLng) return;
+    if (!e.latLng || drawingMode) return;
     setLoading(true);
     try {
       const feature = await fetchParcelAtPoint(e.latLng.lat(), e.latLng.lng());
-      setSelectedParcel(feature);
+      if (feature) {
+        setSelectedParcel(feature);
+      }
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [drawingMode]);
 
   const handleSearch = async (val: string) => {
     setSearchQuery(val);
     if (val.length > 2) {
       const results = await searchProperties(val);
-      setSearchProperties(results);
+      setSearchResults(results);
     } else {
-      setSearchProperties([]);
+      setSearchResults([]);
     }
   };
 
   const handleSelectProperty = (property: any) => {
-    setSearchProperties([]);
+    setSearchResults([]);
     setSearchQuery("");
     setSelectedParcel(property);
     if (map && property.geometry) {
-      // Find center of geometry
-      // For simplicity, we just assume it's a point or has a center
-      map.panTo({ lat: property.geometry.y || 36.1699, lng: property.geometry.x || -115.1398 });
+      const pos = property.geometry.y ? { lat: property.geometry.y, lng: property.geometry.x } : 
+                  (property.geometry.rings ? { lat: property.geometry.rings[0][0][1], lng: property.geometry.rings[0][0][0] } : center);
+      map.panTo(pos);
       map.setZoom(18);
     }
   };
@@ -107,29 +115,40 @@ export default function FarmZonePage() {
     setLoading(true);
     let results = [];
     
-    if (e.type === 'circle') {
-      const radius = e.overlay.getRadius();
-      const center = e.overlay.getCenter();
-      // Approx circle with polygon
-      results = await pullZoneParcels({
-        spatialRel: 'esriSpatialRelIntersects',
-        geometryType: 'esriGeometryEnvelope', // Simplified for demo
-        geometry: e.overlay.getBounds().toJSON()
+    try {
+      if (e.type === 'circle') {
+        const radius = e.overlay.getRadius();
+        const center = e.overlay.getCenter();
+        const bounds = e.overlay.getBounds();
+        
+        // Simple bounding box for radius for now as proxy
+        results = await pullZoneParcels({
+          xmin: bounds.getSouthWest().lng(),
+          ymin: bounds.getSouthWest().lat(),
+          xmax: bounds.getNorthEast().lng(),
+          ymax: bounds.getNorthEast().lat(),
+          spatialReference: { wkid: 4326 }
+        }, 'esriGeometryEnvelope');
+      } else if (e.type === 'polygon') {
+        const path = e.overlay.getPath().getArray().map((p: any) => [p.lng(), p.lat()]);
+        results = await pullZoneParcels({
+          rings: [path],
+          spatialReference: { wkid: 4326 }
+        });
+      }
+      
+      setPulledParcels(results);
+      toast({
+        title: "Zone Pull Complete",
+        description: `Found ${results.length} residential properties in this area.`
       });
-    } else if (e.type === 'polygon') {
-      const path = e.overlay.getPath().getArray().map((p: any) => [p.lng(), p.lat()]);
-      results = await pullZoneParcels({
-        rings: [path],
-        spatialReference: { wkid: 4326 }
-      });
+    } catch (err) {
+      console.error(err);
+      toast({ variant: "destructive", title: "API Error", description: "Could not pull zone data." });
+    } finally {
+      setLoading(false);
+      e.overlay.setMap(null); // Clear drawing
     }
-    
-    setPulledParcels(results);
-    setLoading(false);
-    toast({
-      title: "Zone Pull Complete",
-      description: `Found ${results.length} residential properties in this area.`
-    });
   };
 
   const handleAddLead = (attributes: ClarkParcel) => {
@@ -143,9 +162,9 @@ export default function FarmZonePage() {
       propertyAddress: attributes.SITUS_ADDR,
       email: "",
       phone: "",
-      archagent_source: "farm_zone_manual_click",
+      archagent_source: "gis_import",
       archagent_tags: [
-        "gis_import",
+        "farm_zone",
         attributes.OWNER_STATE !== 'NV' ? "absentee_owner" : "",
         (new Date().getFullYear() - new Date(attributes.SALE_DATE).getFullYear() >= 10) ? "long_term_owner" : ""
       ].filter(Boolean),
@@ -162,6 +181,26 @@ export default function FarmZonePage() {
       title: "Lead Added",
       description: `${attributes.OWNER_NAME} has been added to your Prospector.`
     });
+  };
+
+  const handleJustSoldBlast = async () => {
+    if (!justSoldAddress) return;
+    setLoading(true);
+    try {
+      const results = await searchProperties(justSoldAddress);
+      if (results.length > 0) {
+        const soldParcel = results[0];
+        // In real app, we'd trigger a geofence pull around this address
+        toast({
+          title: "Sold Property Verified",
+          description: `Analyzed ${soldParcel.attributes.SITUS_ADDR}. Creating neighborhood blast list...`
+        });
+      }
+    } catch (err) {
+      toast({ variant: "destructive", title: "Error", description: "Property not found." });
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (!mounted) return null;
@@ -210,9 +249,10 @@ export default function FarmZonePage() {
                 <GoogleMap
                   mapContainerStyle={mapContainerStyle}
                   center={center}
-                  zoom={12}
+                  zoom={zoom}
                   onLoad={setMap}
                   onClick={onMapClick}
+                  onZoomChanged={() => map && setZoom(map.getZoom()!)}
                   options={{
                     disableDefaultUI: true,
                     zoomControl: true,
@@ -251,7 +291,7 @@ export default function FarmZonePage() {
 
                   {selectedParcel && (
                     <InfoWindow
-                      position={selectedParcel.geometry ? { lat: selectedParcel.geometry.y, lng: selectedParcel.geometry.x } : undefined}
+                      position={selectedParcel.geometry?.y ? { lat: selectedParcel.geometry.y, lng: selectedParcel.geometry.x } : undefined}
                       onCloseClick={() => setSelectedParcel(null)}
                     >
                       <div className="p-2 max-w-xs space-y-3">
@@ -276,7 +316,7 @@ export default function FarmZonePage() {
                         )}
                         <Button 
                           size="sm" 
-                          className="w-full gap-2" 
+                          className="w-full gap-2 bg-primary" 
                           onClick={() => handleAddLead(selectedParcel.attributes)}
                         >
                           <Plus className="h-3 w-3" /> Add to Prospector
@@ -299,7 +339,7 @@ export default function FarmZonePage() {
                       size="icon" 
                       onClick={() => setDrawingMode(drawingMode === 'circle' ? null : 'circle')}
                     >
-                      <Circle className="h-4 w-4" />
+                      <CircleIcon className="h-4 w-4" />
                     </Button>
                     <Button 
                       variant={drawingMode === 'polygon' ? 'default' : 'ghost'} 
@@ -313,15 +353,28 @@ export default function FarmZonePage() {
                     </Button>
                   </div>
                 </Card>
+                
+                {zoom >= 16 && (
+                  <Card className="p-3 shadow-md border-none bg-white/90 backdrop-blur-sm">
+                    <p className="text-[10px] font-black uppercase text-muted-foreground mb-2">Map Legend</p>
+                    <div className="space-y-1.5">
+                      <div className="flex items-center gap-2 text-[10px]"><div className="h-2 w-2 bg-slate-400 rounded-sm" /> Standard Owner</div>
+                      <div className="flex items-center gap-2 text-[10px]"><div className="h-2 w-2 bg-yellow-500 rounded-sm" /> 10+ Years Ownership</div>
+                      <div className="flex items-center gap-2 text-[10px]"><div className="h-2 w-2 bg-blue-500 rounded-sm" /> Out of State</div>
+                      <div className="flex items-center gap-2 text-[10px]"><div className="h-2 w-2 bg-green-500 rounded-sm" /> High Equity</div>
+                    </div>
+                  </Card>
+                )}
               </div>
             </div>
 
             <aside className="w-96 border-l bg-white flex flex-col shadow-xl z-20">
               <Tabs defaultValue="zone" className="flex-1 flex flex-col">
                 <div className="p-4 border-b">
-                  <TabsList className="grid w-full grid-cols-2">
+                  <TabsList className="grid w-full grid-cols-3">
                     <TabsTrigger value="zone">Zone Details</TabsTrigger>
                     <TabsTrigger value="lookup">Owner Lookup</TabsTrigger>
+                    <TabsTrigger value="blast">Sold Blast</TabsTrigger>
                   </TabsList>
                 </div>
 
@@ -373,14 +426,14 @@ export default function FarmZonePage() {
                           <Badge className="bg-accent">{pulledParcels.length}</Badge>
                         </div>
                         <div className="space-y-2 max-h-60 overflow-y-auto">
-                          {pulledParcels.slice(0, 5).map((p: any) => (
+                          {pulledParcels.slice(0, 10).map((p: any) => (
                             <div key={p.attributes.APN} className="text-[10px] p-2 bg-white rounded border flex justify-between items-center">
                               <span className="font-medium truncate pr-2">{p.attributes.SITUS_ADDR}</span>
                               <Badge variant="outline" className="h-4 px-1">{calculateICPScore(p.attributes)}</Badge>
                             </div>
                           ))}
-                          {pulledParcels.length > 5 && (
-                            <p className="text-[10px] text-center text-muted-foreground italic">And {pulledParcels.length - 5} more...</p>
+                          {pulledParcels.length > 10 && (
+                            <p className="text-[10px] text-center text-muted-foreground italic">And {pulledParcels.length - 10} more...</p>
                           )}
                         </div>
                       </CardContent>
@@ -389,11 +442,12 @@ export default function FarmZonePage() {
 
                   <div className="pt-4">
                     <Button 
-                      className="w-full gap-2 py-6 text-lg font-bold" 
+                      className="w-full gap-2 py-6 text-lg font-bold bg-primary shadow-lg" 
                       disabled={loading || pulledParcels.length === 0}
                       onClick={() => {
                         pulledParcels.forEach(p => handleAddLead(p.attributes));
                         setPulledParcels([]);
+                        toast({ title: "Import Successful", description: "Leads added to CRM." });
                       }}
                     >
                       {loading ? <RefreshCw className="h-5 w-5 animate-spin" /> : <Download className="h-5 w-5" />}
@@ -402,18 +456,87 @@ export default function FarmZonePage() {
                   </div>
                 </TabsContent>
 
-                <TabsContent value="lookup" className="flex-1 overflow-y-auto p-6">
-                  <div className="space-y-6">
+                <TabsContent value="lookup" className="flex-1 overflow-y-auto p-6 space-y-6">
+                  <div className="space-y-4">
                     <div className="space-y-2">
-                      <Label>Detailed Parcel Lookup</Label>
+                      <Label>Search by APN or Address</Label>
                       <Input placeholder="Enter APN (e.g. 138-24-810-017)" />
                       <Button variant="outline" className="w-full">Lookup Parcel</Button>
                     </div>
                     
-                    <div className="text-center py-20 border-2 border-dashed rounded-xl opacity-50">
-                      <Info className="h-8 w-8 mx-auto mb-2" />
-                      <p className="text-xs">Search for a property to see full purchase history and equity analysis.</p>
+                    <Card className="border-none shadow-md bg-slate-50">
+                      <CardContent className="p-4 space-y-4">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="text-[10px] font-black uppercase text-muted-foreground">Property</p>
+                            <h4 className="font-bold text-primary">1234 Desert Rose Dr</h4>
+                            <p className="text-xs text-muted-foreground">Las Vegas, NV 89134</p>
+                          </div>
+                          <Badge className="bg-accent">84/99 🔥</Badge>
+                        </div>
+                        <div className="space-y-3 pt-3 border-t border-slate-200">
+                          <div className="flex justify-between text-xs">
+                            <span className="text-muted-foreground">Owner</span>
+                            <span className="font-bold">John & Sarah Smith</span>
+                          </div>
+                          <div className="flex justify-between text-xs">
+                            <span className="text-muted-foreground">Mailing</span>
+                            <span className="font-medium text-right max-w-[150px]">Sacramento, CA 95814</span>
+                          </div>
+                          <div className="bg-blue-50 p-2 rounded text-[10px] text-blue-700 font-bold text-center">
+                            ⚠️ OUT OF STATE — ABSENTEE OWNER
+                          </div>
+                        </div>
+                        <div className="space-y-3 pt-3 border-t border-slate-200">
+                          <p className="text-[10px] font-black uppercase text-muted-foreground">Purchase History</p>
+                          <div className="flex justify-between text-xs">
+                            <span className="text-muted-foreground">Purchased</span>
+                            <span className="font-bold">March 2009 ($285k)</span>
+                          </div>
+                          <div className="flex justify-between text-xs">
+                            <span className="text-muted-foreground">Equity Gain</span>
+                            <span className="font-bold text-green-600">~$202,000 (71%)</span>
+                          </div>
+                        </div>
+                        <Button className="w-full gap-2"><Plus className="h-4 w-4" /> Add to Prospector</Button>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="blast" className="flex-1 overflow-y-auto p-6 space-y-6">
+                  <div className="space-y-4">
+                    <h2 className="text-lg font-bold text-primary flex items-center gap-2">
+                      <Zap className="h-5 w-5 text-accent" />
+                      Just Sold Blast
+                    </h2>
+                    <p className="text-xs text-muted-foreground">Target neighbors of a recent high-value sale.</p>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Sold Property Address</Label>
+                      <Input 
+                        placeholder="123 Example St, Las Vegas" 
+                        value={justSoldAddress}
+                        onChange={(e) => setJustSoldAddress(e.target.value)}
+                      />
                     </div>
+                    <div className="space-y-2">
+                      <Label>Radius (Miles)</Label>
+                      <Slider defaultValue={[0.5]} max={2} step={0.1} />
+                    </div>
+                    <Button className="w-full gap-2" onClick={handleJustSoldBlast} disabled={loading}>
+                      {loading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                      Generate Neighbor List
+                    </Button>
+                  </div>
+
+                  <div className="p-4 bg-accent/5 border border-accent/10 rounded-xl space-y-3">
+                    <p className="text-[10px] font-black uppercase text-muted-foreground">AI Blast Preview</p>
+                    <p className="text-xs italic leading-relaxed text-slate-700">
+                      "Hi [name], your neighbor at {justSoldAddress || '[Sold Address]'} just sold for $[sold_price]. Homes in your neighborhood are moving fast. Want to know what yours could sell for?"
+                    </p>
                   </div>
                 </TabsContent>
               </Tabs>

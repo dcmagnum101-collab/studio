@@ -7,14 +7,12 @@ export async function GET(request: NextRequest) {
   const baseUrl = 'https://gisgate.co.clark.nv.us/arcgis/rest/services/';
   const url = new URL(baseUrl + endpoint);
   
-  // Forward all other search params
   searchParams.forEach((value, key) => {
     if (key !== 'endpoint') {
       url.searchParams.append(key, value);
     }
   });
   
-  // Ensure f=json
   if (!url.searchParams.has('f')) {
     url.searchParams.append('f', 'json');
   }
@@ -36,17 +34,17 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const { endpoint, params } = await request.json();
-  
-  const baseUrl = 'https://gisgate.co.clark.nv.us/arcgis/rest/services/';
-  const url = new URL(baseUrl + (endpoint || 'Assessor/MapServer/0/query'));
-  
-  const body = new URLSearchParams({
-    ...params,
-    f: 'json'
-  });
-
   try {
+    const { endpoint, params } = await request.json();
+    
+    const baseUrl = 'https://gisgate.co.clark.nv.us/arcgis/rest/services/';
+    const url = new URL(baseUrl + (endpoint || 'Assessor/MapServer/0/query'));
+    
+    const body = new URLSearchParams({
+      ...params,
+      f: 'json'
+    });
+
     const response = await fetch(url.toString(), {
       method: 'POST',
       headers: {
