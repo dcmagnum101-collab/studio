@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { KPI_STATS } from "@/lib/mock-data";
@@ -35,8 +35,10 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { format } from "date-fns";
 import Link from "next/link";
-import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebase";
+import { useUser } from "@/firebase";
 import { collection, query, where, limit, orderBy } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { useCollection } from "@/hooks/use-collection";
 
 const iconMap: Record<string, any> = {
   Users,
@@ -48,24 +50,23 @@ const iconMap: Record<string, any> = {
 
 export default function DashboardPage() {
   const { user } = useUser();
-  const firestore = useFirestore();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  const tasksQuery = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
+  const tasksQuery = useMemo(() => {
+    if (!user) return null;
     return query(
-      collection(firestore, 'users', user.uid, 'tasks'),
+      collection(db, 'users', user.uid, 'tasks'),
       where('status', '==', 'pending'),
       orderBy('due_date', 'asc'),
       limit(5)
     );
-  }, [firestore, user]);
+  }, [user]);
 
-  const { data: liveTasks, isLoading: tasksLoading } = useCollection(tasksQuery);
+  const { data: liveTasks, loading: tasksLoading } = useCollection(tasksQuery);
 
   if (!mounted) return null;
 
@@ -216,7 +217,7 @@ export default function DashboardPage() {
                           <div className="flex-1 min-w-0">
                             <p className="text-xs font-bold truncate text-primary">{task.title}</p>
                             <p className="text-[10px] text-muted-foreground">
-                              {task.contact_name} • {format(new Date(task.due_date), 'h:mm a')}
+                              {task.contact_name} • {task.due_date ? format(new Date(task.due_date), 'h:mm a') : ''}
                             </p>
                           </div>
                           <Link href={`/contacts/${task.contactId}`}>

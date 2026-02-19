@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useMemo } from "react"
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/layout/app-sidebar"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -11,48 +11,47 @@ import {
   CheckSquare, 
   Calendar, 
   Clock, 
-  AlertCircle, 
   Phone, 
-  Mail, 
   MessageSquare,
   Sparkles,
   ArrowRight,
   Plus
 } from "lucide-react"
 import { format } from "date-fns"
-import { useUser, useFirestore, useCollection, useMemoFirebase, updateDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase"
-import { collection, query, doc, orderBy } from "firebase/firestore"
+import { useUser } from "@/firebase"
+import { collection, query, doc, orderBy, updateDoc } from "firebase/firestore"
+import { db } from "@/lib/firebase"
+import { useCollection } from "@/hooks/use-collection"
 import Link from "next/link"
 
 export default function TasksPage() {
   const { user } = useUser();
-  const firestore = useFirestore();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  const tasksQuery = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
+  const tasksQuery = useMemo(() => {
+    if (!user) return null;
     return query(
-      collection(firestore, 'users', user.uid, 'tasks'),
+      collection(db, 'users', user.uid, 'tasks'),
       orderBy('due_date', 'asc')
     );
-  }, [firestore, user]);
+  }, [user]);
 
-  const { data: tasks, isLoading } = useCollection(tasksQuery);
+  const { data: tasks, loading: isLoading } = useCollection(tasksQuery);
 
   const toggleTask = (id: string, currentStatus: string) => {
-    if (!firestore || !user) return;
-    const taskRef = doc(firestore, 'users', user.uid, 'tasks', id);
-    updateDocumentNonBlocking(taskRef, {
+    if (!user) return;
+    const taskRef = doc(db, 'users', user.uid, 'tasks', id);
+    updateDoc(taskRef, {
       status: currentStatus === 'completed' ? 'pending' : 'completed',
       completed_at: currentStatus === 'completed' ? null : new Date().toISOString()
     });
   };
 
-  const priorityColors = {
+  const priorityColors: Record<string, string> = {
     urgent: 'text-red-600 bg-red-50 border-red-200',
     high: 'text-orange-600 bg-orange-50 border-orange-200',
     normal: 'text-blue-600 bg-blue-50 border-blue-200',
@@ -113,7 +112,7 @@ export default function TasksPage() {
                                   <h4 className="text-sm font-bold text-primary">{task.title}</h4>
                                   <p className="text-xs text-muted-foreground mt-0.5">{task.contact_name}</p>
                                 </div>
-                                <Badge className={`text-[9px] font-bold uppercase tracking-wider ${priorityColors[task.priority as keyof typeof priorityColors]}`}>
+                                <Badge className={`text-[9px] font-bold uppercase tracking-wider ${priorityColors[task.priority] || ''}`}>
                                   {task.priority}
                                 </Badge>
                               </div>
@@ -126,7 +125,7 @@ export default function TasksPage() {
                               )}
                               <div className="flex items-center gap-4 pt-1">
                                 <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground font-bold">
-                                  <Calendar className="h-3 w-3" /> {format(new Date(task.due_date), 'h:mm a')}
+                                  <Calendar className="h-3 w-3" /> {task.due_date ? format(new Date(task.due_date), 'h:mm a') : ''}
                                 </div>
                                 <div className="flex items-center gap-2">
                                   {task.type === 'call' && (
@@ -183,19 +182,6 @@ export default function TasksPage() {
                       <p className="text-xs font-medium">Monica detected 3 leads that haven't been contacted in 5+ days.</p>
                       <Button variant="link" size="sm" className="h-auto p-0 text-xs font-bold text-accent">Bulk Create Tasks <ArrowRight className="h-3 w-3 ml-1" /></Button>
                     </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="shadow-lg border-none bg-primary text-white">
-                  <CardContent className="p-6 text-center space-y-4">
-                    <div className="h-16 w-16 bg-white/20 rounded-full flex items-center justify-center mx-auto ring-8 ring-white/10">
-                      <AlertCircle className="h-8 w-8 text-white" />
-                    </div>
-                    <div className="space-y-1">
-                      <h3 className="font-bold">Power Hour Focus</h3>
-                      <p className="text-xs text-white/70">Connect with high-intent leads from ArchAgent Expireds.</p>
-                    </div>
-                    <Button className="w-full bg-white text-primary font-bold hover:bg-white/90">View Strategy</Button>
                   </CardContent>
                 </Card>
               </div>

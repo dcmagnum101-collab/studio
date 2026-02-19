@@ -1,31 +1,9 @@
 'use client';
 
-import React, { createContext, useContext, ReactNode, useMemo, useState, useEffect, DependencyList } from 'react';
+import React, { createContext, useContext, ReactNode, useMemo, useState, useEffect } from 'react';
 import { FirebaseApp } from 'firebase/app';
 import { Firestore } from 'firebase/firestore';
-import { Auth, User, onAuthStateChanged } from 'firebase/auth';
-import { errorEmitter } from './error-emitter';
-import { FirestorePermissionError } from './errors';
-
-// Internal listener to handle permissions errors and throw them to the Next.js boundary
-function LocalFirebaseErrorListener() {
-  const [error, setError] = useState<FirestorePermissionError | null>(null);
-
-  useEffect(() => {
-    const handleError = (err: FirestorePermissionError) => {
-      setError(err);
-    };
-    errorEmitter.on('permission-error', handleError);
-    return () => {
-      errorEmitter.off('permission-error', handleError);
-    };
-  }, []);
-
-  if (error) {
-    throw error;
-  }
-  return null;
-}
+import { Auth, User, onAuthStateChanged, signInAnonymously } from 'firebase/auth';
 
 interface FirebaseProviderProps {
   children: ReactNode;
@@ -62,6 +40,9 @@ export function FirebaseProvider({
     const unsubscribe = onAuthStateChanged(
       auth,
       (user) => {
+        if (!user) {
+          signInAnonymously(auth);
+        }
         setUserState({ user, loading: false, error: null });
       },
       (error) => {
@@ -83,7 +64,6 @@ export function FirebaseProvider({
 
   return (
     <FirebaseContext.Provider value={value}>
-      <LocalFirebaseErrorListener />
       {children}
     </FirebaseContext.Provider>
   );
@@ -114,14 +94,6 @@ export const useFirebaseApp = () => {
   if (!firebaseApp) throw new Error('Firebase app not available');
   return firebaseApp;
 };
-
-export function useMemoFirebase<T>(factory: () => T, deps: DependencyList): T & { __memo?: boolean } {
-  const memoized = useMemo(factory, deps);
-  if (memoized && typeof memoized === 'object') {
-    (memoized as any).__memo = true;
-  }
-  return memoized as any;
-}
 
 export const useUser = () => {
   const { user, isUserLoading, userError } = useFirebase();

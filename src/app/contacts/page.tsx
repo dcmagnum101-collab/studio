@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useMemo } from "react"
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { 
@@ -17,13 +17,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { 
   Search, 
   Filter, 
-  Download, 
   MoreHorizontal, 
   UserPlus,
-  TrendingUp,
   Flame,
-  Sparkles,
-  Smartphone
+  Sparkles
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { 
@@ -33,11 +30,12 @@ import {
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
 import { ContactDetailsSheet } from "@/components/contacts/contact-details-sheet";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SocialLeadCapture } from "@/components/prospecting/social-lead-capture";
-import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebase";
+import { useUser } from "@/firebase";
 import { collection, query, orderBy } from "firebase/firestore";
-import { Contact } from "@/lib/mock-data";
+import { db } from "@/lib/firebase";
+import { useCollection } from "@/hooks/use-collection";
 
 const SOURCE_CONFIG: Record<string, { label: string; color: string }> = {
   expired: { label: 'Expired', color: 'bg-red-500' },
@@ -54,8 +52,7 @@ const SOURCE_CONFIG: Record<string, { label: string; color: string }> = {
 
 export default function ContactsPage() {
   const { user } = useUser();
-  const firestore = useFirestore();
-  const [selectedContact, setSelectedContact] = React.useState<Contact | null>(null);
+  const [selectedContact, setSelectedContact] = React.useState<any | null>(null);
   const [sheetOpen, setSheetOpen] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState<string>("all");
   const [mounted, setMounted] = useState(false);
@@ -65,25 +62,25 @@ export default function ContactsPage() {
     setMounted(true);
   }, []);
 
-  const contactsQuery = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
+  const contactsQuery = useMemo(() => {
+    if (!user) return null;
     return query(
-      collection(firestore, 'users', user.uid, 'contacts'),
+      collection(db, 'users', user.uid, 'contacts'),
       orderBy('name', 'asc')
     );
-  }, [firestore, user]);
+  }, [user]);
 
-  const { data: liveContacts, isLoading } = useCollection(contactsQuery);
+  const { data: liveContacts, loading: isLoading } = useCollection(contactsQuery);
 
-  const handleViewDetails = (contact: Contact) => {
+  const handleViewDetails = (contact: any) => {
     setSelectedContact(contact);
     setSheetOpen(true);
   };
 
   const filteredContacts = (liveContacts || []).filter(c => {
     const matchesTab = activeTab === "all" || c.archagent_source === activeTab;
-    const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                         c.propertyAddress.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = c.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                         c.propertyAddress?.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesTab && matchesSearch;
   });
 

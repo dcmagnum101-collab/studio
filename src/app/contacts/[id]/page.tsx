@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useMemo } from "react"
 import { useParams } from "next/navigation"
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/layout/app-sidebar"
@@ -26,41 +26,41 @@ import {
   ArrowRight
 } from "lucide-react"
 import Link from "next/link"
-import { useUser, useFirestore, useDoc, useCollection, useMemoFirebase, addDocumentNonBlocking } from "@/firebase"
-import { collection, query, doc, orderBy } from "firebase/firestore"
+import { useUser } from "@/firebase"
+import { collection, query, orderBy, addDoc } from "firebase/firestore"
 import { format } from "date-fns"
+import { db } from "@/lib/firebase"
+import { useDocument } from "@/hooks/use-document"
+import { useCollection } from "@/hooks/use-collection"
 
 export default function ContactProfilePage() {
   const params = useParams();
   const { user } = useUser();
-  const firestore = useFirestore();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  const contactRef = useMemoFirebase(() => {
-    if (!firestore || !user || !params.id) return null;
-    return doc(firestore, 'users', user.uid, 'contacts', params.id as string);
-  }, [firestore, user, params.id]);
+  const { data: contact, loading: contactLoading } = useDocument(
+    user ? `users/${user.uid}/contacts` : '',
+    params.id as string
+  );
 
-  const { data: contact, isLoading: contactLoading } = useDoc(contactRef);
-
-  const logsQuery = useMemoFirebase(() => {
-    if (!firestore || !user || !params.id) return null;
+  const logsQuery = useMemo(() => {
+    if (!user || !params.id) return null;
     return query(
-      collection(firestore, 'users', user.uid, 'contacts', params.id as string, 'activityLogs'),
+      collection(db, 'users', user.uid, 'contacts', params.id as string, 'activityLogs'),
       orderBy('date', 'desc')
     );
-  }, [firestore, user, params.id]);
+  }, [user, params.id]);
 
   const { data: activityLogs } = useCollection(logsQuery);
 
   const handleLogActivity = (type: 'call' | 'sms' | 'email') => {
-    if (!firestore || !user || !params.id) return;
-    const logsRef = collection(firestore, 'users', user.uid, 'contacts', params.id as string, 'activityLogs');
-    addDocumentNonBlocking(logsRef, {
+    if (!user || !params.id) return;
+    const logsRef = collection(db, 'users', user.uid, 'contacts', params.id as string, 'activityLogs');
+    addDoc(logsRef, {
       type,
       date: new Date().toISOString(),
       outcome: `${type.toUpperCase()} outreach initiated`,
@@ -73,13 +73,13 @@ export default function ContactProfilePage() {
   if (!mounted || contactLoading) return <div className="p-8 text-center text-slate-400">Loading profile...</div>;
   if (!contact) return <div className="p-8 text-center">Contact not found.</div>;
 
-  const sentimentColors = {
+  const sentimentColors: Record<string, string> = {
     positive: 'bg-green-500',
     neutral: 'bg-slate-400',
     negative: 'bg-red-500'
   };
 
-  const urgencyColors = {
+  const urgencyColors: Record<string, string> = {
     hot: 'text-red-600 bg-red-50',
     warm: 'text-orange-600 bg-orange-50',
     cold: 'text-blue-600 bg-blue-50',
@@ -108,13 +108,13 @@ export default function ContactProfilePage() {
             <aside className="w-80 border-r bg-slate-50/50 p-6 flex flex-col gap-8 overflow-y-auto">
               <div className="flex flex-col items-center text-center gap-4">
                 <div className="h-24 w-24 rounded-full bg-primary flex items-center justify-center text-white text-3xl font-bold relative shadow-xl">
-                  {contact.name.split(' ').map((n: string) => n[0]).join('')}
-                  <div className={`absolute bottom-0 right-0 h-6 w-6 rounded-full border-4 border-white ${sentimentColors[contact.ai_sentiment as keyof typeof sentimentColors] || 'bg-slate-400'}`} />
+                  {contact.name?.split(' ').map((n: string) => n[0]).join('')}
+                  <div className={`absolute bottom-0 right-0 h-6 w-6 rounded-full border-4 border-white ${sentimentColors[contact.ai_sentiment] || 'bg-slate-400'}`} />
                 </div>
                 <div className="space-y-1">
                   <h2 className="text-xl font-black text-primary">{contact.name}</h2>
                   <div className="flex items-center justify-center gap-2">
-                    <Badge variant="outline" className={`text-[10px] font-bold ${urgencyColors[contact.ai_urgency as keyof typeof urgencyColors]}`}>
+                    <Badge variant="outline" className={`text-[10px] font-bold ${urgencyColors[contact.ai_urgency]}`}>
                       {contact.ai_urgency?.toUpperCase() || 'NURTURE'}
                     </Badge>
                     <Badge className="bg-accent text-white font-bold h-5 px-1.5">{contact.icpScore}/99</Badge>
@@ -208,9 +208,9 @@ export default function ContactProfilePage() {
                             <div className="space-y-1 pt-1">
                               <div className="flex items-center justify-between">
                                 <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                                  {format(new Date(log.date), 'MMM d, yyyy h:mm a')}
+                                  {log.date ? format(new Date(log.date), 'MMM d, yyyy h:mm a') : ''}
                                 </span>
-                                {log.sentiment && <Badge className={`h-4 text-[8px] ${sentimentColors[log.sentiment as keyof typeof sentimentColors]}`}>{log.sentiment.toUpperCase()}</Badge>}
+                                {log.sentiment && <Badge className={`h-4 text-[8px] ${sentimentColors[log.sentiment]}`}>{log.sentiment.toUpperCase()}</Badge>}
                               </div>
                               <h4 className="font-bold text-slate-800">{log.outcome}</h4>
                               <p className="text-sm text-slate-600 leading-relaxed bg-slate-50/50 p-3 rounded-xl border border-slate-100">{log.summary}</p>

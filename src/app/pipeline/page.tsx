@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useMemo } from "react"
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/layout/app-sidebar"
 import { PipelineStage } from "@/lib/mock-data"
@@ -12,12 +12,13 @@ import {
   Phone, 
   MessageSquare, 
   Flame, 
-  Clock,
   ArrowRight
 } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { useUser, useFirestore, useCollection, useMemoFirebase, updateDocumentNonBlocking } from "@/firebase"
-import { collection, query, doc } from "firebase/firestore"
+import { useUser } from "@/firebase"
+import { collection, query, doc, updateDoc } from "firebase/firestore"
+import { db } from "@/lib/firebase"
+import { useCollection } from "@/hooks/use-collection"
 import Link from "next/link"
 
 const STAGES: { id: PipelineStage; label: string; color: string }[] = [
@@ -31,19 +32,18 @@ const STAGES: { id: PipelineStage; label: string; color: string }[] = [
 
 export default function PipelinePage() {
   const { user } = useUser();
-  const firestore = useFirestore();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  const contactsQuery = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
-    return query(collection(firestore, 'users', user.uid, 'contacts'));
-  }, [firestore, user]);
+  const contactsQuery = useMemo(() => {
+    if (!user) return null;
+    return query(collection(db, 'users', user.uid, 'contacts'));
+  }, [user]);
 
-  const { data: contacts, isLoading } = useCollection(contactsQuery);
+  const { data: contacts, loading: isLoading } = useCollection(contactsQuery);
 
   const getContactsInStage = (stageId: PipelineStage) => {
     return (contacts || []).filter(c => c.pipeline_stage === stageId);
@@ -55,9 +55,9 @@ export default function PipelinePage() {
   };
 
   const handleMoveStage = (contactId: string, nextStage: PipelineStage) => {
-    if (!firestore || !user) return;
-    const contactRef = doc(firestore, 'users', user.uid, 'contacts', contactId);
-    updateDocumentNonBlocking(contactRef, {
+    if (!user) return;
+    const contactRef = doc(db, 'users', user.uid, 'contacts', contactId);
+    updateDoc(contactRef, {
       pipeline_stage: nextStage,
       updated_at: new Date().toISOString()
     });
