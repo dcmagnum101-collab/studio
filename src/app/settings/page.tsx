@@ -1,7 +1,7 @@
 
 "use client"
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -19,7 +19,6 @@ import {
   RefreshCw, 
   Zap,
   Key,
-  Sparkles,
   Smartphone,
   Globe,
   Home,
@@ -35,6 +34,11 @@ export default function SettingsPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Quota Data for APIs
   const month = new Date().toISOString().slice(0, 7);
@@ -61,6 +65,8 @@ export default function SettingsPage() {
 
   const bookmarkletCode = "javascript:(function(){var text=window.getSelection().toString()||document.body.innerText.substring(0,500);var url=window.location.href;window.open('https://monica-ai-hub.vercel.app/quick-capture?url='+encodeURIComponent(url)+'&text='+encodeURIComponent(text),'_blank','width=500,height=600');})();";
 
+  if (!mounted) return null;
+
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full">
@@ -76,14 +82,14 @@ export default function SettingsPage() {
           </header>
           
           <main className="p-8 max-w-4xl mx-auto w-full">
-            <Tabs defaultValue="apis">
+            <Tabs defaultValue="ai">
               <TabsList className="mb-8 w-full justify-start gap-4 h-auto p-0 bg-transparent overflow-x-auto no-scrollbar">
                 <TabsTrigger value="general" className="data-[state=active]:bg-secondary rounded-lg px-4 py-2">Business</TabsTrigger>
-                <TabsTrigger value="apis" className="data-[state=active]:bg-secondary rounded-lg px-4 py-2 flex gap-2">
-                  <Database className="h-4 w-4" /> Data Pipelines
-                </TabsTrigger>
                 <TabsTrigger value="ai" className="data-[state=active]:bg-secondary rounded-lg px-4 py-2 flex gap-2">
                   <BrainCircuit className="h-4 w-4" /> Grok AI Hub
+                </TabsTrigger>
+                <TabsTrigger value="apis" className="data-[state=active]:bg-secondary rounded-lg px-4 py-2 flex gap-2">
+                  <Database className="h-4 w-4" /> Data Pipelines
                 </TabsTrigger>
                 <TabsTrigger value="free-sources" className="data-[state=active]:bg-secondary rounded-lg px-4 py-2">Quick Capture</TabsTrigger>
                 <TabsTrigger value="outreach" className="data-[state=active]:bg-secondary rounded-lg px-4 py-2">Gmail API</TabsTrigger>
