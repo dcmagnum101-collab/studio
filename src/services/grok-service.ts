@@ -4,10 +4,17 @@
 /**
  * @fileOverview Grok (xAI) completion service.
  * OpenAI-compatible format using native fetch.
+ * All usage is scoped to users/{userId}/ai_usage.
  */
 
-import { db } from '@/lib/firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import * as admin from 'firebase-admin';
+
+// Initialize Firebase Admin if not already initialized
+if (!admin.apps.length) {
+  admin.initializeApp();
+}
+
+const db = admin.firestore();
 
 const GROK_API_KEY = process.env.GROK_API_KEY!;
 const GROK_BASE_URL = process.env.GROK_BASE_URL || 'https://api.x.ai/v1';
@@ -19,6 +26,7 @@ interface Message {
 }
 
 interface GrokOptions {
+  userId?: string;
   temperature?: number;
   max_tokens?: number;
   stream?: boolean;
@@ -57,20 +65,20 @@ export async function grokComplete(
 
   const data = await response.json();
   
-  // Log usage to Firestore for the AI Dashboard
-  try {
-    // Note: We use client-side db here but in server component context
-    // This is fine for server actions.
-    await addDoc(collection(db, 'ai_usage'), {
-      model: GROK_MODEL,
-      prompt_tokens: data.usage?.prompt_tokens || 0,
-      completion_tokens: data.usage?.completion_tokens || 0,
-      total_tokens: data.usage?.total_tokens || 0,
-      called_at: serverTimestamp(),
-      feature: messages[0]?.content.slice(0, 50) || 'unknown',
-    });
-  } catch (e) {
-    console.error('Failed to log AI usage:', e);
+  // Log usage to Firestore for the AI Dashboard - Scoped to User
+  if (options.userId) {
+    try {
+      await db.collection('users').doc(options.userId).collection('ai_usage').add({
+        model: GROK_MODEL,
+        prompt_tokens: data.usage?.prompt_tokens || 0,
+        completion_tokens: data.usage?.completion_tokens || 0,
+        total_tokens: data.usage?.total_tokens || 0,
+        called_at: admin.firestore.FieldValue.serverTimestamp(),
+        feature: messages[0]?.content.slice(0, 50) || 'unknown',
+      });
+    } catch (e) {
+      console.error('Failed to log AI usage:', e);
+    }
   }
 
   return data.choices[0].message.content;
@@ -82,12 +90,13 @@ export async function grokComplete(
 export async function grokAsk(
   systemPrompt: string,
   userPrompt: string,
+  userId?: string,
   temperature = 0.7
 ): Promise<string> {
   return grokComplete([
     { role: 'system', content: systemPrompt },
     { role: 'user', content: userPrompt },
-  ], { temperature });
+  ], { temperature, userId });
 }
 
 /**
@@ -95,11 +104,13 @@ export async function grokAsk(
  */
 export async function grokJSON<T = any>(
   systemPrompt: string,
-  userPrompt: string
+  userPrompt: string,
+  userId?: string
 ): Promise<T> {
   const result = await grokAsk(
     systemPrompt + '\n\nRespond ONLY with valid JSON. No markdown, no backticks, no explanation.',
     userPrompt,
+    userId,
     0.2 // Low temperature for structured output
   );
   

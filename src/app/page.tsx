@@ -1,3 +1,4 @@
+
 "use client"
 
 import React, { useState, useEffect, useMemo } from "react";
@@ -72,14 +73,16 @@ export default function DashboardPage() {
     return allTasks.filter(t => t.status === 'pending').slice(0, 5);
   }, [allTasks]);
 
-  // Daily Email Quota Fetch
+  // Daily Email Quota Fetch - Scoped to User
   const today = new Date().toISOString().split('T')[0];
   const quotaRef = useMemoFirebase(() => {
-    return `email_quota/${today}`;
-  }, [today]);
+    if (!user) return null;
+    return `users/${user.uid}/email_quota/${today}`;
+  }, [user, today]);
   const { data: emailQuota } = useDoc(quotaRef);
+  
   const emailSentToday = emailQuota?.count || 0;
-  const quotaPercentage = (emailSentToday / 500) * 100;
+  const quotaPercentage = Math.min(100, (emailSentToday / 500) * 100);
 
   if (!mounted) return null;
 

@@ -40,16 +40,20 @@ export default function SettingsPage() {
     setMounted(true);
   }, []);
 
-  // Quota Data for APIs
+  // Quota Data for APIs - Scoped to User
   const month = new Date().toISOString().slice(0, 7);
   const quotaRef = useMemoFirebase(() => user ? `users/${user.uid}/rapidapi_quota/${month}` : null, [user, month]);
   const { data: quota } = useDoc(quotaRef);
 
-  // AI Usage Data
+  // AI Usage Data - Scoped to User
   const aiUsageQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return query(collection(firestore, 'ai_usage'), orderBy('called_at', 'desc'), limit(50));
-  }, [firestore]);
+    if (!firestore || !user) return null;
+    return query(
+      collection(firestore, 'users', user.uid, 'ai_usage'), 
+      orderBy('called_at', 'desc'), 
+      limit(50)
+    );
+  }, [firestore, user]);
   const { data: aiUsage } = useCollection(aiUsageQuery);
 
   const totalTokens = (aiUsage || []).reduce((acc, curr) => acc + (curr.total_tokens || 0), 0);

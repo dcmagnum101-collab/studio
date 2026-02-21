@@ -1,3 +1,4 @@
+
 'use server';
 
 import * as nodemailer from 'nodemailer';
@@ -20,6 +21,7 @@ const transporter = nodemailer.createTransport({
 });
 
 export interface EmailOptions {
+  userId: string;
   to: string;
   subject: string;
   html: string;
@@ -29,16 +31,18 @@ export interface EmailOptions {
 
 /**
  * Sends a single email using Gmail and logs it to Firestore.
- * Handles unsubscribe checks and daily quota limits.
+ * Scoped to users/{userId}/outreach_log and users/{userId}/email_quota.
  */
 export async function sendEmail(
   options: EmailOptions
 ): Promise<{ success: boolean; messageId?: string; error?: string }> {
 
-  // Check unsubscribe status if contactId is provided
+  const userDocRef = db.collection('users').doc(options.userId);
+
+  // Check unsubscribe status if contactId is provided - Scoped to User
   if (options.contactId) {
     try {
-      const contact = await db
+      const contact = await userDocRef
         .collection('contacts')
         .doc(options.contactId)
         .get();
@@ -52,9 +56,9 @@ export async function sendEmail(
     }
   }
 
-  // Check daily quota (max 500/day for standard Gmail)
+  // Check daily quota (max 500/day for standard Gmail) - Scoped to User
   const today = new Date().toISOString().split('T')[0];
-  const quotaRef = db.collection('email_quota').doc(today);
+  const quotaRef = userDocRef.collection('email_quota').doc(today);
   
   try {
     const quota = await quotaRef.get();
@@ -62,10 +66,10 @@ export async function sendEmail(
     const dailyLimit = 500;
 
     if (currentCount >= dailyLimit) {
-      // Queue for tomorrow if limit reached
-      await db.collection('email_queue').add({
+      // Queue for tomorrow if limit reached - Scoped to User
+      await userDocRef.collection('email_queue').add({
         ...options,
-        queued_at: admin.FieldValue.serverTimestamp(),
+        queued_at: admin.firestore.FieldValue.serverTimestamp(),
         status: 'queued',
       });
       console.log(`Email to ${options.to} queued - daily limit reached (${currentCount}/${dailyLimit}).`);
@@ -81,21 +85,21 @@ export async function sendEmail(
       replyTo: options.replyTo || process.env.GMAIL_USER,
     });
 
-    // Increment daily quota count
+    // Increment daily quota count - Scoped to User
     await quotaRef.set(
-      { count: admin.FieldValue.increment(1), date: today, last_sent: admin.FieldValue.serverTimestamp() },
+      { count: admin.firestore.FieldValue.increment(1), date: today, last_sent: admin.firestore.FieldValue.serverTimestamp() },
       { merge: true }
     );
 
-    // Log the successful send
-    await db.collection('outreach_log').add({
+    // Log the successful send - Scoped to User
+    await userDocRef.collection('outreach_log').add({
       type: 'email',
       to: options.to,
       subject: options.subject,
       contact_id: options.contactId || null,
       status: 'delivered',
       message_id: result.messageId,
-      sent_at: admin.FieldValue.serverTimestamp(),
+      sent_at: admin.firestore.FieldValue.serverTimestamp(),
     });
 
     return { success: true, messageId: result.messageId };
@@ -103,15 +107,15 @@ export async function sendEmail(
   } catch (error: any) {
     console.error('Email send failure:', error);
     
-    // Log the failure
-    await db.collection('outreach_log').add({
+    // Log the failure - Scoped to User
+    await userDocRef.collection('outreach_log').add({
       type: 'email',
       to: options.to,
       subject: options.subject,
       contact_id: options.contactId || null,
       status: 'failed',
       error: error.message,
-      sent_at: admin.FieldValue.serverTimestamp(),
+      sent_at: admin.firestore.FieldValue.serverTimestamp(),
     });
 
     return { success: false, error: error.message };
