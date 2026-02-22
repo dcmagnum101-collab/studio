@@ -1,4 +1,3 @@
-
 "use client"
 
 import React, { useState, useEffect, useMemo } from "react"
@@ -31,6 +30,7 @@ import Link from "next/link"
 import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase, addDocumentNonBlocking } from "@/firebase"
 import { collection, query, orderBy, where } from "firebase/firestore"
 import { format } from "date-fns"
+import { LeadNurtureEngine } from "@/components/contacts/nurture-engine"
 
 export default function ContactProfilePage() {
   const params = useParams();
@@ -169,6 +169,12 @@ export default function ContactProfilePage() {
             <div className="flex-1 flex flex-col bg-white">
               <ScrollArea className="flex-1">
                 <div className="p-8 max-w-4xl mx-auto space-y-10">
+                  {/* AI Nurture Engine Integration */}
+                  <LeadNurtureEngine 
+                    contactId={params.id as string} 
+                    contactName={contact.name} 
+                  />
+
                   {/* Gmail Conversation History */}
                   <section className="space-y-6">
                     <div className="flex items-center justify-between">
