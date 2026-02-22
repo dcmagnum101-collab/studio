@@ -34,10 +34,15 @@ export function initializeFirebase(): {
     if (typeof window !== 'undefined') {
       const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
       if (siteKey) {
-        initializeAppCheck(firebaseAppInstance, {
-          provider: new ReCaptchaV3Provider(siteKey),
-          isTokenAutoRefreshEnabled: true,
-        });
+        try {
+          initializeAppCheck(firebaseAppInstance, {
+            provider: new ReCaptchaV3Provider(siteKey),
+            isTokenAutoRefreshEnabled: true,
+          });
+        } catch (err) {
+          // Prevent multiple initializations during HMR
+          console.warn('[App Check] Initialization logic bypassed:', err);
+        }
       }
     }
   }
