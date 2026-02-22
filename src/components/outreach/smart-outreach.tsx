@@ -154,6 +154,14 @@ export function SmartOutreach() {
                       <Badge className="bg-accent text-white h-5 text-[10px]">Score: {contact.icpScore}</Badge>
                     </div>
                     <p className="text-xs text-muted-foreground truncate">{contact.propertyAddress}</p>
+                    {contact.phone && (
+                      <div className="mt-2 flex items-center gap-1.5 text-[10px] font-bold text-primary">
+                        <PhoneCall className="h-3 w-3" />
+                        <a href={`tel:${contact.phone.replace(/\D/g, '')}`} onClick={e => e.stopPropagation()}>
+                          {contact.phone}
+                        </a>
+                      </div>
+                    )}
                   </div>
                 ))
               ) : (
@@ -177,7 +185,11 @@ export function SmartOutreach() {
                   <CardTitle className="text-xl text-primary">{selectedContact.name}</CardTitle>
                   <CardDescription className="flex items-center gap-2 mt-1">
                     <span className="flex items-center gap-1"><Mail className="h-3 w-3" /> {selectedContact.email || 'No email'}</span>
-                    <span className="flex items-center gap-1"><PhoneCall className="h-3 w-3" /> {selectedContact.phone || 'No phone'}</span>
+                    {selectedContact.phone && (
+                      <a href={`tel:${selectedContact.phone.replace(/\D/g, '')}`} className="flex items-center gap-1 hover:underline">
+                        <PhoneCall className="h-3 w-3" /> {selectedContact.phone}
+                      </a>
+                    )}
                   </CardDescription>
                 </div>
               </div>

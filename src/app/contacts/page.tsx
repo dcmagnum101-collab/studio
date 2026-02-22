@@ -1,4 +1,3 @@
-
 "use client"
 
 import React, { useState } from "react"
@@ -15,6 +14,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
 import { 
   Search, 
   Filter, 
@@ -34,10 +34,22 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogTrigger,
+  DialogFooter
+} from "@/components/ui/dialog";
 import { ContactDetailsSheet } from "@/components/contacts/contact-details-sheet";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EnrichmentTool } from "@/components/prospecting/enrichment-tool";
 import { useContacts } from "@/hooks/useFirestoreData";
+import { normalizePhone } from "@/lib/utils";
+import { useUser, useFirestore, addDocumentNonBlocking } from "@/firebase";
+import { collection } from "firebase/firestore";
+import { useToast } from "@/hooks/use-toast";
 
 const SOURCE_CONFIG: Record<string, { label: string; color: string }> = {
   expired: { label: 'Expired', color: 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.4)]' },
@@ -49,10 +61,20 @@ const SOURCE_CONFIG: Record<string, { label: string; color: string }> = {
 };
 
 export default function ContactsPage() {
+  const { user } = useUser();
+  const firestore = useFirestore();
+  const { toast } = useToast();
   const [selectedContact, setSelectedContact] = React.useState<any | null>(null);
   const [sheetOpen, setSheetOpen] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  
+  // Quick Add State
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newPhone, setNewPhone] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+  const [newAddress, setNewAddress] = useState("");
 
   const { 
     data: contacts, 
@@ -66,6 +88,32 @@ export default function ContactsPage() {
     setSheetOpen(true);
   };
 
+  const handleManualAdd = () => {
+    if (!user || !firestore || !newName) return;
+    
+    const normalized = normalizePhone(newPhone);
+    const contactsRef = collection(firestore, 'users', user.uid, 'contacts');
+    
+    addDocumentNonBlocking(contactsRef, {
+      name: newName,
+      phone: normalized,
+      email: newEmail,
+      propertyAddress: newAddress,
+      archagent_source: 'manual',
+      icpScore: 50,
+      pipeline_stage: 'new_lead',
+      ownerId: user.uid,
+      created_at: new Date().toISOString()
+    });
+
+    toast({ title: "Lead Added", description: `${newName} added to your Prospector.` });
+    setIsAddOpen(false);
+    setNewName("");
+    setNewPhone("");
+    setNewEmail("");
+    setNewAddress("");
+  };
+
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full">
@@ -75,10 +123,47 @@ export default function ContactsPage() {
             <SidebarTrigger className="-ml-1" />
             <h1 className="text-lg md:text-xl font-bold font-headline text-primary truncate">Prospecting Hub</h1>
             <div className="ml-auto flex items-center gap-2">
-               <Button size="sm" className="gap-2 bg-accent hover:bg-accent/90 h-9 shadow-md text-[10px] md:text-xs font-black uppercase tracking-widest">
-                <UserPlus className="h-4 w-4" />
-                <span className="hidden sm:inline">Add Lead</span>
-              </Button>
+              <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
+                <DialogTrigger asChild>
+                  <Button size="sm" className="gap-2 bg-accent hover:bg-accent/90 h-9 shadow-md text-[10px] md:text-xs font-black uppercase tracking-widest">
+                    <UserPlus className="h-4 w-4" />
+                    <span className="hidden sm:inline">Add Lead</span>
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Quick Add Prospect</DialogTitle>
+                  </DialogHeader>
+                  <div className="grid gap-4 py-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="name">Full Name</Label>
+                      <Input id="name" value={newName} onChange={e => setNewName(e.target.value)} placeholder="John Doe" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="phone">Phone Number</Label>
+                      <Input 
+                        id="phone" 
+                        value={newPhone} 
+                        onChange={e => setNewPhone(e.target.value)}
+                        onBlur={() => setNewPhone(normalizePhone(newPhone))} 
+                        placeholder="(702) 555-0100" 
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="email">Email</Label>
+                      <Input id="email" type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)} placeholder="john@example.com" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="address">Property Address</Label>
+                      <Input id="address" value={newAddress} onChange={e => setNewAddress(e.target.value)} placeholder="123 Example St, Las Vegas" />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setIsAddOpen(false)}>Cancel</Button>
+                    <Button onClick={handleManualAdd} className="bg-primary">Save Lead</Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </div>
           </header>
           
@@ -142,7 +227,11 @@ export default function ContactsPage() {
                                       {contact.name}
                                       {contact.ai_urgency === 'hot' && <Flame className="h-3.5 w-3.5 text-red-500 fill-red-500" />}
                                     </span>
-                                    <span className="text-xs text-muted-foreground">{contact.phone}</span>
+                                    {contact.phone && (
+                                      <a href={`tel:${contact.phone.replace(/\D/g, '')}`} className="text-xs text-muted-foreground hover:text-primary transition-colors" onClick={e => e.stopPropagation()}>
+                                        {contact.phone}
+                                      </a>
+                                    )}
                                     <Badge className={`w-fit mt-1.5 text-[9px] h-4 py-0 font-bold uppercase tracking-tighter ${SOURCE_CONFIG[contact.archagent_source]?.color || 'bg-slate-500'}`}>
                                       {SOURCE_CONFIG[contact.archagent_source]?.label || 'Other'}
                                     </Badge>
@@ -174,9 +263,11 @@ export default function ContactsPage() {
                                 </TableCell>
                                 <TableCell className="text-right py-4 px-6" onClick={(e) => e.stopPropagation()}>
                                   <div className="flex justify-end gap-1">
-                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-primary">
-                                      <Phone className="h-4 w-4" />
-                                    </Button>
+                                    <a href={`tel:${contact.phone?.replace(/\D/g, '')}`}>
+                                      <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-primary">
+                                        <Phone className="h-4 w-4" />
+                                      </Button>
+                                    </a>
                                     <DropdownMenu>
                                       <DropdownMenuTrigger asChild>
                                         <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400">
@@ -231,9 +322,11 @@ export default function ContactsPage() {
                                 {SOURCE_CONFIG[contact.archagent_source]?.label || 'Other'}
                               </Badge>
                               <div className="flex gap-2">
-                                <Button size="icon" variant="secondary" className="h-8 w-8 rounded-full bg-slate-100">
-                                  <Phone className="h-3.5 w-3.5 text-primary" />
-                                </Button>
+                                <a href={`tel:${contact.phone?.replace(/\D/g, '')}`}>
+                                  <Button size="icon" variant="secondary" className="h-8 w-8 rounded-full bg-slate-100">
+                                    <Phone className="h-3.5 w-3.5 text-primary" />
+                                  </Button>
+                                </a>
                                 <Button size="icon" variant="secondary" className="h-8 w-8 rounded-full bg-slate-100">
                                   <Mail className="h-3.5 w-3.5 text-primary" />
                                 </Button>

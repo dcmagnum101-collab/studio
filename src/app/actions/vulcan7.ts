@@ -3,6 +3,7 @@
 import { adminDb } from '@/lib/firebase-admin';
 import * as admin from 'firebase-admin';
 import { getNextFollowUpDate, type LeadStatus } from '@/lib/lead-types';
+import { normalizePhone } from '@/lib/utils';
 
 /**
  * Syncs leads from a Vulcan7 CSV export string.
@@ -31,11 +32,13 @@ export async function syncVulcan7Leads(userId: string, csvData: string) {
       continue;
     }
 
-    const phone = data.Phone;
-    if (!phone) continue;
+    const rawPhone = data.Phone;
+    if (!rawPhone) continue;
+
+    const normalizedPhone = normalizePhone(rawPhone);
 
     // 2. Deduplicate by Phone
-    const existing = await contactsRef.where('phone', '==', phone).limit(1).get();
+    const existing = await contactsRef.where('phone', '==', normalizedPhone).limit(1).get();
     if (!existing.empty) {
       duplicates++;
       continue;
@@ -64,8 +67,8 @@ export async function syncVulcan7Leads(userId: string, csvData: string) {
       name: `${data.FirstName} ${data.LastName}`,
       firstName: data.FirstName,
       lastName: data.LastName,
-      phone: data.Phone,
-      phone2: data.Phone2 || '',
+      phone: normalizedPhone,
+      phone2: data.Phone2 ? normalizePhone(data.Phone2) : '',
       propertyAddress: data.Address,
       city: data.City,
       state: data.State,

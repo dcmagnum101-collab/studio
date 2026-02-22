@@ -78,6 +78,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { ComplianceGuard } from "@/components/compliance/ComplianceGuard"
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { normalizePhone } from "@/lib/utils"
 
 interface ContactDetailsSheetProps {
   contact: any | null;
@@ -169,7 +170,14 @@ export function ContactDetailsSheet({ contact: initialContact, open, onOpenChang
                 <SheetTitle className="text-3xl font-black font-headline text-primary mt-2">
                   {contact.name}
                 </SheetTitle>
-                <p className="text-xs font-bold text-muted-foreground">{contact.propertyAddress}</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-xs font-bold text-muted-foreground">{contact.propertyAddress}</p>
+                  {contact.phone && (
+                    <a href={`tel:${contact.phone.replace(/\D/g, '')}`} className="flex items-center gap-1 text-xs font-bold text-primary hover:underline">
+                      <PhoneCall className="h-3 w-3" /> {contact.phone}
+                    </a>
+                  )}
+                </div>
               </div>
               <div className="text-center p-3 bg-white rounded-2xl shadow-sm border border-slate-200">
                 <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">ICP Score</p>
@@ -208,7 +216,9 @@ export function ContactDetailsSheet({ contact: initialContact, open, onOpenChang
                     )}
                     
                     <div className="grid grid-cols-2 gap-4">
-                      <Button variant="outline" className="h-11 font-bold gap-2"><Phone className="h-4 w-4" /> Call</Button>
+                      <a href={`tel:${contact.phone?.replace(/\D/g, '')}`} className="w-full">
+                        <Button variant="outline" className="w-full h-11 font-bold gap-2"><Phone className="h-4 w-4" /> Call</Button>
+                      </a>
                       <Button variant="outline" className="h-11 font-bold gap-2"><Mail className="h-4 w-4" /> Email</Button>
                     </div>
                   </section>
@@ -309,9 +319,6 @@ export function ContactDetailsSheet({ contact: initialContact, open, onOpenChang
                     </div>
                   </div>
                 </TabsContent>
-
-                {/* ... AI Steps and History tabs logic ... */}
-                
               </div>
             </ScrollArea>
           </Tabs>

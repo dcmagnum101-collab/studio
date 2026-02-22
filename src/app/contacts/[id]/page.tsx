@@ -1,4 +1,3 @@
-
 "use client"
 
 import React, { useState, useEffect } from "react"
@@ -25,7 +24,8 @@ import {
   ArrowRight,
   Inbox,
   Clock,
-  ClipboardList
+  ClipboardList,
+  RefreshCw
 } from "lucide-react"
 import Link from "next/link"
 import { useUser, useFirestore, useDoc, useMemoFirebase, addDocumentNonBlocking } from "@/firebase"
@@ -119,7 +119,9 @@ export default function ContactProfilePage() {
               </div>
 
               <div className="grid grid-cols-2 lg:grid-cols-1 gap-2">
-                <Button className="gap-2 bg-primary w-full h-11 rounded-xl shadow-lg shadow-primary/10 font-bold" onClick={() => handleLogActivity('call')}><Phone className="h-4 w-4" /> Call</Button>
+                <a href={`tel:${contact.phone?.replace(/\D/g, '')}`} className="w-full">
+                  <Button className="gap-2 bg-primary w-full h-11 rounded-xl shadow-lg shadow-primary/10 font-bold" onClick={() => handleLogActivity('call')}><Phone className="h-4 w-4" /> Call</Button>
+                </a>
                 <Button variant="outline" className="gap-2 w-full h-11 rounded-xl bg-white font-bold border-slate-200" onClick={() => handleLogActivity('sms')}><MessageSquare className="h-4 w-4 text-primary" /> SMS</Button>
                 <Button variant="outline" className="hidden lg:flex w-full h-11 gap-2 border-slate-200 bg-white font-bold rounded-xl" onClick={() => handleLogActivity('email')}><Mail className="h-4 w-4 text-primary" /> Email</Button>
                 <Button variant="secondary" className="hidden lg:flex w-full h-11 gap-2 font-bold rounded-xl"><Calendar className="h-4 w-4 text-primary" /> Schedule</Button>
@@ -142,7 +144,9 @@ export default function ContactProfilePage() {
                       <Phone className="h-4 w-4 text-primary shrink-0" />
                       <div className="space-y-0.5">
                         <p className="text-[8px] font-black uppercase text-slate-400 leading-none">Primary Phone</p>
-                        <span className="text-xs font-bold text-slate-700 leading-tight block">{contact.phone || 'No phone recorded'}</span>
+                        <a href={`tel:${contact.phone?.replace(/\D/g, '')}`} className="text-xs font-bold text-slate-700 hover:text-primary transition-colors leading-tight block">
+                          {contact.phone || 'No phone recorded'}
+                        </a>
                       </div>
                     </div>
                     <div className="flex items-center gap-3">

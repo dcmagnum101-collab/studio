@@ -1,4 +1,3 @@
-
 'use server';
 
 /**
@@ -9,6 +8,7 @@
 import { grokJSON } from './grok-service';
 import { monicaSystemPrompt } from '@/config/monica-system-prompt';
 import * as admin from 'firebase-admin';
+import { normalizePhone } from '@/lib/utils';
 
 if (!admin.apps.length) {
   admin.initializeApp();
@@ -71,6 +71,8 @@ async function processEnrichmentJob(userId: string, jobId: string, url: string) 
     const extracted = await grokJSON<EnrichmentResult>(system, userPrompt, userId);
     console.log(`[Prospecting Worker] Intelligence extracted successfully for ${extracted.name || 'Unknown'}`);
 
+    const normalizedPhone = extracted.phone ? normalizePhone(extracted.phone) : '';
+
     // ─── DEDUPLICATION LOGIC ───
     let existingContactId: string | null = null;
 
@@ -82,11 +84,11 @@ async function processEnrichmentJob(userId: string, jobId: string, url: string) 
       }
     }
 
-    if (!existingContactId && extracted.phone) {
-      const phoneMatch = await userRef.collection('contacts').where('phone', '==', extracted.phone).limit(1).get();
+    if (!existingContactId && normalizedPhone) {
+      const phoneMatch = await userRef.collection('contacts').where('phone', '==', normalizedPhone).limit(1).get();
       if (!phoneMatch.empty) {
         existingContactId = phoneMatch.docs[0].id;
-        console.log(`[Prospecting Worker] Dedupe hit on phone: ${extracted.phone}`);
+        console.log(`[Prospecting Worker] Dedupe hit on phone: ${normalizedPhone}`);
       }
     }
 
@@ -104,7 +106,7 @@ async function processEnrichmentJob(userId: string, jobId: string, url: string) 
         firstName: extracted.firstName || '',
         lastName: extracted.lastName || '',
         email: extracted.email || '',
-        phone: extracted.phone || '',
+        phone: normalizedPhone,
         propertyAddress: extracted.propertyAddress || '',
         motivation: extracted.motivation || 'Extracted from URL enrichment',
         icpScore: 50, // Default mid score
