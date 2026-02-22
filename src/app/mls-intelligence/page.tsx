@@ -5,7 +5,6 @@ import React, { useState, useEffect } from "react"
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/layout/app-sidebar"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { 
@@ -17,84 +16,92 @@ import {
   TableRow 
 } from "@/components/ui/table"
 import { 
-  Search, 
-  Filter, 
-  Home, 
-  TrendingDown, 
-  AlertCircle, 
+  Database, 
+  RefreshCw, 
   Sparkles, 
-  RefreshCw,
-  Clock,
+  MapPin, 
+  TrendingUp, 
+  Clock, 
+  AlertCircle,
+  CheckCircle2,
+  ChevronRight,
   ArrowUpRight,
-  ShieldAlert,
-  Database,
-  CheckCircle2
+  Home,
+  ShieldCheck
 } from "lucide-react"
 import { useUser, useFirestore, addDocumentNonBlocking } from "@/firebase"
-import { unifiedMLSSync } from "@/services/mls-sync-orchestrator"
-import { MONICA_MARKET_HASHES } from "@/config/trulia-constants"
+import { syncLVRListings, fetchNeighborhoodStats, getExpiringLeadsAction } from "@/app/actions/lvr-mls"
 import { useToast } from "@/hooks/use-toast"
 import { collection } from "firebase/firestore"
 
+const VEGAS_ZIPS = [
+  { zip: "89144", area: "Summerlin" },
+  { zip: "89135", area: "Summerlin South" },
+  { zip: "89012", area: "Henderson" },
+  { zip: "89052", area: "Seven Hills" },
+  { zip: "89117", area: "Lakes/Peccole" },
+  { zip: "89138", area: "The Vistas" },
+];
+
 export default function MLSIntelligencePage() {
   const { user } = useUser();
-  const firestore = useFirestore();
   const { toast } = useToast();
-  const [activeMarket, setActiveMarket] = useState("las_vegas");
-  const [listings, setListings] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState("active");
-  const [currentSource, setCurrentSource] = useState<'trulia' | 'realtor' | 'zillow' | 'homes' | 'fallback'>('trulia');
+  const [selectedZips, setSelectedZips] = useState<string[]>(["89144", "89135"]);
+  const [loading, setLoading] = useState<string | null>(null);
+  const [results, setResults] = useState<any[]>([]);
+  const [vitals, setVitals] = useState<any[]>([]);
 
   useEffect(() => {
     if (user) {
-      handleSync();
+      handleLoadVitals();
     }
-  }, [user, activeMarket, activeTab]);
+  }, [user, selectedZips]);
 
-  const handleSync = async () => {
+  const handleLoadVitals = async () => {
     if (!user) return;
-    setLoading(true);
     try {
-      const result = await unifiedMLSSync(user.uid, activeMarket, activeTab);
-      setListings(result.data);
-      setCurrentSource(result.source);
-      
-      if (result.status === 'fallback') {
-        toast({ 
-          title: "Fallback Sync Active", 
-          description: `Switched to ${result.source.toUpperCase()} as Trulia primary was unavailable.` 
-        });
-      }
+      const data = await fetchNeighborhoodStats(user.uid, selectedZips);
+      setVitals(data);
     } catch (err) {
-      toast({ variant: "destructive", title: "Global Sync Failed", description: "All real estate data sources are currently unreachable." });
-    } finally {
-      setLoading(false);
+      console.error(err);
     }
   };
 
-  const handleCreateLead = (listing: any) => {
-    if (!user || !firestore) return;
-    const contactsRef = collection(firestore, 'users', user.uid, 'contacts');
-    
-    let icp = 50;
-    if (listing.is_fsbo) icp += 15;
-    if (listing.is_foreclosure) icp += 20;
-    if (listing.days_on_market > 60) icp += 20;
+  const handleSync = async (type: 'active' | 'expired' | 'pending' | 'sold') => {
+    if (!user) return;
+    setLoading(type);
+    try {
+      const res = await syncLVRListings({ type, zipCodes: selectedZips, userId: user.uid });
+      toast({
+        title: `Sync Complete: ${type.toUpperCase()}`,
+        description: `Imported ${res.imported} new prospects. ${res.duplicates} duplicates skipped.`,
+      });
+      // Optionally refresh a local results preview if needed
+    } catch (err: any) {
+      toast({ variant: "destructive", title: "Sync Failed", description: err.message });
+    } finally {
+      setLoading(null);
+    }
+  };
 
-    addDocumentNonBlocking(contactsRef, {
-      name: "Market Prospect",
-      propertyAddress: listing.address,
-      icpScore: icp,
-      archagent_source: "mls_intel",
-      archagent_tags: [listing.source || "mls", listing.is_fsbo ? "fsbo" : "", listing.is_foreclosure ? "foreclosure" : ""].filter(Boolean),
-      pipeline_stage: "new_lead",
-      motivation: listing.is_fsbo ? "FSBO listing detected" : "MLS monitoring signal",
-      ownerId: user.uid,
-      created_at: new Date().toISOString()
-    });
+  const handleFindExpiring = async () => {
+    if (!user) return;
+    setLoading('expiring');
+    try {
+      const leads = await getExpiringLeadsAction(user.uid, selectedZips);
+      setResults(leads);
+      toast({ title: "Pre-Expiry Scan Complete", description: `Found ${leads.length} listings expiring within 7 days.` });
+    } catch (err: any) {
+      toast({ variant: "destructive", title: "Scan Failed", description: err.message });
+    } finally {
+      setLoading(null);
+    }
+  };
 
-    toast({ title: "Lead Created", description: `${listing.address} added to CRM.` });
+  const toggleZip = (zip: string) => {
+    setSelectedZips(prev => 
+      prev.includes(zip) ? prev.filter(z => z !== zip) : [...prev, zip]
+    );
   };
 
   return (
@@ -105,152 +112,213 @@ export default function MLSIntelligencePage() {
           <header className="flex h-16 shrink-0 items-center gap-2 border-b px-6 bg-white shadow-sm sticky top-0 z-10">
             <SidebarTrigger className="-ml-1" />
             <div className="flex items-center gap-3">
-              <h1 className="text-xl font-bold font-headline text-primary">MLS Intelligence</h1>
-              <Badge variant="outline" className="gap-1.5 py-1 px-2 border-slate-200 bg-slate-50 text-[10px] text-slate-500 font-bold uppercase tracking-wider">
-                <Database className="h-3 w-3" />
-                Live Source: {currentSource}
+              <h1 className="text-xl font-bold font-headline text-primary">LVR MLS Intelligence</h1>
+              <Badge className="bg-green-500 gap-1.5 h-6 px-2 text-[10px] uppercase font-black tracking-widest">
+                <ShieldCheck className="h-3 w-3" /> Connection: Active
               </Badge>
             </div>
-            <div className="ml-auto flex gap-2">
-              <select 
-                className="h-9 rounded-md border border-input px-3 text-sm bg-white"
-                value={activeMarket}
-                onChange={(e) => setActiveMarket(e.target.value)}
-              >
-                <option value="las_vegas">Las Vegas, NV</option>
-                <option value="henderson">Henderson, NV</option>
-                <option value="north_las_vegas">North Las Vegas</option>
-                <option value="summerlin">Summerlin</option>
-              </select>
-              <Button size="sm" variant="outline" onClick={handleSync} disabled={loading}>
-                <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-                Force Sync
-              </Button>
-            </div>
+            <Button className="ml-auto bg-accent hover:bg-accent/90 text-primary font-bold shadow-md h-9 gap-2">
+              <RefreshCw className="h-4 w-4" /> Sync All Data
+            </Button>
           </header>
           
           <main className="p-8 max-w-7xl mx-auto w-full space-y-8">
-            <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-600 text-white rounded-lg">
-                  <CheckCircle2 className="h-5 w-5" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-blue-900">Multi-Source Sync Active</h3>
-                  <p className="text-xs text-blue-700">Monica is currently cross-referencing Trulia, Realtor.com, and Zillow for data integrity.</p>
-                </div>
+            <section className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                  <MapPin className="h-4 w-4 text-accent" />
+                  Target Zip Codes
+                </h2>
+                <span className="text-[10px] text-muted-foreground italic">Monica is monitoring {selectedZips.length} neighborhoods</span>
               </div>
-              <div className="flex -space-x-2">
-                {['T', 'R', 'Z', 'H'].map((source) => (
-                  <div key={source} className="h-8 w-8 rounded-full border-2 border-white bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-600 shadow-sm">
-                    {source}
+              <div className="flex flex-wrap gap-2">
+                {VEGAS_ZIPS.map(item => (
+                  <Button 
+                    key={item.zip}
+                    variant={selectedZips.includes(item.zip) ? "default" : "outline"}
+                    className={`h-10 rounded-xl px-4 font-bold text-xs transition-all ${selectedZips.includes(item.zip) ? 'bg-primary shadow-lg shadow-primary/20' : 'bg-white border-slate-200'}`}
+                    onClick={() => toggleZip(item.zip)}
+                  >
+                    {item.zip} <span className="ml-2 text-[10px] opacity-60 font-medium">{item.area}</span>
+                  </Button>
+                ))}
+              </div>
+            </section>
+
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+              <Card className="border-none shadow-md hover:shadow-xl transition-all cursor-pointer group" onClick={() => handleSync('active')}>
+                <CardContent className="p-6 space-y-4">
+                  <div className="flex justify-between items-start">
+                    <div className="p-2 bg-blue-50 text-blue-600 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                      <Home className="h-5 w-5" />
+                    </div>
+                    {loading === 'active' && <RefreshCw className="h-4 w-4 animate-spin text-blue-600" />}
                   </div>
+                  <div>
+                    <h3 className="font-bold text-slate-800">Active Listings</h3>
+                    <p className="text-xs text-muted-foreground">Monitor current competition</p>
+                  </div>
+                  <Button variant="ghost" size="sm" className="w-full justify-between p-0 h-auto font-black text-[10px] uppercase tracking-tighter text-blue-600">
+                    Run Sync <ChevronRight className="h-3 w-3" />
+                  </Button>
+                </CardContent>
+              </Card>
+
+              <Card className="border-none shadow-md hover:shadow-xl transition-all cursor-pointer group" onClick={() => handleSync('expired')}>
+                <CardContent className="p-6 space-y-4">
+                  <div className="flex justify-between items-start">
+                    <div className="p-2 bg-red-50 text-red-600 rounded-lg group-hover:bg-red-600 group-hover:text-white transition-colors">
+                      <Clock className="h-5 w-5" />
+                    </div>
+                    {loading === 'expired' && <RefreshCw className="h-4 w-4 animate-spin text-red-600" />}
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-800">Expired Sync</h3>
+                    <p className="text-xs text-muted-foreground">High-intent seller leads</p>
+                  </div>
+                  <Button variant="ghost" size="sm" className="w-full justify-between p-0 h-auto font-black text-[10px] uppercase tracking-tighter text-red-600">
+                    Run Sync <ChevronRight className="h-3 w-3" />
+                  </Button>
+                </CardContent>
+              </Card>
+
+              <Card className="border-none shadow-md hover:shadow-xl transition-all cursor-pointer group" onClick={handleFindExpiring}>
+                <CardContent className="p-6 space-y-4">
+                  <div className="flex justify-between items-start">
+                    <div className="p-2 bg-accent/10 text-accent rounded-lg group-hover:bg-accent group-hover:text-white transition-colors">
+                      <AlertCircle className="h-5 w-5" />
+                    </div>
+                    {loading === 'expiring' && <RefreshCw className="h-4 w-4 animate-spin text-accent" />}
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-800">Pre-Expiry Alert</h3>
+                    <p className="text-xs text-muted-foreground">Approach before they expire</p>
+                  </div>
+                  <Button variant="ghost" size="sm" className="w-full justify-between p-0 h-auto font-black text-[10px] uppercase tracking-tighter text-accent">
+                    Scan LVR <ChevronRight className="h-3 w-3" />
+                  </Button>
+                </CardContent>
+              </Card>
+
+              <Card className="border-none shadow-md hover:shadow-xl transition-all cursor-pointer group" onClick={() => handleSync('sold')}>
+                <CardContent className="p-6 space-y-4">
+                  <div className="flex justify-between items-start">
+                    <div className="p-2 bg-green-50 text-green-600 rounded-lg group-hover:bg-green-600 group-hover:text-white transition-colors">
+                      <CheckCircle2 className="h-5 w-5" />
+                    </div>
+                    {loading === 'sold' && <RefreshCw className="h-4 w-4 animate-spin text-green-600" />}
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-800">Recent Solds</h3>
+                    <p className="text-xs text-muted-foreground">Analyze neighbor price points</p>
+                  </div>
+                  <Button variant="ghost" size="sm" className="w-full justify-between p-0 h-auto font-black text-[10px] uppercase tracking-tighter text-green-600">
+                    Run Sync <ChevronRight className="h-3 w-3" />
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="grid gap-8 lg:grid-cols-3">
+              <div className="lg:col-span-2 space-y-6">
+                <Card className="border-none shadow-xl bg-white overflow-hidden">
+                  <CardHeader className="bg-slate-50/50 border-b">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle className="text-lg">Recent Sync Results</CardTitle>
+                        <CardDescription className="text-xs">Intelligence matches from LVR feed</CardDescription>
+                      </div>
+                      <Sparkles className="h-5 w-5 text-accent animate-pulse" />
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <Table>
+                      <TableHeader className="bg-slate-50/50">
+                        <TableRow>
+                          <TableHead className="font-bold text-xs uppercase">Property</TableHead>
+                          <TableHead className="font-bold text-xs uppercase">Price</TableHead>
+                          <TableHead className="font-bold text-xs uppercase">DOM</TableHead>
+                          <TableHead className="text-right font-bold text-xs uppercase">Action</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {results.length > 0 ? (
+                          results.map((item) => (
+                            <TableRow key={item.mlsNumber} className="hover:bg-slate-50/50 transition-colors">
+                              <TableCell className="py-4">
+                                <div className="flex items-center gap-3">
+                                  <div className="h-10 w-14 rounded-lg bg-slate-100 overflow-hidden shrink-0">
+                                    {item.thumbnail ? (
+                                      <img src={item.thumbnail} className="h-full w-full object-cover" />
+                                    ) : <Home className="h-full w-full p-2 text-slate-300" />}
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className="text-sm font-bold text-primary truncate">{item.propertyAddress}</p>
+                                    <p className="text-[10px] text-muted-foreground uppercase">{item.zip} • {item.beds}bd/{item.baths}ba</p>
+                                  </div>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <span className="text-sm font-black text-slate-700">${item.listPrice?.toLocaleString()}</span>
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="outline" className="text-[10px] font-bold border-slate-200">{item.daysOnMarket} Days</Badge>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <Button size="sm" variant="ghost" className="h-8 gap-2 text-xs font-bold text-primary">
+                                  Prospect <ArrowUpRight className="h-3.5 w-3.5" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        ) : (
+                          <TableRow>
+                            <TableCell colSpan={4} className="text-center py-20 text-muted-foreground italic text-xs">
+                              Select a sync category to preview real-time LVR data.
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="space-y-6">
+                <h2 className="text-sm font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4 text-accent" />
+                  Neighborhood Vitals
+                </h2>
+                {vitals.map(stat => (
+                  <Card key={stat.zipCode} className="border-none shadow-md bg-gradient-to-br from-white to-slate-50">
+                    <CardHeader className="pb-2">
+                      <div className="flex justify-between items-center">
+                        <CardTitle className="text-lg font-black text-primary">{stat.zipCode}</CardTitle>
+                        <Badge className="bg-primary/5 text-primary border-primary/10">{VEGAS_ZIPS.find(z => z.zip === stat.zipCode)?.area}</Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="grid grid-cols-2 gap-4">
+                      <div className="space-y-0.5">
+                        <p className="text-[8px] font-black uppercase text-slate-400">Median Price</p>
+                        <p className="text-sm font-bold text-slate-700">${stat.median_price.toLocaleString()}</p>
+                      </div>
+                      <div className="space-y-0.5">
+                        <p className="text-[8px] font-black uppercase text-slate-400">Avg DOM</p>
+                        <p className="text-sm font-bold text-slate-700">{stat.avg_dom} Days</p>
+                      </div>
+                      <div className="space-y-0.5">
+                        <p className="text-[8px] font-black uppercase text-slate-400">Active Listings</p>
+                        <p className="text-sm font-bold text-blue-600">{stat.active_count}</p>
+                      </div>
+                      <div className="space-y-0.5">
+                        <p className="text-[8px] font-black uppercase text-slate-400">Sold (30d)</p>
+                        <p className="text-sm font-bold text-green-600">{stat.sold_last_30_days}</p>
+                      </div>
+                    </CardContent>
+                  </Card>
                 ))}
               </div>
             </div>
-
-            <div className="grid gap-6 md:grid-cols-3">
-              <Card className="border-none shadow-md bg-primary text-white">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-bold flex items-center gap-2">
-                    <Home className="h-4 w-4 text-accent" />
-                    Market Inventory
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-black">{listings.length}</div>
-                  <p className="text-xs text-white/70 mt-1">Properties tracked in {activeMarket.replace('_', ' ')}</p>
-                </CardContent>
-              </Card>
-              <Card className="border-none shadow-md bg-accent text-white">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-bold flex items-center gap-2">
-                    <AlertCircle className="h-4 w-4" />
-                    Stale Inventory
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-black">{listings.filter(l => l.days_on_market > 60).length}</div>
-                  <p className="text-xs text-white/70 mt-1">Listings with DOM 60+</p>
-                </CardContent>
-              </Card>
-              <Card className="border-none shadow-md bg-white">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-bold flex items-center gap-2 text-primary">
-                    <Sparkles className="h-4 w-4 text-accent" />
-                    Source Health
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-xl font-black text-primary uppercase">{loading ? 'Syncing...' : 'Optimal'}</div>
-                  <p className="text-xs text-muted-foreground mt-1">Redundancy systems online</p>
-                </CardContent>
-              </Card>
-            </div>
-
-            <Tabs defaultValue="active" value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-              <TabsList className="bg-slate-100 p-1 rounded-xl w-full justify-start h-auto overflow-x-auto no-scrollbar">
-                <TabsTrigger value="active">Active Listings</TabsTrigger>
-                <TabsTrigger value="sold">Recently Sold</TabsTrigger>
-                <TabsTrigger value="fsbo">FSBO Tracker</TabsTrigger>
-                <TabsTrigger value="foreclosure">Foreclosures</TabsTrigger>
-                <TabsTrigger value="reduced">Price Reductions</TabsTrigger>
-              </TabsList>
-
-              <Card className="border-none shadow-xl">
-                <CardContent className="p-0">
-                  <Table>
-                    <TableHeader className="bg-slate-50">
-                      <TableRow>
-                        <TableHead className="font-bold">Property</TableHead>
-                        <TableHead className="font-bold">Price</TableHead>
-                        <TableHead className="font-bold">DOM</TableHead>
-                        <TableHead className="font-bold">Source</TableHead>
-                        <TableHead className="text-right font-bold">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {loading ? (
-                        <TableRow>
-                          <TableCell colSpan={5} className="text-center py-20 text-muted-foreground italic">Fetching intelligence from multiple sources...</TableCell>
-                        </TableRow>
-                      ) : listings.length > 0 ? (
-                        listings.map((listing) => (
-                          <TableRow key={listing.id} className="hover:bg-slate-50 transition-colors">
-                            <TableCell>
-                              <div className="font-bold text-primary">{listing.address}</div>
-                              <div className="text-[10px] text-muted-foreground uppercase">{listing.city} • {listing.beds}bd/{listing.baths}ba • {listing.sqft}sf</div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="font-bold">${listing.list_price?.toLocaleString() || listing.sold_price?.toLocaleString()}</div>
-                              {listing.price_reduced && <Badge className="bg-green-100 text-green-700 hover:bg-green-100 text-[9px] h-4">REDUCED</Badge>}
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                <Clock className={`h-3 w-3 ${listing.days_on_market > 60 ? 'text-red-500' : 'text-slate-400'}`} />
-                                <span className={listing.days_on_market > 60 ? 'font-bold text-red-600' : ''}>{listing.days_on_market} days</span>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant="outline" className="capitalize text-[10px] font-medium bg-white">{listing.source || currentSource}</Badge>
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <Button size="sm" className="gap-2" onClick={() => handleCreateLead(listing)}>
-                                <ArrowUpRight className="h-4 w-4" /> Import Lead
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      ) : (
-                        <TableRow>
-                          <TableCell colSpan={5} className="text-center py-20 text-muted-foreground">No matching listings found in current data pull.</TableCell>
-                        </TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-            </Tabs>
           </main>
         </SidebarInset>
       </div>
