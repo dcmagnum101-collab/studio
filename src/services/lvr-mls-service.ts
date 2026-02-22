@@ -46,7 +46,7 @@ async function fetchLVR(query: string) {
 /**
  * Normalizes LVR Property data to the Monica Lead format
  */
-export function normalizeLVRProperty(raw: any, source: string): any {
+export async function normalizeLVRProperty(raw: any, source: string): Promise<any> {
   return {
     mlsNumber: raw.ListingId,
     name: "Market Prospect", // Default until enriched

@@ -52,7 +52,7 @@ export async function syncLVRListings(payload: {
     const contactsRef = adminDb.collection('users').doc(userId).collection('contacts');
 
     for (const raw of rawListings) {
-      const normalized = normalizeLVRProperty(raw, source);
+      const normalized = await normalizeLVRProperty(raw, source);
       
       // Deduplicate by MLS Number
       const existing = await contactsRef.where('mlsNumber', '==', normalized.mlsNumber).limit(1).get();
@@ -84,7 +84,7 @@ export async function getExpiringLeadsAction(userId: string, zipCodes: string[])
   const filter = `ExpirationDate le ${nextWeek.toISOString().split('T')[0]} and ExpirationDate ge ${new Date().toISOString().split('T')[0]}`;
 
   const raw = await queryLVRListings({ status: ['Active'], zipCodes, filter });
-  return raw.map((r: any) => normalizeLVRProperty(r, 'pre-expiry-alert'));
+  return Promise.all(raw.map(async (r: any) => await normalizeLVRProperty(r, 'pre-expiry-alert')));
 }
 
 export async function fetchNeighborhoodStats(userId: string, zipCodes: string[]) {
@@ -96,5 +96,5 @@ export async function refreshListingDetailAction(userId: string, mlsNumber: stri
   // Queries a single listing by ID
   const raw = await queryLVRListings({ status: ['Active', 'Expired', 'Closed', 'Pending'], zipCodes: [], filter: `ListingId eq '${mlsNumber}'` });
   if (!raw.length) throw new Error('Listing not found in LVR feed.');
-  return normalizeLVRProperty(raw[0], 'mls-refresh');
+  return await normalizeLVRProperty(raw[0], 'mls-refresh');
 }
