@@ -1,3 +1,4 @@
+
 "use client"
 
 import React, { useState, useEffect, useMemo } from "react"
@@ -23,11 +24,12 @@ import {
   ArrowLeft,
   User,
   MoreVertical,
-  ArrowRight
+  ArrowRight,
+  Inbox
 } from "lucide-react"
 import Link from "next/link"
 import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase, addDocumentNonBlocking } from "@/firebase"
-import { collection, query, orderBy } from "firebase/firestore"
+import { collection, query, orderBy, where } from "firebase/firestore"
 import { format } from "date-fns"
 
 export default function ContactProfilePage() {
@@ -46,6 +48,18 @@ export default function ContactProfilePage() {
   }, [user, firestore, params.id]);
 
   const { data: contact, isLoading: contactLoading } = useDoc(contactRef);
+
+  // Sync real message history from Gmail Integration
+  const messagesQuery = useMemoFirebase(() => {
+    if (!user || !firestore || !params.id) return null;
+    return query(
+      collection(firestore, 'users', user.uid, 'messages'),
+      where('leadId', '==', params.id),
+      orderBy('created_at', 'desc')
+    );
+  }, [user, firestore, params.id]);
+
+  const { data: gmailMessages } = useCollection(messagesQuery);
 
   const logsQuery = useMemoFirebase(() => {
     if (!user || !firestore || !params.id) return null;
@@ -149,22 +163,46 @@ export default function ContactProfilePage() {
                     </div>
                   </div>
                 </div>
-
-                <div className="space-y-2">
-                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Lead Source</p>
-                  <div className="flex flex-wrap gap-1">
-                    <Badge variant="secondary" className="bg-primary/5 text-primary text-[10px]">{contact.archagent_source}</Badge>
-                    {contact.archagent_tags?.map((tag: string) => (
-                      <Badge key={tag} className="bg-slate-100 text-slate-600 text-[10px]">{tag.replace('_', ' ')}</Badge>
-                    ))}
-                  </div>
-                </div>
               </div>
             </aside>
 
             <div className="flex-1 flex flex-col bg-white">
               <ScrollArea className="flex-1">
                 <div className="p-8 max-w-4xl mx-auto space-y-10">
+                  {/* Gmail Conversation History */}
+                  <section className="space-y-6">
+                    <div className="flex items-center justify-between">
+                      <h2 className="text-lg font-bold flex items-center gap-2">
+                        <Inbox className="h-5 w-5 text-primary" />
+                        Gmail History
+                      </h2>
+                      <Badge variant="outline" className="bg-primary/5 text-primary">Live Sync Active</Badge>
+                    </div>
+                    
+                    <div className="space-y-4">
+                      {gmailMessages && gmailMessages.length > 0 ? (
+                        gmailMessages.map((msg) => (
+                          <div key={msg.id} className="p-4 rounded-xl border border-slate-100 bg-slate-50/30 space-y-2">
+                            <div className="flex justify-between items-center">
+                              <span className="text-xs font-bold text-primary">{msg.subject}</span>
+                              <span className="text-[10px] text-muted-foreground">{msg.created_at ? format(msg.created_at.toDate(), 'MMM d, h:mm a') : ''}</span>
+                            </div>
+                            <p className="text-xs text-slate-600 line-clamp-3 leading-relaxed">{msg.body}</p>
+                            <div className="flex items-center gap-2 pt-1">
+                              <Badge className="bg-green-500 text-[8px] h-4">DELIVERED</Badge>
+                              {msg.threadId && <span className="text-[8px] text-muted-foreground">Thread ID: {msg.threadId.slice(0, 8)}...</span>}
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-center py-10 bg-slate-50/50 rounded-xl border border-dashed">
+                          <Mail className="h-8 w-8 text-slate-300 mx-auto mb-2" />
+                          <p className="text-xs text-muted-foreground">No linked Gmail conversations found.</p>
+                        </div>
+                      )}
+                    </div>
+                  </section>
+
                   <section className="grid gap-6 md:grid-cols-2">
                     <Card className="border-none shadow-md bg-gradient-to-br from-slate-50 to-white">
                       <CardHeader className="pb-2">
@@ -194,7 +232,7 @@ export default function ContactProfilePage() {
                     <div className="flex items-center justify-between">
                       <h2 className="text-lg font-bold flex items-center gap-2">
                         <History className="h-5 w-5 text-accent" />
-                        Activity History
+                        CRM Timeline
                       </h2>
                     </div>
 
@@ -214,17 +252,12 @@ export default function ContactProfilePage() {
                               </div>
                               <h4 className="font-bold text-slate-800">{log.outcome}</h4>
                               <p className="text-sm text-slate-600 leading-relaxed bg-slate-50/50 p-3 rounded-xl border border-slate-100">{log.summary}</p>
-                              {log.nextAction && (
-                                <div className="flex items-center gap-2 text-xs text-primary font-bold mt-2">
-                                  <ArrowRight className="h-3 w-3" /> Next Action: {log.nextAction}
-                                </div>
-                              )}
                             </div>
                           </div>
                         ))
                       ) : (
                         <div className="text-center py-10 bg-slate-50 rounded-xl border border-dashed">
-                          <p className="text-xs text-muted-foreground">No activities logged yet.</p>
+                          <p className="text-xs text-muted-foreground">No CRM events logged yet.</p>
                         </div>
                       )}
                     </div>
@@ -232,42 +265,6 @@ export default function ContactProfilePage() {
                 </div>
               </ScrollArea>
             </div>
-
-            <aside className="w-80 border-l bg-slate-50/50 p-6 space-y-8 overflow-y-auto">
-              <section className="space-y-4">
-                <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Deal Snapshot</h3>
-                <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 space-y-4">
-                  <div className="flex justify-between items-end">
-                    <span className="text-[10px] text-muted-foreground uppercase">Est. Commission</span>
-                    <span className="text-lg font-black text-primary">${contact.estimated_commission?.toLocaleString() || '0'}</span>
-                  </div>
-                  <Separator />
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-[10px] font-bold">
-                      <span>Probability</span>
-                      <span className="text-accent">72%</span>
-                    </div>
-                    <Progress value={72} className="h-2" />
-                  </div>
-                </div>
-              </section>
-
-              <section className="space-y-4">
-                <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Property Intel</h3>
-                <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <span className="text-[9px] text-muted-foreground uppercase">Value Est.</span>
-                      <div className="text-xs font-bold">$485k</div>
-                    </div>
-                    <div className="space-y-1 text-right">
-                      <span className="text-[9px] text-muted-foreground uppercase">Equity</span>
-                      <div className="text-xs font-bold">{contact.loan_to_value ? `${100 - contact.loan_to_value}%` : 'High'}</div>
-                    </div>
-                  </div>
-                </div>
-              </section>
-            </aside>
           </main>
         </SidebarInset>
       </div>

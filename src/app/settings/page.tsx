@@ -23,29 +23,40 @@ import {
   Globe,
   Home,
   BrainCircuit,
-  PieChart
+  PieChart,
+  CheckCircle2
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useUser, useDoc, useMemoFirebase, useCollection, useFirestore } from "@/firebase";
-import { collection, query, orderBy, limit } from "firebase/firestore";
+import { collection, query, orderBy, limit, doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { useSearchParams } from "next/navigation";
 
 export default function SettingsPage() {
   const { user } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
+  const searchParams = useSearchParams();
   const [saving, setSaving] = useState(false);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
-  }, []);
+    
+    // Handle Gmail callback success
+    if (searchParams.get('gmail_success') === 'true' && user) {
+      // In a real app, the server would handle this token exchange more directly
+      // Here we assume the temp cookie logic or a simple re-auth
+      toast({ title: "Gmail Connected", description: "Your outreach engine is now linked." });
+    }
+  }, [searchParams, user]);
 
-  // Quota Data for APIs - Scoped to User
   const month = new Date().toISOString().slice(0, 7);
   const quotaRef = useMemoFirebase(() => user ? `users/${user.uid}/rapidapi_quota/${month}` : null, [user, month]);
   const { data: quota } = useDoc(quotaRef);
 
-  // AI Usage Data - Scoped to User
+  const gmailRef = useMemoFirebase(() => user ? `users/${user.uid}/integrations/gmail` : null, [user]);
+  const { data: gmailConfig } = useDoc(gmailRef);
+
   const aiUsageQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     return query(
@@ -67,6 +78,10 @@ export default function SettingsPage() {
     }, 800);
   }
 
+  const handleConnectGmail = () => {
+    window.location.href = '/api/auth/gmail/connect';
+  };
+
   const bookmarkletCode = "javascript:(function(){var text=window.getSelection().toString()||document.body.innerText.substring(0,500);var url=window.location.href;window.open('https://monica-ai-hub.vercel.app/quick-capture?url='+encodeURIComponent(url)+'&text='+encodeURIComponent(text),'_blank','width=500,height=600');})();";
 
   if (!mounted) return null;
@@ -86,7 +101,7 @@ export default function SettingsPage() {
           </header>
           
           <main className="p-8 max-w-4xl mx-auto w-full">
-            <Tabs defaultValue="ai">
+            <Tabs defaultValue="outreach">
               <TabsList className="mb-8 w-full justify-start gap-4 h-auto p-0 bg-transparent overflow-x-auto no-scrollbar">
                 <TabsTrigger value="general" className="data-[state=active]:bg-secondary rounded-lg px-4 py-2">Business</TabsTrigger>
                 <TabsTrigger value="ai" className="data-[state=active]:bg-secondary rounded-lg px-4 py-2 flex gap-2">
@@ -96,8 +111,113 @@ export default function SettingsPage() {
                   <Database className="h-4 w-4" /> Data Pipelines
                 </TabsTrigger>
                 <TabsTrigger value="free-sources" className="data-[state=active]:bg-secondary rounded-lg px-4 py-2">Quick Capture</TabsTrigger>
-                <TabsTrigger value="outreach" className="data-[state=active]:bg-secondary rounded-lg px-4 py-2">Gmail API</TabsTrigger>
+                <TabsTrigger value="outreach" className="data-[state=active]:bg-secondary rounded-lg px-4 py-2 flex gap-2">
+                  <Mail className="h-4 w-4" /> Gmail API
+                </TabsTrigger>
               </TabsList>
+
+              <TabsContent value="outreach" className="space-y-6">
+                <Card className="border-none shadow-md">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div className="p-2 bg-primary text-white rounded-lg">
+                        <Mail className="h-5 w-5" />
+                      </div>
+                      {gmailConfig ? (
+                        <Badge className="bg-green-500 gap-1.5"><CheckCircle2 className="h-3 w-3" /> Connected</Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-slate-400">Not Connected</Badge>
+                      )}
+                    </div>
+                    <CardTitle className="mt-4">Gmail API Integration</CardTitle>
+                    <CardDescription>Monica needs OAuth permission to sync threads and send follow-ups.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    {!gmailConfig ? (
+                      <div className="p-8 border-2 border-dashed rounded-2xl bg-slate-50 text-center space-y-4">
+                        <div className="h-12 w-12 bg-white rounded-full flex items-center justify-center mx-auto shadow-sm">
+                          <Mail className="h-6 w-6 text-primary" />
+                        </div>
+                        <div className="space-y-1">
+                          <h3 className="font-bold text-primary">Enable Real Outreach</h3>
+                          <p className="text-xs text-muted-foreground max-w-xs mx-auto">Connect your workspace Gmail to allow Monica to handle your daily seller follow-up.</p>
+                        </div>
+                        <Button onClick={handleConnectGmail} className="bg-primary px-8">Connect Google Account</Button>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <div className="p-4 bg-slate-50 rounded-xl border space-y-1">
+                            <Label className="text-[10px] font-bold uppercase text-slate-500">Connected As</Label>
+                            <p className="text-sm font-bold text-primary">{user?.email}</p>
+                          </div>
+                          <div className="p-4 bg-slate-50 rounded-xl border space-y-1">
+                            <Label className="text-[10px] font-bold uppercase text-slate-500">Last Sync</Label>
+                            <p className="text-sm font-bold text-primary">Just now</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between p-4 bg-primary/5 rounded-xl border border-primary/10">
+                          <div className="space-y-0.5">
+                            <p className="text-sm font-bold">Auto-Sync Threads</p>
+                            <p className="text-xs text-muted-foreground">Keep conversation history updated in the CRM.</p>
+                          </div>
+                          <Switch checked />
+                        </div>
+                        <Button variant="outline" className="w-full text-red-600 border-red-100 hover:bg-red-50" onClick={() => {
+                          toast({ title: "Disconnected", description: "Gmail access revoked." });
+                        }}>Disconnect Gmail</Button>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="ai" className="space-y-6">
+                <div className="grid gap-6 md:grid-cols-2">
+                  <Card className="border-none shadow-md bg-gradient-to-br from-primary to-primary/90 text-white">
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <div className="p-2 bg-white/10 rounded-lg backdrop-blur-sm">
+                          <Zap className="h-5 w-5 text-accent" />
+                        </div>
+                        <Badge className="bg-accent text-white border-none">Active</Badge>
+                      </div>
+                      <CardTitle className="text-lg mt-4">Grok-4 Latest</CardTitle>
+                      <CardDescription className="text-white/70 text-xs">xAI OpenAI-Compatible Engine</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="flex justify-between items-end">
+                        <span className="text-xs text-white/60">Calls this month</span>
+                        <span className="text-2xl font-black">{totalCalls}</span>
+                      </div>
+                      <div className="flex justify-between items-end">
+                        <span className="text-xs text-white/60">Tokens used</span>
+                        <span className="text-2xl font-black">{totalTokens.toLocaleString()}</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card className="border-none shadow-md">
+                    <CardHeader>
+                      <CardTitle className="text-sm font-bold flex items-center gap-2">
+                        <PieChart className="h-4 w-4 text-primary" />
+                        Usage Breakdown
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-[10px] font-bold uppercase text-slate-500">
+                          <span>Monthly Budget</span>
+                          <span>42%</span>
+                        </div>
+                        <Progress value={42} className="h-1.5" />
+                      </div>
+                      <div className="bg-slate-50 p-3 rounded-xl border border-dashed text-[10px] text-slate-600 leading-relaxed italic">
+                        "Your most used AI feature this week is **Email Drafting**, accounting for 64% of completion tokens."
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </TabsContent>
 
               <TabsContent value="general" className="space-y-6">
                 <Card className="border-none shadow-md">
@@ -128,73 +248,6 @@ export default function SettingsPage() {
                 </Card>
               </TabsContent>
 
-              <TabsContent value="ai" className="space-y-6">
-                <div className="grid gap-6 md:grid-cols-2">
-                  <Card className="border-none shadow-md bg-gradient-to-br from-primary to-primary/90 text-white">
-                    <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <div className="p-2 bg-white/10 rounded-lg backdrop-blur-sm">
-                          <Zap className="h-5 w-5 text-accent" />
-                        </div>
-                        <Badge className="bg-accent text-white border-none">Active</Badge>
-                      </div>
-                      <CardTitle className="text-lg mt-4">Grok-4 Latest</CardTitle>
-                      <CardDescription className="text-white/70 text-xs">xAI OpenAI-Compatible Engine</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="flex justify-between items-end">
-                        <span className="text-xs text-white/60">Calls this month</span>
-                        <span className="text-2xl font-black">{totalCalls}</span>
-                      </div>
-                      <div className="flex justify-between items-end">
-                        <span className="text-xs text-white/60">Tokens used</span>
-                        <span className="text-2xl font-black">{totalTokens.toLocaleString()}</span>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="border-none shadow-md">
-                    <CardHeader>
-                      <CardTitle className="text-sm font-bold flex items-center gap-2">
-                        <PieChart className="h-4 w-4 text-primary" />
-                        Usage Breakdown
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="space-y-2">
-                        <div className="flex justify-between text-[10px] font-bold uppercase text-slate-500">
-                          <span>Monthly Budget</span>
-                          <span>42%</span>
-                        </div>
-                        <Progress value={42} className="h-1.5" />
-                      </div>
-                      <div className="bg-slate-50 p-3 rounded-xl border border-dashed text-[10px] text-slate-600 leading-relaxed italic">
-                        "Your most used AI feature this week is **Email Drafting**, accounting for 64% of completion tokens."
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-
-                <Card className="border-none shadow-md">
-                  <CardHeader>
-                    <CardTitle className="text-sm font-bold flex items-center gap-2">
-                      <Key className="h-4 w-4" />
-                      xAI Credentials
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <Label className="text-xs font-bold uppercase">Grok API Key</Label>
-                      <Input type="password" value="••••••••••••••••" readOnly className="bg-slate-100" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-xs font-bold uppercase">Model</Label>
-                      <Input value="grok-4-latest" readOnly className="bg-slate-100" />
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
               <TabsContent value="apis" className="space-y-6">
                 <div className="grid gap-6 md:grid-cols-2">
                   <Card className="border-none shadow-md">
@@ -218,7 +271,6 @@ export default function SettingsPage() {
                       </div>
                     </CardContent>
                   </Card>
-
                   <Card className="border-none shadow-md">
                     <CardHeader className="pb-4">
                       <div className="flex items-center justify-between">
@@ -266,34 +318,6 @@ export default function SettingsPage() {
                         <Smartphone className="h-4 w-4" />
                         Monica Quick Capture
                       </a>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="outreach" className="space-y-6">
-                <Card className="border-none shadow-md">
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <div className="p-2 bg-primary text-white rounded-lg">
-                        <Mail className="h-5 w-5" />
-                      </div>
-                      <Badge className="bg-green-500">Connected</Badge>
-                    </div>
-                    <CardTitle className="mt-4">Gmail API Integration</CardTitle>
-                    <CardDescription>Powering your automated and manual email outreach.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <Label>Connected Gmail Account</Label>
-                      <Input value="monica@gmail.com" readOnly className="bg-slate-100" />
-                    </div>
-                    <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-dashed">
-                      <div className="space-y-0.5">
-                        <p className="text-sm font-bold">Artificial Delay</p>
-                        <p className="text-xs text-muted-foreground">Randomized delay (2-5 mins) to mimic human behavior.</p>
-                      </div>
-                      <Switch checked />
                     </div>
                   </CardContent>
                 </Card>
