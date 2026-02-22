@@ -1,3 +1,4 @@
+
 "use client"
 
 import React, { useState, useEffect, useMemo } from "react"
@@ -24,7 +25,9 @@ import {
   User,
   MoreVertical,
   ArrowRight,
-  Inbox
+  Inbox,
+  Clock,
+  ClipboardList
 } from "lucide-react"
 import Link from "next/link"
 import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase, addDocumentNonBlocking } from "@/firebase"
@@ -49,7 +52,6 @@ export default function ContactProfilePage() {
 
   const { data: contact, isLoading: contactLoading } = useDoc(contactRef);
 
-  // Sync real message history from Gmail Integration
   const messagesQuery = useMemoFirebase(() => {
     if (!user || !firestore || !params.id) return null;
     return query(
@@ -84,8 +86,8 @@ export default function ContactProfilePage() {
     });
   };
 
-  if (!mounted || contactLoading) return <div className="p-8 text-center text-slate-400">Loading profile...</div>;
-  if (!contact) return <div className="p-8 text-center">Contact not found.</div>;
+  if (!mounted || contactLoading) return <div className="p-8 text-center text-slate-400 italic">Syncing Lead Intelligence...</div>;
+  if (!contact) return <div className="p-8 text-center">Lead not found in database.</div>;
 
   const sentimentColors: Record<string, string> = {
     positive: 'bg-green-500',
@@ -94,10 +96,10 @@ export default function ContactProfilePage() {
   };
 
   const urgencyColors: Record<string, string> = {
-    hot: 'text-red-600 bg-red-50',
-    warm: 'text-orange-600 bg-orange-50',
-    cold: 'text-blue-600 bg-blue-50',
-    nurture: 'text-purple-600 bg-purple-50'
+    hot: 'text-red-600 bg-red-50 border-red-100',
+    warm: 'text-orange-600 bg-orange-50 border-orange-100',
+    cold: 'text-blue-600 bg-blue-50 border-blue-100',
+    nurture: 'text-purple-600 bg-purple-50 border-purple-100'
   };
 
   return (
@@ -105,70 +107,82 @@ export default function ContactProfilePage() {
       <div className="flex min-h-screen w-full">
         <AppSidebar />
         <SidebarInset>
-          <header className="flex h-16 shrink-0 items-center gap-2 border-b px-6 bg-white shadow-sm sticky top-0 z-10">
+          <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4 md:px-6 bg-white shadow-sm sticky top-0 z-10">
             <SidebarTrigger className="-ml-1" />
-            <Link href="/contacts" className="hover:text-primary transition-colors">
-              <ArrowLeft className="h-5 w-5" />
+            <Link href="/contacts" className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
+              <ArrowLeft className="h-5 w-5 text-slate-600" />
             </Link>
-            <h1 className="text-lg font-bold font-headline text-primary">{contact.name}</h1>
-            <Badge className="ml-2 bg-slate-100 text-slate-600 capitalize">{contact.pipeline_stage?.replace('_', ' ')}</Badge>
-            <div className="ml-auto flex gap-2">
-              <Button size="sm" variant="outline" className="gap-2"><User className="h-4 w-4" /> Edit Profile</Button>
-              <Button size="icon" variant="ghost" className="h-8 w-8"><MoreVertical className="h-4 w-4" /></Button>
+            <div className="flex-1 min-w-0">
+              <h1 className="text-sm md:text-lg font-bold font-headline text-primary truncate">{contact.name}</h1>
+            </div>
+            <div className="flex items-center gap-1 md:gap-2">
+              <Button size="sm" variant="outline" className="hidden sm:flex gap-2 font-bold h-9 rounded-xl"><User className="h-4 w-4" /> Edit</Button>
+              <Button size="icon" variant="ghost" className="h-9 w-9 text-slate-400"><MoreVertical className="h-4 w-4" /></Button>
             </div>
           </header>
           
-          <main className="flex h-[calc(100vh-64px)] overflow-hidden">
-            <aside className="w-80 border-r bg-slate-50/50 p-6 flex flex-col gap-8 overflow-y-auto">
+          <main className="flex flex-col lg:flex-row h-[calc(100vh-64px)] overflow-hidden">
+            {/* PROFILE SIDEBAR / TOP INFO */}
+            <aside className="w-full lg:w-80 border-b lg:border-b-0 lg:border-r bg-slate-50/50 p-4 md:p-6 flex flex-col gap-6 md:gap-8 overflow-y-auto no-scrollbar">
               <div className="flex flex-col items-center text-center gap-4">
-                <div className="h-24 w-24 rounded-full bg-primary flex items-center justify-center text-white text-3xl font-bold relative shadow-xl">
+                <div className="h-20 w-20 md:h-24 md:w-24 rounded-3xl bg-primary flex items-center justify-center text-white text-3xl font-black relative shadow-2xl">
                   {contact.name?.split(' ').map((n: string) => n[0]).join('')}
-                  <div className={`absolute bottom-0 right-0 h-6 w-6 rounded-full border-4 border-white ${sentimentColors[contact.ai_sentiment] || 'bg-slate-400'}`} />
+                  <div className={`absolute -bottom-1 -right-1 h-6 w-6 rounded-full border-4 border-white ${sentimentColors[contact.ai_sentiment] || 'bg-slate-400'}`} />
                 </div>
                 <div className="space-y-1">
                   <h2 className="text-xl font-black text-primary">{contact.name}</h2>
                   <div className="flex items-center justify-center gap-2">
-                    <Badge variant="outline" className={`text-[10px] font-bold ${urgencyColors[contact.ai_urgency]}`}>
-                      {contact.ai_urgency?.toUpperCase() || 'NURTURE'}
+                    <Badge variant="outline" className={`text-[9px] font-black uppercase tracking-widest px-2 ${urgencyColors[contact.ai_urgency] || 'text-slate-500 bg-slate-50'}`}>
+                      {contact.ai_urgency || 'NURTURE'}
                     </Badge>
-                    <Badge className="bg-accent text-white font-bold h-5 px-1.5">{contact.icpScore}/99</Badge>
+                    <Badge className="bg-accent text-white font-black h-5 px-2 text-[10px]">{contact.icpScore}/99 ICP</Badge>
                   </div>
                 </div>
               </div>
 
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-2">
-                  <Button className="gap-2 bg-primary w-full h-11" onClick={() => handleLogActivity('call')}><Phone className="h-4 w-4" /> Call</Button>
-                  <Button variant="outline" className="gap-2 w-full h-11" onClick={() => handleLogActivity('sms')}><MessageSquare className="h-4 w-4" /> SMS</Button>
-                </div>
-                <Button variant="outline" className="w-full gap-2 border-slate-200" onClick={() => handleLogActivity('email')}><Mail className="h-4 w-4" /> Email</Button>
-                <Button variant="secondary" className="w-full gap-2"><Calendar className="h-4 w-4" /> Schedule Appt</Button>
+              <div className="grid grid-cols-2 lg:grid-cols-1 gap-2">
+                <Button className="gap-2 bg-primary w-full h-11 rounded-xl shadow-lg shadow-primary/10 font-bold" onClick={() => handleLogActivity('call')}><Phone className="h-4 w-4" /> Call</Button>
+                <Button variant="outline" className="gap-2 w-full h-11 rounded-xl bg-white font-bold border-slate-200" onClick={() => handleLogActivity('sms')}><MessageSquare className="h-4 w-4 text-primary" /> SMS</Button>
+                <Button variant="outline" className="hidden lg:flex w-full h-11 gap-2 border-slate-200 bg-white font-bold rounded-xl" onClick={() => handleLogActivity('email')}><Mail className="h-4 w-4 text-primary" /> Email</Button>
+                <Button variant="secondary" className="hidden lg:flex w-full h-11 gap-2 font-bold rounded-xl"><Calendar className="h-4 w-4 text-primary" /> Schedule</Button>
               </div>
 
               <div className="space-y-6 pt-4 border-t border-slate-200">
-                <div className="space-y-2">
-                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Contact Information</p>
-                  <div className="space-y-3">
-                    <div className="flex items-start gap-3 text-xs">
-                      <MapPin className="h-4 w-4 text-slate-400 shrink-0" />
-                      <span className="font-medium">{contact.propertyAddress}</span>
+                <div className="space-y-4">
+                  <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-2">
+                    <ClipboardList className="h-3 w-3" /> Lead Context
+                  </p>
+                  <div className="space-y-4">
+                    <div className="flex items-start gap-3">
+                      <MapPin className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+                      <div className="space-y-0.5">
+                        <p className="text-[8px] font-black uppercase text-slate-400 leading-none">Property Address</p>
+                        <span className="text-xs font-bold text-slate-700 leading-tight block">{contact.propertyAddress}</span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-3 text-xs">
-                      <Phone className="h-4 w-4 text-slate-400" />
-                      <span className="font-medium">{contact.phone}</span>
+                    <div className="flex items-center gap-3">
+                      <Phone className="h-4 w-4 text-primary shrink-0" />
+                      <div className="space-y-0.5">
+                        <p className="text-[8px] font-black uppercase text-slate-400 leading-none">Primary Phone</p>
+                        <span className="text-xs font-bold text-slate-700 leading-tight block">{contact.phone || 'No phone recorded'}</span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-3 text-xs">
-                      <Mail className="h-4 w-4 text-slate-400" />
-                      <span className="font-medium">{contact.email}</span>
+                    <div className="flex items-center gap-3">
+                      <Mail className="h-4 w-4 text-primary shrink-0" />
+                      <div className="space-y-0.5">
+                        <p className="text-[8px] font-black uppercase text-slate-400 leading-none">Email Identity</p>
+                        <span className="text-xs font-bold text-slate-700 leading-tight block truncate w-48">{contact.email || 'No email recorded'}</span>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
             </aside>
 
-            <div className="flex-1 flex flex-col bg-white">
+            {/* MAIN CONTENT AREA */}
+            <div className="flex-1 flex flex-col bg-white overflow-hidden">
               <ScrollArea className="flex-1">
-                <div className="p-8 max-w-4xl mx-auto space-y-10">
+                <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-10">
                   {/* AI Nurture Engine Integration */}
                   <LeadNurtureEngine 
                     contactId={params.id as string} 
@@ -178,41 +192,46 @@ export default function ContactProfilePage() {
                   {/* Gmail Conversation History */}
                   <section className="space-y-6">
                     <div className="flex items-center justify-between">
-                      <h2 className="text-lg font-bold flex items-center gap-2">
+                      <h2 className="text-base md:text-lg font-black flex items-center gap-2 text-primary">
                         <Inbox className="h-5 w-5 text-primary" />
-                        Gmail History
+                        Gmail Correspondence
                       </h2>
-                      <Badge variant="outline" className="bg-primary/5 text-primary">Live Sync Active</Badge>
+                      <Badge variant="outline" className="bg-primary/5 text-primary text-[9px] font-bold h-5 border-primary/10">LIVE SYNC ACTIVE</Badge>
                     </div>
                     
                     <div className="space-y-4">
                       {gmailMessages && gmailMessages.length > 0 ? (
                         gmailMessages.map((msg) => (
-                          <div key={msg.id} className="p-4 rounded-xl border border-slate-100 bg-slate-50/30 space-y-2">
+                          <div key={msg.id} className="p-4 rounded-2xl border border-slate-100 bg-slate-50/30 space-y-2 hover:border-primary/20 transition-colors group">
                             <div className="flex justify-between items-center">
-                              <span className="text-xs font-bold text-primary">{msg.subject}</span>
-                              <span className="text-[10px] text-muted-foreground">{msg.created_at ? format(msg.created_at.toDate(), 'MMM d, h:mm a') : ''}</span>
+                              <span className="text-xs font-black text-primary group-hover:text-accent transition-colors">{msg.subject}</span>
+                              <span className="text-[9px] font-bold text-muted-foreground uppercase">{msg.created_at ? format(msg.created_at.toDate(), 'MMM d, h:mm a') : ''}</span>
                             </div>
                             <p className="text-xs text-slate-600 line-clamp-3 leading-relaxed">{msg.body}</p>
-                            <div className="flex items-center gap-2 pt-1">
-                              <Badge className="bg-green-500 text-[8px] h-4">DELIVERED</Badge>
-                              {msg.threadId && <span className="text-[8px] text-muted-foreground">Thread ID: {msg.threadId.slice(0, 8)}...</span>}
+                            <div className="flex items-center justify-between pt-1">
+                              <div className="flex items-center gap-2">
+                                <Badge className="bg-green-500 text-[8px] h-4 font-black">DELIVERED</Badge>
+                                {msg.threadId && <span className="text-[8px] text-muted-foreground font-medium">Thread ID: {msg.threadId.slice(0, 8)}...</span>}
+                              </div>
+                              <Button variant="ghost" size="icon" className="h-6 w-6 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <ArrowRight className="h-3 w-3" />
+                              </Button>
                             </div>
                           </div>
                         ))
                       ) : (
-                        <div className="text-center py-10 bg-slate-50/50 rounded-xl border border-dashed">
+                        <div className="text-center py-12 bg-slate-50/50 rounded-2xl border-2 border-dashed border-slate-200">
                           <Mail className="h-8 w-8 text-slate-300 mx-auto mb-2" />
-                          <p className="text-xs text-muted-foreground">No linked Gmail conversations found.</p>
+                          <p className="text-xs text-muted-foreground italic">No linked Gmail conversations found for this contact.</p>
                         </div>
                       )}
                     </div>
                   </section>
 
-                  <section className="grid gap-6 md:grid-cols-2">
+                  <section className="grid gap-6 grid-cols-1 md:grid-cols-2">
                     <Card className="border-none shadow-md bg-gradient-to-br from-slate-50 to-white">
                       <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-bold flex items-center gap-2 text-primary">
+                        <CardTitle className="text-xs font-black flex items-center gap-2 text-primary uppercase tracking-widest">
                           <Sparkles className="h-4 w-4 text-accent" />
                           Monica AI Summary
                         </CardTitle>
@@ -223,22 +242,23 @@ export default function ContactProfilePage() {
                     </Card>
                     <Card className="border-none shadow-md bg-primary text-white">
                       <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-bold flex items-center gap-2">
+                        <CardTitle className="text-xs font-black flex items-center gap-2 uppercase tracking-widest text-accent">
                           <TrendingUp className="h-4 w-4 text-accent" />
-                          Next Best Action
+                          Strategic Next Step
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
-                        <p className="text-sm font-bold leading-relaxed">{contact.ai_next_best_action || "Schedule initial discovery call."}</p>
+                        <p className="text-sm font-bold leading-relaxed">{contact.ai_next_best_action || "Initiate initial discovery call to gauge timeline."}</p>
                       </CardContent>
                     </Card>
                   </section>
 
+                  {/* CRM TIMELINE */}
                   <section className="space-y-6">
                     <div className="flex items-center justify-between">
-                      <h2 className="text-lg font-bold flex items-center gap-2">
+                      <h2 className="text-base md:text-lg font-black flex items-center gap-2 text-primary">
                         <History className="h-5 w-5 text-accent" />
-                        CRM Timeline
+                        CRM Activity Log
                       </h2>
                     </div>
 
@@ -246,24 +266,25 @@ export default function ContactProfilePage() {
                       {activityLogs && activityLogs.length > 0 ? (
                         activityLogs.map((log) => (
                           <div key={log.id} className="relative pl-12">
-                            <div className={`absolute left-0 h-10 w-10 rounded-full border-4 border-white flex items-center justify-center shadow-sm z-10 ${log.type === 'call' ? 'bg-blue-100 text-blue-600' : log.type === 'ai_note' ? 'bg-accent/10 text-accent' : 'bg-slate-100'}`}>
-                              {log.type === 'call' ? <Phone className="h-4 w-4" /> : <BrainCircuit className="h-4 w-4" />}
+                            <div className={`absolute left-0 h-10 w-10 rounded-2xl border-4 border-white flex items-center justify-center shadow-md z-10 ${log.type === 'call' ? 'bg-blue-600 text-white' : log.type === 'ai_note' ? 'bg-accent text-white' : 'bg-slate-800 text-white'}`}>
+                              {log.type === 'call' ? <Phone className="h-4 w-4" /> : log.type === 'email' ? <Mail className="h-4 w-4" /> : <BrainCircuit className="h-4 w-4" />}
                             </div>
-                            <div className="space-y-1 pt-1">
+                            <div className="space-y-2 pt-1">
                               <div className="flex items-center justify-between">
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                                <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                                  <Clock className="h-3 w-3" />
                                   {log.date ? format(new Date(log.date), 'MMM d, yyyy h:mm a') : ''}
                                 </span>
-                                {log.sentiment && <Badge className={`h-4 text-[8px] ${sentimentColors[log.sentiment]}`}>{log.sentiment.toUpperCase()}</Badge>}
+                                {log.sentiment && <Badge className={`h-4 text-[8px] font-black uppercase ${sentimentColors[log.sentiment]}`}>{log.sentiment}</Badge>}
                               </div>
-                              <h4 className="font-bold text-slate-800">{log.outcome}</h4>
-                              <p className="text-sm text-slate-600 leading-relaxed bg-slate-50/50 p-3 rounded-xl border border-slate-100">{log.summary}</p>
+                              <h4 className="font-bold text-slate-800 text-sm">{log.outcome}</h4>
+                              <p className="text-xs text-slate-600 leading-relaxed bg-slate-50 p-4 rounded-2xl border border-slate-100 italic">"{log.summary}"</p>
                             </div>
                           </div>
                         ))
                       ) : (
-                        <div className="text-center py-10 bg-slate-50 rounded-xl border border-dashed">
-                          <p className="text-xs text-muted-foreground">No CRM events logged yet.</p>
+                        <div className="text-center py-12 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
+                          <p className="text-xs text-muted-foreground italic">No events logged in the CRM timeline yet.</p>
                         </div>
                       )}
                     </div>

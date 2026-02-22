@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -23,7 +24,7 @@
     --border: 214 32% 91%;
     --input: 214 32% 91%;
     --ring: 224 64% 33%;
-    --radius: 0.75rem;
+    --radius: 1rem;
     --sidebar-background: 224 64% 33%;
     --sidebar-foreground: 210 20% 98%;
     --sidebar-primary: 45 60% 41%;
@@ -43,7 +44,7 @@
     @apply bg-background text-foreground font-body;
   }
   h1, h2, h3, h4, h5, h6 {
-    @apply font-headline font-bold;
+    @apply font-headline font-bold tracking-tight;
   }
 }
 
@@ -59,4 +60,17 @@
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+/* Smooth transitions for all cards and interactive elements */
+.card-hover {
+  @apply transition-all duration-300 hover:shadow-xl hover:-translate-y-1 hover:scale-[1.01];
+}
+
+/* Modern utility for text truncation with better line heights */
+.truncate-multiline {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }

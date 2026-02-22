@@ -30,6 +30,7 @@ import {
   Smartphone,
   ShieldCheck,
   ArrowRight,
+  Plus,
 } from "lucide-react";
 import {
   BarChart,
@@ -105,29 +106,34 @@ export default function DashboardPage() {
       <div className="flex min-h-screen w-full">
         <AppSidebar />
         <SidebarInset>
-          <header className="flex h-16 shrink-0 items-center gap-2 border-b px-6 bg-white shadow-sm sticky top-0 z-10">
+          <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4 md:px-6 bg-white shadow-sm sticky top-0 z-10">
             <SidebarTrigger className="-ml-1" />
-            <h1 className="text-xl font-bold font-headline text-primary">
+            <h1 className="text-base md:text-xl font-bold font-headline text-primary truncate">
               Monica Executive Dashboard
             </h1>
+            <div className="ml-auto hidden md:flex items-center gap-2">
+              <Button size="sm" variant="outline" className="gap-2">
+                <Plus className="h-4 w-4" /> Quick Lead
+              </Button>
+            </div>
           </header>
 
-          <main className="flex-1 space-y-8 p-8 max-w-7xl mx-auto w-full">
+          <main className="flex-1 space-y-6 md:space-y-8 p-4 md:p-8 max-w-7xl mx-auto w-full">
             <MorningBriefingCard />
 
             {!mounted || isUserLoading ? (
               <StatsSkeleton />
             ) : (
-              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+              <div className="grid gap-4 md:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
                 {KPI_STATS.map((stat) => {
                   const Icon = iconMap[stat.icon];
                   return (
                     <Card
                       key={stat.label}
-                      className="border-none shadow-md hover:scale-[1.02] transition-transform"
+                      className="border-none shadow-md hover:scale-[1.01] transition-transform"
                     >
                       <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">
+                        <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground uppercase tracking-wider">
                           {stat.label}
                         </CardTitle>
                         <div className="p-2 bg-secondary rounded-lg">
@@ -135,10 +141,10 @@ export default function DashboardPage() {
                         </div>
                       </CardHeader>
                       <CardContent>
-                        <div className="text-3xl font-bold text-primary">
+                        <div className="text-2xl md:text-3xl font-bold text-primary">
                           {stat.value}
                         </div>
-                        <p className="text-xs text-green-600 flex items-center gap-1 mt-1">
+                        <p className="text-xs text-green-600 flex items-center gap-1 mt-1 font-medium">
                           <Activity className="h-3 w-3" />
                           {stat.change}
                         </p>
@@ -149,13 +155,13 @@ export default function DashboardPage() {
               </div>
             )}
 
-            <div className="grid gap-6 lg:grid-cols-3">
+            <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
               <Card className="lg:col-span-2 shadow-md border-none bg-white">
                 <CardHeader>
                   <div className="flex justify-between items-center">
                     <div>
-                      <CardTitle>Prospecting Intelligence</CardTitle>
-                      <CardDescription>
+                      <CardTitle className="text-lg">Prospecting Intelligence</CardTitle>
+                      <CardDescription className="text-xs">
                         AI-detected lead signals & heatmap patterns
                       </CardDescription>
                     </div>
@@ -163,9 +169,9 @@ export default function DashboardPage() {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  <div className="grid md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="p-4 bg-primary/5 rounded-xl border border-primary/10">
-                      <p className="text-[10px] font-black text-muted-foreground uppercase mb-2">
+                      <p className="text-[10px] font-black text-muted-foreground uppercase mb-2 tracking-widest">
                         Best Call Window
                       </p>
                       <div className="flex items-center gap-3">
@@ -179,7 +185,7 @@ export default function DashboardPage() {
                       </div>
                     </div>
                     <div className="p-4 bg-orange-50 rounded-xl border border-orange-100">
-                      <p className="text-[10px] font-black text-orange-600 uppercase mb-2">
+                      <p className="text-[10px] font-black text-orange-600 uppercase mb-2 tracking-widest">
                         Almost Leads Detected
                       </p>
                       <div className="flex items-center gap-3">
@@ -202,10 +208,10 @@ export default function DashboardPage() {
                         <div className="flex items-center gap-2">
                           <Mail className="h-4 w-4 text-primary" />
                           <span className="text-xs font-bold uppercase text-slate-700">
-                            Daily Email Outreach Quota
+                            Daily Outreach Quota
                           </span>
                         </div>
-                        <Badge variant="outline" className="bg-white">
+                        <Badge variant="outline" className="bg-white text-[10px] font-black">
                           {emailSentToday} / 500
                         </Badge>
                       </div>
@@ -213,9 +219,9 @@ export default function DashboardPage() {
                         value={quotaPercentage}
                         className={`h-2 ${quotaPercentage > 90 ? "bg-red-100" : quotaPercentage > 80 ? "bg-yellow-100" : "bg-slate-200"}`}
                       />
-                      <p className="text-[10px] text-muted-foreground mt-2 italic">
-                        Monica uses Gmail bulk sending with artificial delay to
-                        ensure high deliverability.
+                      <p className="text-[10px] text-muted-foreground mt-2 italic leading-relaxed">
+                        Monica uses intelligent bulk sending with artificial delay to
+                        ensure maximum deliverability.
                       </p>
                     </div>
                   )}
@@ -224,15 +230,15 @@ export default function DashboardPage() {
 
               <Card className="shadow-md border-none bg-slate-50/50">
                 <CardHeader>
-                  <CardTitle className="text-sm font-bold flex items-center gap-2">
+                  <CardTitle className="text-sm font-bold flex items-center gap-2 uppercase tracking-widest text-slate-600">
                     <ShieldCheck className="h-4 w-4 text-accent" />
-                    Compliance & Safety
+                    Compliance
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex justify-between items-center text-xs">
                     <span className="text-muted-foreground">
-                      DNC Registries Matched
+                      DNC Registry Matches
                     </span>
                     <span className="font-bold">4,281</span>
                   </div>
@@ -243,12 +249,12 @@ export default function DashboardPage() {
                     <span className="font-bold">8am - 8pm</span>
                   </div>
                   <div className="h-px bg-slate-200 w-full" />
-                  <div className="space-y-2">
-                    <p className="text-[10px] text-muted-foreground font-medium">
+                  <div className="space-y-3">
+                    <p className="text-[10px] text-muted-foreground font-medium leading-relaxed">
                       Automatic DNC scrubbing and Email Unsubscribe tracking are
-                      active.
+                      active for all outreach sequences.
                     </p>
-                    <Button variant="outline" className="w-full text-xs h-8">
+                    <Button variant="outline" className="w-full text-xs h-9 font-bold shadow-sm">
                       View Compliance Logs
                     </Button>
                   </div>
@@ -256,7 +262,7 @@ export default function DashboardPage() {
               </Card>
             </div>
 
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
+            <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-7">
               <Card className="lg:col-span-3 shadow-md border-none bg-slate-50/50">
                 <CardHeader>
                   <div className="flex justify-between items-center">
@@ -264,12 +270,12 @@ export default function DashboardPage() {
                       <CardTitle className="text-lg">
                         Today's Game Plan
                       </CardTitle>
-                      <CardDescription>
+                      <CardDescription className="text-xs">
                         Monica's Top Priorities
                       </CardDescription>
                     </div>
                     {mounted && (
-                      <Badge className="bg-primary">
+                      <Badge className="bg-primary text-[10px] h-5">
                         {liveTasks.length} Actions
                       </Badge>
                     )}
@@ -277,11 +283,11 @@ export default function DashboardPage() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
-                    <div className="flex justify-between text-xs font-bold mb-1">
-                      <span>Progress</span>
-                      <span>{liveTasks.length === 0 ? '100%' : '25%'} Complete</span>
+                    <div className="flex justify-between text-[10px] font-black uppercase mb-1">
+                      <span>Daily Progress</span>
+                      <span>{liveTasks.length === 0 ? '100%' : '25%'}</span>
                     </div>
-                    <Progress value={liveTasks.length === 0 ? 100 : 25} className="h-2 bg-slate-200" />
+                    <Progress value={liveTasks.length === 0 ? 100 : 25} className="h-1.5 bg-slate-200" />
                   </div>
 
                   {!mounted || tasksLoading ? (
@@ -291,10 +297,10 @@ export default function DashboardPage() {
                       {liveTasks.map((task) => (
                         <div
                           key={task.id}
-                          className="bg-white p-3 rounded-xl border flex items-center gap-3 shadow-sm"
+                          className="bg-white p-3 rounded-xl border flex items-center gap-3 shadow-sm hover:shadow-md transition-shadow group"
                         >
                           <div
-                            className={`h-2 w-2 rounded-full shrink-0 ${task.priority === "urgent" ? "bg-red-500" : "bg-blue-400"}`}
+                            className={`h-2 w-2 rounded-full shrink-0 ${task.priority === "urgent" ? "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]" : "bg-blue-400"}`}
                           />
                           <div className="flex-1 min-w-0">
                             <p className="text-xs font-bold truncate text-primary">
@@ -311,7 +317,7 @@ export default function DashboardPage() {
                             <Button
                               size="icon"
                               variant="ghost"
-                              className="h-8 w-8 text-slate-400"
+                              className="h-8 w-8 text-slate-300 group-hover:text-primary transition-colors"
                             >
                               <ArrowRight className="h-4 w-4" />
                             </Button>
@@ -320,7 +326,7 @@ export default function DashboardPage() {
                       ))}
                     </div>
                   ) : (
-                    <div className="text-center py-10 border border-dashed rounded-xl bg-white/50">
+                    <div className="text-center py-10 border-2 border-dashed border-slate-200 rounded-xl bg-white/50">
                       <p className="text-xs text-muted-foreground">
                         No tasks for today. Power Hour complete! 🎉
                       </p>
@@ -328,63 +334,64 @@ export default function DashboardPage() {
                   )}
                   <Link href="/tasks" className="block">
                     <Button
-                      className="w-full bg-primary mt-4"
-                      variant="outline"
+                      className="w-full bg-primary mt-4 font-bold h-10 shadow-lg"
+                      variant="default"
                     >
-                      View All Tasks
+                      Open Task Manager
                     </Button>
                   </Link>
                 </CardContent>
               </Card>
 
-              <Card className="lg:col-span-4 shadow-md">
+              <Card className="lg:col-span-4 shadow-md bg-white">
                 <CardHeader>
                   <div className="flex justify-between items-center">
                     <div>
-                      <CardTitle>Pipeline Performance</CardTitle>
-                      <CardDescription>
-                        Conversion through the funnel
+                      <CardTitle className="text-lg">Pipeline Performance</CardTitle>
+                      <CardDescription className="text-xs">
+                        Conversion through the listing funnel
                       </CardDescription>
                     </div>
                     <Trello className="h-5 w-5 text-accent" />
                   </div>
                 </CardHeader>
-                <CardContent className="h-[350px]">
+                <CardContent className="h-[300px] md:h-[350px]">
                   {mounted ? (
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart
                         data={[
-                          { stage: "New", count: 42, value: 0 },
-                          { stage: "Attempted", count: 28, value: 0 },
-                          { stage: "Talked", count: 18, value: 240000 },
-                          { stage: "Appt Set", count: 8, value: 580000 },
-                          { stage: "Listed", count: 3, value: 1200000 },
+                          { stage: "New", count: 42 },
+                          { stage: "Attempted", count: 28 },
+                          { stage: "Talked", count: 18 },
+                          { stage: "Appt Set", count: 8 },
+                          { stage: "Listed", count: 3 },
                         ]}
                       >
                         <CartesianGrid
                           strokeDasharray="3 3"
                           vertical={false}
-                          stroke="#E5E7EB"
+                          stroke="#F1F5F9"
                         />
                         <XAxis
                           dataKey="stage"
                           axisLine={false}
                           tickLine={false}
-                          tick={{ fill: "#6B7280", fontSize: 10 }}
+                          tick={{ fill: "#94A3B8", fontSize: 10, fontWeight: 600 }}
                         />
                         <YAxis hide />
                         <ChartTooltip
                           contentStyle={{
-                            borderRadius: "8px",
+                            borderRadius: "12px",
                             border: "none",
-                            boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                            boxShadow: "0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)",
                           }}
                         />
                         <Bar
                           dataKey="count"
                           name="Leads"
                           fill="hsl(var(--primary))"
-                          radius={[4, 4, 0, 0]}
+                          radius={[6, 6, 0, 0]}
+                          barSize={40}
                         />
                       </BarChart>
                     </ResponsiveContainer>
