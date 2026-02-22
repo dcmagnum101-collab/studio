@@ -8,8 +8,9 @@ import { initializeFirebase } from '@/firebase/init';
  * 
  * Prevents multiple app initializations which cause token invalidation.
  */
-const { firestore, auth: firebaseAuth, firebaseApp } = initializeFirebase();
+const { firestore, auth: firebaseAuth, firebaseApp, functions: firebaseFunctions } = initializeFirebase();
 
 export const db = firestore;
 export const auth = firebaseAuth;
+export const functions = firebaseFunctions;
 export default firebaseApp;
