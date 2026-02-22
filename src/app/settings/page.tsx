@@ -11,26 +11,25 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { 
   Database, 
   Mail, 
   RefreshCw, 
   Zap,
   BrainCircuit,
-  PieChart,
   CheckCircle2,
   PhoneCall,
   Download,
   Upload,
   FileSpreadsheet,
   Globe,
-  Home
+  Clock,
+  ExternalLink,
+  ShieldCheck
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useUser, useDoc, useMemoFirebase, useCollection, useFirestore } from "@/firebase";
 import { collection, query, orderBy, limit } from "firebase/firestore";
-import { useSearchParams } from "next/navigation";
 import { syncVulcan7Leads, getContactsForVulcan7Export, pushToVulcan7DialQueue } from "@/app/actions/vulcan7";
 import { connectGmailAccount } from "@/firebase/auth/gmail-auth";
 
@@ -38,36 +37,19 @@ export default function SettingsPage() {
   const { user } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
-  const searchParams = useSearchParams();
   const [saving, setSaving] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [syncingVulcan, setSyncingVulcan] = useState(false);
   const [exportingQueue, setExportingQueue] = useState(false);
   const [connectingGmail, setConnectingGmail] = useState(false);
+  const [runningCadence, setRunningCadence] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  const month = new Date().toISOString().slice(0, 7);
-  const quotaRef = useMemoFirebase(() => user ? `users/${user.uid}/rapidapi_quota/${month}` : null, [user, month]);
-  const { data: quota } = useDoc(quotaRef);
-
   const gmailRef = useMemoFirebase(() => user ? `users/${user.uid}/integrations/gmail` : null, [user]);
   const { data: gmailConfig } = useDoc(gmailRef);
-
-  const aiUsageQuery = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
-    return query(
-      collection(firestore, 'users', user.uid, 'ai_usage'), 
-      orderBy('called_at', 'desc'), 
-      limit(50)
-    );
-  }, [firestore, user]);
-  const { data: aiUsage } = useCollection(aiUsageQuery);
-
-  const totalTokens = (aiUsage || []).reduce((acc, curr) => acc + (curr.total_tokens || 0), 0);
-  const totalCalls = (aiUsage || []).length;
 
   const handleSaveSettings = () => {
     setSaving(true);
@@ -76,6 +58,31 @@ export default function SettingsPage() {
       toast({ title: "Settings Saved", description: "System configuration updated." });
     }, 800);
   }
+
+  const handleRunCadenceManually = async () => {
+    if (!user) return;
+    setRunningCadence(true);
+    try {
+      const res = await fetch('/api/run-cadence', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_CRON_SECRET || 'dev-secret'}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ userId: user.uid })
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      toast({ 
+        title: "Automation Complete", 
+        description: `Successfully processed cadences. Created ${data.tasksCreated} new follow-up tasks.` 
+      });
+    } catch (err: any) {
+      toast({ variant: "destructive", title: "Automation Failed", description: err.message });
+    } finally {
+      setRunningCadence(false);
+    }
+  };
 
   const handleConnectGmail = async () => {
     if (!user) return;
@@ -155,22 +162,72 @@ export default function SettingsPage() {
           </header>
           
           <main className="p-8 max-w-4xl mx-auto w-full">
-            <Tabs defaultValue="vulcan7">
+            <Tabs defaultValue="automation">
               <TabsList className="mb-8 w-full justify-start gap-4 h-auto p-0 bg-transparent overflow-x-auto no-scrollbar">
-                <TabsTrigger value="general" className="data-[state=active]:bg-secondary rounded-lg px-4 py-2">Business</TabsTrigger>
+                <TabsTrigger value="automation" className="data-[state=active]:bg-secondary rounded-lg px-4 py-2 flex gap-2">
+                  <Zap className="h-4 w-4" /> Automation
+                </TabsTrigger>
                 <TabsTrigger value="vulcan7" className="data-[state=active]:bg-secondary rounded-lg px-4 py-2 flex gap-2">
                   <PhoneCall className="h-4 w-4" /> Vulcan7
-                </TabsTrigger>
-                <TabsTrigger value="ai" className="data-[state=active]:bg-secondary rounded-lg px-4 py-2 flex gap-2">
-                  <BrainCircuit className="h-4 w-4" /> Grok AI Hub
                 </TabsTrigger>
                 <TabsTrigger value="outreach" className="data-[state=active]:bg-secondary rounded-lg px-4 py-2 flex gap-2">
                   <Mail className="h-4 w-4" /> Gmail API
                 </TabsTrigger>
-                <TabsTrigger value="apis" className="data-[state=active]:bg-secondary rounded-lg px-4 py-2 flex gap-2">
-                  <Database className="h-4 w-4" /> Data Pipelines
+                <TabsTrigger value="ai" className="data-[state=active]:bg-secondary rounded-lg px-4 py-2 flex gap-2">
+                  <BrainCircuit className="h-4 w-4" /> Grok AI Hub
                 </TabsTrigger>
               </TabsList>
+
+              <TabsContent value="automation" className="space-y-6">
+                <Card className="border-none shadow-md">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Clock className="h-5 w-5 text-accent" />
+                      Follow-up Cadence Engine
+                    </CardTitle>
+                    <CardDescription>Monica automatically scans your contacts every morning to advance follow-up stages.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div className="p-6 bg-slate-50 rounded-2xl border space-y-4">
+                      <div className="space-y-1">
+                        <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Webhook Configuration</Label>
+                        <div className="flex items-center gap-2 bg-white p-3 rounded-xl border">
+                          <code className="text-xs font-mono text-primary flex-1">https://monica-hub.ai/api/run-cadence</code>
+                          <Button variant="ghost" size="icon" className="h-8 w-8"><ExternalLink className="h-4 w-4" /></Button>
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        To automate this, set up a **Make.com** or **Zapier** scenario to send a POST request to this URL every morning at 7:00 AM. Ensure you include the user ID in the body and your secret token in the headers.
+                      </p>
+                      <Button 
+                        onClick={handleRunCadenceManually} 
+                        disabled={runningCadence}
+                        className="w-full bg-accent hover:bg-accent/90 text-primary font-bold shadow-lg shadow-accent/10"
+                      >
+                        {runningCadence ? <RefreshCw className="h-4 w-4 animate-spin mr-2" /> : <Zap className="h-4 w-4 mr-2" />}
+                        Run Cadence Logic Now
+                      </Button>
+                    </div>
+
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="p-4 bg-primary/5 rounded-2xl border border-primary/10 space-y-2">
+                        <div className="flex justify-between items-center">
+                          <Label className="font-bold">Auto-Nurture Emails</Label>
+                          <Switch defaultChecked />
+                        </div>
+                        <p className="text-[10px] text-slate-500 leading-relaxed">Automatically send cadence emails when they are due (requires Gmail connection).</p>
+                      </div>
+                      <div className="p-4 bg-primary/5 rounded-2xl border border-primary/10 space-y-2">
+                        <div className="flex justify-between items-center">
+                          <Label className="font-bold">Quarterly Nurture</Label>
+                          <Switch defaultChecked />
+                        </div>
+                        <p className="text-[10px] text-slate-500 leading-relaxed">Move leads to long-term quarterly follow-up after cadence completion.</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
 
               <TabsContent value="outreach" className="space-y-6">
                 <Card className="border-none shadow-md">
@@ -264,8 +321,6 @@ export default function SettingsPage() {
                   </Card>
                 </div>
               </TabsContent>
-
-              {/* ... other tabs ... */}
             </Tabs>
           </main>
         </SidebarInset>
