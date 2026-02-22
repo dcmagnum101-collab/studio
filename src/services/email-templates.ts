@@ -51,7 +51,7 @@ export const emailTemplates = {
         <strong>Current Market Pulse for your neighborhood:</strong><br>
         • Active competing listings: ${market.active_listings || 12}<br>
         • Avg. Days on Market: ${market.avg_dom || 42} days<br>
-        • Recent neighbor sale: $${(market.avg_price || 485000).toLocaleString()}
+        • Recent neighbor sale benchmark established in your area.
       </div>
       <p>Selling a home today requires a different strategy than it did even six months ago. I've helped several homeowners in your exact situation reposition their properties for a successful sale.</p>
       <p>I have a few specific ideas for your property. No pitch — just a real conversation about what works right now.</p>
@@ -90,14 +90,14 @@ export const emailTemplates = {
       <p>Warmly,<br><strong>Monica Selvaggio</strong></p>
     `, contact.id),
 
-  justSoldBlast: (contact: any, soldAddress: string, soldPrice: number, soldDom: number) =>
+  justSoldBlast: (contact: any, soldAddress: string, _soldPrice: number, soldDom: number) =>
     base(`
       <p>Hi ${contact.name.split(' ')[0]},</p>
       <p>I have some great news for your property value! Your neighbor's home just sold, and it sets a new high-water mark for the area:</p>
       <div class="box">
         <strong>🏆 RECENT NEIGHBORHOOD SALE</strong><br>
         ${soldAddress}<br>
-        Sale Price: <strong>$${soldPrice.toLocaleString()}</strong><br>
+        <strong>Recent Activity:</strong> A home near yours recently sold — and it sets a strong benchmark for your neighborhood's current value.<br>
         Days on Market: <strong>${soldDom} days</strong>
       </div>
       <p>Based on this recent activity, your home at <strong>${contact.propertyAddress}</strong> could be worth significantly more than the automated estimates online might suggest.</p>
