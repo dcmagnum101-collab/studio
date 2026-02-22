@@ -1,21 +1,9 @@
-
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
-import {
-  SidebarProvider,
-  SidebarInset,
-  SidebarTrigger,
-} from "@/components/ui/sidebar";
+import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/app-sidebar";
-import { KPI_STATS } from "@/lib/mock-data";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import {
   Users,
   Target,
@@ -31,6 +19,7 @@ import {
   ShieldCheck,
   ArrowRight,
   Plus,
+  RefreshCw,
 } from "lucide-react";
 import {
   BarChart,
@@ -48,23 +37,9 @@ import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 import Link from "next/link";
-import {
-  useUser,
-  useFirestore,
-  useCollection,
-  useMemoFirebase,
-  useDoc,
-} from "@/firebase";
+import { useUser, useFirestore, useCollection, useMemoFirebase, useDoc } from "@/firebase";
 import { collection, query, limit, orderBy } from "firebase/firestore";
 import { StatsSkeleton, TasksSkeleton, QuotaSkeleton } from "@/components/dashboard/dashboard-skeletons";
-
-const iconMap: Record<string, any> = {
-  Users,
-  Target,
-  Phone,
-  TrendingUp,
-  CheckCircle,
-};
 
 export default function DashboardPage() {
   const { user, isUserLoading } = useUser();
@@ -77,19 +52,33 @@ export default function DashboardPage() {
 
   const tasksQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
-    return query(
-      collection(firestore, "users", user.uid, "tasks"),
-      orderBy("due_date", "asc"),
-      limit(20)
-    );
+    return query(collection(firestore, "users", user.uid, "tasks"), orderBy("due_date", "asc"), limit(20));
+  }, [firestore, user]);
+
+  const contactsQuery = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return query(collection(firestore, "users", user.uid, "contacts"));
   }, [firestore, user]);
 
   const { data: allTasks, isLoading: tasksLoading } = useCollection(tasksQuery);
+  const { data: allContacts, isLoading: contactsLoading } = useCollection(contactsQuery);
 
   const liveTasks = useMemo(() => {
     if (!allTasks) return [];
     return allTasks.filter((t) => t.status === "pending").slice(0, 5);
   }, [allTasks]);
+
+  const pipelineValue = useMemo(() => {
+    if (!allContacts) return 0;
+    return allContacts.reduce((sum, c) => sum + (c.estimated_commission || 0), 0);
+  }, [allContacts]);
+
+  const stats = [
+    { label: "Active Pipeline", value: `$${(pipelineValue / 1000).toFixed(1)}k`, icon: Target, color: "text-primary" },
+    { label: "Total Leads", value: allContacts?.length || 0, icon: Users, color: "text-blue-600" },
+    { label: "Tasks Due", value: liveTasks.length, icon: CheckCircle, color: "text-green-600" },
+    { label: "ICP Hot Leads", value: allContacts?.filter((c) => (c.icpScore || 0) >= 80).length || 0, icon: Zap, color: "text-accent" },
+  ];
 
   const today = new Date().toISOString().split("T")[0];
   const quotaRef = useMemoFirebase(() => {
@@ -108,9 +97,7 @@ export default function DashboardPage() {
         <SidebarInset>
           <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4 md:px-6 bg-white shadow-sm sticky top-0 z-10">
             <SidebarTrigger className="-ml-1" />
-            <h1 className="text-base md:text-xl font-bold font-headline text-primary truncate">
-              Monica Executive Dashboard
-            </h1>
+            <h1 className="text-base md:text-xl font-bold font-headline text-primary truncate">Monica Executive Dashboard</h1>
             <div className="ml-auto hidden md:flex items-center gap-2">
               <Button size="sm" variant="outline" className="gap-2">
                 <Plus className="h-4 w-4" /> Quick Lead
@@ -121,37 +108,29 @@ export default function DashboardPage() {
           <main className="flex-1 space-y-6 md:space-y-8 p-4 md:p-8 max-w-7xl mx-auto w-full">
             <MorningBriefingCard />
 
-            {!mounted || isUserLoading ? (
+            {!mounted || isUserLoading || contactsLoading ? (
               <StatsSkeleton />
             ) : (
               <div className="grid gap-4 md:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-                {KPI_STATS.map((stat) => {
-                  const Icon = iconMap[stat.icon];
-                  return (
-                    <Card
-                      key={stat.label}
-                      className="border-none shadow-md hover:scale-[1.01] transition-transform"
-                    >
-                      <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                        <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground uppercase tracking-wider">
-                          {stat.label}
-                        </CardTitle>
-                        <div className="p-2 bg-secondary rounded-lg">
-                          {Icon && <Icon className="h-4 w-4 text-primary" />}
-                        </div>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="text-2xl md:text-3xl font-bold text-primary">
-                          {stat.value}
-                        </div>
-                        <p className="text-xs text-green-600 flex items-center gap-1 mt-1 font-medium">
-                          <Activity className="h-3 w-3" />
-                          {stat.change}
-                        </p>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
+                {stats.map((stat) => (
+                  <Card key={stat.label} className="border-none shadow-md hover:scale-[1.01] transition-transform">
+                    <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                      <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground uppercase tracking-wider">
+                        {stat.label}
+                      </CardTitle>
+                      <div className="p-2 bg-secondary rounded-lg">
+                        <stat.icon className={`h-4 w-4 ${stat.color}`} />
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl md:text-3xl font-bold text-primary">{stat.value}</div>
+                      <p className="text-xs text-green-600 flex items-center gap-1 mt-1 font-medium">
+                        <Activity className="h-3 w-3" />
+                        Live Status
+                      </p>
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
             )}
 
@@ -161,9 +140,7 @@ export default function DashboardPage() {
                   <div className="flex justify-between items-center">
                     <div>
                       <CardTitle className="text-lg">Prospecting Intelligence</CardTitle>
-                      <CardDescription className="text-xs">
-                        AI-detected lead signals & heatmap patterns
-                      </CardDescription>
+                      <CardDescription className="text-xs">AI-detected lead signals & patterns</CardDescription>
                     </div>
                     <Zap className="h-5 w-5 text-accent animate-pulse" />
                   </div>
@@ -178,23 +155,21 @@ export default function DashboardPage() {
                         <Clock className="h-5 w-5 text-primary" />
                         <div>
                           <p className="text-sm font-bold">Now - 11:30 AM</p>
-                          <p className="text-[10px] text-muted-foreground">
-                            34% Predict Answer Rate
-                          </p>
+                          <p className="text-[10px] text-muted-foreground">34% Predict Answer Rate</p>
                         </div>
                       </div>
                     </div>
                     <div className="p-4 bg-orange-50 rounded-xl border border-orange-100">
                       <p className="text-[10px] font-black text-orange-600 uppercase mb-2 tracking-widest">
-                        Almost Leads Detected
+                        High Intensity
                       </p>
                       <div className="flex items-center gap-3">
                         <Smartphone className="h-5 w-5 text-orange-600" />
                         <div>
-                          <p className="text-sm font-bold">4 Follow-ups Ready</p>
-                          <p className="text-[10px] text-orange-700">
-                            Implied timeline reached
+                          <p className="text-sm font-bold">
+                            {allContacts?.filter((c) => c.ai_urgency === "hot").length || 0} Hot Leads
                           </p>
+                          <p className="text-[10px] text-orange-700">Immediate action advised</p>
                         </div>
                       </div>
                     </div>
@@ -207,9 +182,7 @@ export default function DashboardPage() {
                       <div className="flex justify-between items-center mb-3">
                         <div className="flex items-center gap-2">
                           <Mail className="h-4 w-4 text-primary" />
-                          <span className="text-xs font-bold uppercase text-slate-700">
-                            Daily Outreach Quota
-                          </span>
+                          <span className="text-xs font-bold uppercase text-slate-700">Daily Outreach Quota</span>
                         </div>
                         <Badge variant="outline" className="bg-white text-[10px] font-black">
                           {emailSentToday} / 500
@@ -220,8 +193,7 @@ export default function DashboardPage() {
                         className={`h-2 ${quotaPercentage > 90 ? "bg-red-100" : quotaPercentage > 80 ? "bg-yellow-100" : "bg-slate-200"}`}
                       />
                       <p className="text-[10px] text-muted-foreground mt-2 italic leading-relaxed">
-                        Monica uses intelligent bulk sending with artificial delay to
-                        ensure maximum deliverability.
+                        Monica ensures maximum deliverability with artificial delay between messages.
                       </p>
                     </div>
                   )}
@@ -237,22 +209,17 @@ export default function DashboardPage() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex justify-between items-center text-xs">
-                    <span className="text-muted-foreground">
-                      DNC Registry Matches
-                    </span>
-                    <span className="font-bold">4,281</span>
+                    <span className="text-muted-foreground">Unsubscribes</span>
+                    <span className="font-bold">Active Tracking</span>
                   </div>
                   <div className="flex justify-between items-center text-xs">
-                    <span className="text-muted-foreground">
-                      Safe Call Windows
-                    </span>
+                    <span className="text-muted-foreground">Safe Windows</span>
                     <span className="font-bold">8am - 8pm</span>
                   </div>
                   <div className="h-px bg-slate-200 w-full" />
                   <div className="space-y-3">
                     <p className="text-[10px] text-muted-foreground font-medium leading-relaxed">
-                      Automatic DNC scrubbing and Email Unsubscribe tracking are
-                      active for all outreach sequences.
+                      Automatic DNC scrubbing and Email Unsubscribe tracking are active for all outreach sequences.
                     </p>
                     <Button variant="outline" className="w-full text-xs h-9 font-bold shadow-sm">
                       View Compliance Logs
@@ -267,29 +234,13 @@ export default function DashboardPage() {
                 <CardHeader>
                   <div className="flex justify-between items-center">
                     <div>
-                      <CardTitle className="text-lg">
-                        Today's Game Plan
-                      </CardTitle>
-                      <CardDescription className="text-xs">
-                        Monica's Top Priorities
-                      </CardDescription>
+                      <CardTitle className="text-lg">Today's Game Plan</CardTitle>
+                      <CardDescription className="text-xs">Monica's Top Priorities</CardDescription>
                     </div>
-                    {mounted && (
-                      <Badge className="bg-primary text-[10px] h-5">
-                        {liveTasks.length} Actions
-                      </Badge>
-                    )}
+                    {mounted && <Badge className="bg-primary text-[10px] h-5">{liveTasks.length} Actions</Badge>}
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-[10px] font-black uppercase mb-1">
-                      <span>Daily Progress</span>
-                      <span>{liveTasks.length === 0 ? '100%' : '25%'}</span>
-                    </div>
-                    <Progress value={liveTasks.length === 0 ? 100 : 25} className="h-1.5 bg-slate-200" />
-                  </div>
-
                   {!mounted || tasksLoading ? (
                     <TasksSkeleton />
                   ) : liveTasks.length > 0 ? (
@@ -303,14 +254,9 @@ export default function DashboardPage() {
                             className={`h-2 w-2 rounded-full shrink-0 ${task.priority === "urgent" ? "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]" : "bg-blue-400"}`}
                           />
                           <div className="flex-1 min-w-0">
-                            <p className="text-xs font-bold truncate text-primary">
-                              {task.title}
-                            </p>
+                            <p className="text-xs font-bold truncate text-primary">{task.title}</p>
                             <p className="text-[10px] text-muted-foreground">
-                              {task.contact_name} •{" "}
-                              {task.due_date
-                                ? format(new Date(task.due_date), "h:mm a")
-                                : ""}
+                              {task.contact_name} • {task.due_date ? format(new Date(task.due_date), "h:mm a") : ""}
                             </p>
                           </div>
                           <Link href={`/contacts/${task.contactId}`}>
@@ -327,16 +273,11 @@ export default function DashboardPage() {
                     </div>
                   ) : (
                     <div className="text-center py-10 border-2 border-dashed border-slate-200 rounded-xl bg-white/50">
-                      <p className="text-xs text-muted-foreground">
-                        No tasks for today. Power Hour complete! 🎉
-                      </p>
+                      <p className="text-xs text-muted-foreground">No tasks for today. Power Hour complete! 🎉</p>
                     </div>
                   )}
                   <Link href="/tasks" className="block">
-                    <Button
-                      className="w-full bg-primary mt-4 font-bold h-10 shadow-lg"
-                      variant="default"
-                    >
+                    <Button className="w-full bg-primary mt-4 font-bold h-10 shadow-lg" variant="default">
                       Open Task Manager
                     </Button>
                   </Link>
@@ -347,31 +288,39 @@ export default function DashboardPage() {
                 <CardHeader>
                   <div className="flex justify-between items-center">
                     <div>
-                      <CardTitle className="text-lg">Pipeline Performance</CardTitle>
-                      <CardDescription className="text-xs">
-                        Conversion through the listing funnel
-                      </CardDescription>
+                      <CardTitle className="text-lg">Pipeline Distribution</CardTitle>
+                      <CardDescription className="text-xs">Active leads across funnel stages</CardDescription>
                     </div>
                     <Trello className="h-5 w-5 text-accent" />
                   </div>
                 </CardHeader>
                 <CardContent className="h-[300px] md:h-[350px]">
-                  {mounted ? (
+                  {mounted && !contactsLoading ? (
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart
                         data={[
-                          { stage: "New", count: 42 },
-                          { stage: "Attempted", count: 28 },
-                          { stage: "Talked", count: 18 },
-                          { stage: "Appt Set", count: 8 },
-                          { stage: "Listed", count: 3 },
+                          {
+                            stage: "New",
+                            count: allContacts?.filter((c) => c.pipeline_stage === "new_lead").length || 0,
+                          },
+                          {
+                            stage: "Working",
+                            count:
+                              allContacts?.filter((c) =>
+                                ["attempted_contact", "conversation_had"].includes(c.pipeline_stage)
+                              ).length || 0,
+                          },
+                          {
+                            stage: "Set",
+                            count: allContacts?.filter((c) => c.pipeline_stage === "appointment_set").length || 0,
+                          },
+                          {
+                            stage: "Listed",
+                            count: allContacts?.filter((c) => c.pipeline_stage === "listed").length || 0,
+                          },
                         ]}
                       >
-                        <CartesianGrid
-                          strokeDasharray="3 3"
-                          vertical={false}
-                          stroke="#F1F5F9"
-                        />
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
                         <XAxis
                           dataKey="stage"
                           axisLine={false}
@@ -383,21 +332,15 @@ export default function DashboardPage() {
                           contentStyle={{
                             borderRadius: "12px",
                             border: "none",
-                            boxShadow: "0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)",
+                            boxShadow: "0 10px 25px -5px rgba(0,0,0,0.1)",
                           }}
                         />
-                        <Bar
-                          dataKey="count"
-                          name="Leads"
-                          fill="hsl(var(--primary))"
-                          radius={[6, 6, 0, 0]}
-                          barSize={40}
-                        />
+                        <Bar dataKey="count" name="Leads" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} barSize={40} />
                       </BarChart>
                     </ResponsiveContainer>
                   ) : (
                     <div className="flex items-center justify-center h-full">
-                      <Skeleton className="h-full w-full rounded-xl" />
+                      <RefreshCw className="h-8 w-8 animate-spin text-slate-200" />
                     </div>
                   )}
                 </CardContent>
