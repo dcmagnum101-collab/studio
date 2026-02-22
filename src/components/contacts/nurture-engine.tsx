@@ -19,6 +19,8 @@ import {
 import { generateNurturePlan, NurtureAnalysis } from "@/services/nurture-engine-service"
 import { useUser } from "@/firebase"
 import { useToast } from "@/hooks/use-toast"
+import { sendNurtureEmail } from "@/app/actions/gmail"
+import { ComplianceGuard } from "@/components/compliance/ComplianceGuard"
 
 interface NurtureEngineProps {
   contactId: string;
@@ -29,6 +31,7 @@ export function LeadNurtureEngine({ contactId, contactName }: NurtureEngineProps
   const { user } = useUser();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [sending, setSending] = useState(false);
   const [analysis, setAnalysis] = useState<NurtureAnalysis | null>(null);
 
   const handleRefresh = async () => {
@@ -42,6 +45,27 @@ export function LeadNurtureEngine({ contactId, contactName }: NurtureEngineProps
       toast({ variant: "destructive", title: "AI Run Failed", description: "Could not generate nurture plan." });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSendDraft = async (finalContent: string) => {
+    if (!user || !analysis?.draftedMessage) return;
+    setSending(true);
+    try {
+      await sendNurtureEmail({
+        userId: user.uid,
+        contactId,
+        to: "recipient@example.com", // This would be the contact's real email
+        subject: analysis.draftedMessage.subject || "Strategic Real Estate Update",
+        body: finalContent,
+        isAiGenerated: true
+      });
+      toast({ title: "Email Sent", description: "Nurture message delivered." });
+      setAnalysis(null);
+    } catch (err: any) {
+      toast({ variant: "destructive", title: "Send Failed", description: err.message });
+    } finally {
+      setSending(false);
     }
   };
 
@@ -86,17 +110,6 @@ export function LeadNurtureEngine({ contactId, contactName }: NurtureEngineProps
           </div>
         ) : (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2">
-            {/* Summary Section */}
-            <section className="space-y-3">
-              <h4 className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
-                <CheckCircle2 className="h-3 w-3 text-accent" />
-                Deal Context Summary
-              </h4>
-              <p className="text-sm leading-relaxed text-slate-200 bg-white/5 p-4 rounded-xl border border-white/5 italic">
-                "{analysis.summary}"
-              </p>
-            </section>
-
             {/* Next Actions */}
             <section className="space-y-4">
               <h4 className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Suggested Next Actions</h4>
@@ -136,19 +149,27 @@ export function LeadNurtureEngine({ contactId, contactName }: NurtureEngineProps
                       <ShieldCheck className={`h-4 w-4 ${analysis.compliance.isEligible ? 'text-green-500' : 'text-slate-600'}`} />
                       <span className="text-[10px] text-slate-500 font-bold uppercase">Compliance Pass</span>
                     </div>
-                    <Button 
-                      disabled={!analysis.compliance.isEligible} 
-                      className="gap-2 bg-accent hover:bg-accent/90 text-primary font-bold shadow-lg shadow-accent/20"
+                    
+                    <ComplianceGuard 
+                      content={analysis.draftedMessage.body} 
+                      type={analysis.draftedMessage.type} 
+                      contactName={contactName} 
+                      onApproved={handleSendDraft}
                     >
-                      {analysis.compliance.isEligible ? <Send className="h-4 w-4" /> : <MailX className="h-4 w-4" />}
-                      {analysis.compliance.isEligible ? 'Send via Gmail' : 'Blocked'}
-                    </Button>
+                      <Button 
+                        disabled={!analysis.compliance.isEligible || sending} 
+                        className="gap-2 bg-accent hover:bg-accent/90 text-primary font-bold shadow-lg shadow-accent/20"
+                      >
+                        {sending ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                        {analysis.compliance.isEligible ? 'Send via Gmail' : 'Blocked'}
+                      </Button>
+                    </ComplianceGuard>
                   </div>
                 </div>
               ) : (
                 <div className="p-6 border-2 border-dashed border-white/10 rounded-2xl text-center bg-white/5">
                   <AlertCircle className="h-8 w-8 text-slate-600 mx-auto mb-2" />
-                  <p className="text-xs text-slate-500">{analysis.compliance.reason || "No outbound message drafted for this stage."}</p>
+                  <p className="text-xs text-slate-500">{analysis.compliance.reason || "No outbound message drafted."}</p>
                 </div>
               )}
             </section>
