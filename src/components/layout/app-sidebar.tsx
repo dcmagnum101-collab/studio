@@ -15,7 +15,8 @@ import {
   CalendarDays,
   Home,
   Database,
-  Building2
+  Building2,
+  Wrench
 } from "lucide-react"
 
 import {
@@ -33,6 +34,7 @@ import { usePathname } from "next/navigation"
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
+  { name: "Setup Guide", href: "/setup-guide", icon: Wrench },
   { name: "Prospector", href: "/contacts", icon: Users },
   { name: "MLS Intel", href: "/mls-intelligence", icon: Building2 },
   { name: "Sources Hub", href: "/sources", icon: Database },

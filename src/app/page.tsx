@@ -20,7 +20,9 @@ import {
   Activity,
   Clock,
   Sparkles,
-  Play
+  Play,
+  AlertTriangle,
+  ArrowUpRight
 } from "lucide-react";
 import {
   BarChart,
@@ -36,10 +38,11 @@ import { MorningBriefingCard } from "@/components/morning-briefing/morning-brief
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import Link from "next/link";
-import { useUser, useDoc, useMemoFirebase } from "@/firebase";
+import { useUser, useDoc, useMemoFirebase, useCollection } from "@/firebase";
 import { useContacts, useTasks } from "@/hooks/useFirestoreData";
 import { StatsSkeleton, TasksSkeleton, QuotaSkeleton } from "@/components/dashboard/dashboard-skeletons";
 import { useToast } from "@/hooks/use-toast";
+import { collection, query, limit } from "firebase/firestore";
 
 export default function DashboardPage() {
   const { user, isUserLoading } = useUser();
@@ -47,6 +50,17 @@ export default function DashboardPage() {
   const { data: allContacts, isLoading: contactsLoading } = useContacts();
   const { data: allTasks, isLoading: tasksLoading } = useTasks('pending');
   const [runningNurture, setRunningNurture] = useState(false);
+
+  // Settings for onboarding check
+  const gmailRef = useMemoFirebase(() => user ? `users/${user.uid}/settings/outreach_gmail` : null, [user]);
+  const v7Ref = useMemoFirebase(() => user ? `users/${user.uid}/settings/dialer_v7` : null, [user]);
+  const { data: gmailSettings } = useDoc(gmailRef);
+  const { data: v7Settings } = useDoc(v7Ref);
+
+  const needsSetup = useMemo(() => {
+    if (isUserLoading) return false;
+    return !gmailSettings?.connected || !v7Settings?.username || (allContacts || []).length === 0;
+  }, [gmailSettings, v7Settings, allContacts, isUserLoading]);
 
   const pipelineValue = useMemo(() => {
     if (!allContacts) return 0;
@@ -112,6 +126,26 @@ export default function DashboardPage() {
           </header>
 
           <main className="flex-1 space-y-6 md:space-y-8 p-4 md:p-8 max-w-7xl mx-auto w-full pb-24 md:pb-8">
+            
+            {needsSetup && (
+              <div className="bg-orange-50 border border-orange-100 rounded-2xl p-4 md:p-6 flex flex-col md:flex-row items-center justify-between gap-4 animate-in fade-in slide-in-from-top-4">
+                <div className="flex items-center gap-4">
+                  <div className="h-12 w-12 rounded-full bg-orange-100 flex items-center justify-center shrink-0">
+                    <AlertTriangle className="h-6 w-6 text-orange-600" />
+                  </div>
+                  <div className="space-y-1">
+                    <h3 className="font-black text-orange-900 uppercase text-xs tracking-widest">Complete Your Setup</h3>
+                    <p className="text-sm text-orange-700">Connect Gmail and import your leads to enable Monica's deal intelligence.</p>
+                  </div>
+                </div>
+                <Button asChild className="bg-orange-600 hover:bg-orange-700 text-white font-bold gap-2 w-full md:w-auto">
+                  <Link href="/setup-guide">
+                    Open Setup Guide <ArrowUpRight className="h-4 w-4" />
+                  </Link>
+                </Button>
+              </div>
+            )}
+
             <MorningBriefingCard />
 
             {isUserLoading || contactsLoading ? (
