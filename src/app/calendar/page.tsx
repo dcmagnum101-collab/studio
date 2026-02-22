@@ -1,6 +1,7 @@
+
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { Card, CardContent } from "@/components/ui/card";
@@ -30,34 +31,14 @@ import {
   addMonths,
   subMonths,
 } from "date-fns";
-import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebase";
-import { collection, query, orderBy } from "firebase/firestore";
+import { useAppointments, useTasks } from "@/hooks/useFirestoreData";
 
 export default function CalendarPage() {
-  const { user } = useUser();
-  const firestore = useFirestore();
-  const [mounted, setMounted] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState<"month" | "week" | "day">("month");
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  const appointmentsQuery = useMemoFirebase(() => {
-    if (!user || !firestore) return null;
-    return query(collection(firestore, "users", user.uid, "appointments"), orderBy("date", "asc"));
-  }, [user, firestore]);
-
-  const tasksQuery = useMemoFirebase(() => {
-    if (!user || !firestore) return null;
-    return query(collection(firestore, "users", user.uid, "tasks"), orderBy("due_date", "asc"));
-  }, [user, firestore]);
-
-  const { data: appointments, isLoading: apptsLoading } = useCollection(appointmentsQuery);
-  const { data: tasks, isLoading: tasksLoading } = useCollection(tasksQuery);
-
-  if (!mounted) return null;
+  const { data: appointments, isLoading: apptsLoading } = useAppointments();
+  const { data: tasks, isLoading: tasksLoading } = useTasks();
 
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(monthStart);

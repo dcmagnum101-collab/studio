@@ -1,10 +1,10 @@
 
 "use client"
 
-import React, { useState, useEffect, useMemo } from "react"
+import React, { useState, useEffect } from "react"
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/layout/app-sidebar"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Badge } from "@/components/ui/badge"
@@ -20,33 +20,20 @@ import {
   Filter
 } from "lucide-react"
 import { format } from "date-fns"
-import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebase"
-import { collection, query, doc, orderBy, updateDoc } from "firebase/firestore"
+import { useUser, useFirestore, updateDocumentNonBlocking } from "@/firebase"
+import { doc } from "firebase/firestore"
 import Link from "next/link"
+import { useTasks } from "@/hooks/useFirestoreData"
 
 export default function TasksPage() {
   const { user } = useUser();
   const firestore = useFirestore();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  const tasksQuery = useMemoFirebase(() => {
-    if (!user || !firestore) return null;
-    return query(
-      collection(firestore, 'users', user.uid, 'tasks'),
-      orderBy('due_date', 'asc')
-    );
-  }, [user, firestore]);
-
-  const { data: tasks, loading: isLoading } = useCollection(tasksQuery);
+  const { data: tasks, isLoading } = useTasks();
 
   const toggleTask = (id: string, currentStatus: string) => {
     if (!user || !firestore) return;
     const taskRef = doc(firestore, 'users', user.uid, 'tasks', id);
-    updateDoc(taskRef, {
+    updateDocumentNonBlocking(taskRef, {
       status: currentStatus === 'completed' ? 'pending' : 'completed',
       completed_at: currentStatus === 'completed' ? null : new Date().toISOString()
     });
@@ -58,8 +45,6 @@ export default function TasksPage() {
     normal: 'text-blue-600 bg-blue-50 border-blue-200',
     low: 'text-slate-600 bg-slate-50 border-slate-200',
   };
-
-  if (!mounted) return null;
 
   return (
     <SidebarProvider>

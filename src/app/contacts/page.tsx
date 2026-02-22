@@ -1,7 +1,7 @@
 
 "use client"
 
-import React, { useState, useEffect } from "react"
+import React, { useState } from "react"
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { 
@@ -37,9 +37,7 @@ import {
 import { ContactDetailsSheet } from "@/components/contacts/contact-details-sheet";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EnrichmentTool } from "@/components/prospecting/enrichment-tool";
-import { useUser, useFirestore, usePaginatedCollection, useMemoFirebase } from "@/firebase";
-import { collection, query, orderBy, where } from "firebase/firestore";
-import Link from "next/link";
+import { useContacts } from "@/hooks/useFirestoreData";
 
 const SOURCE_CONFIG: Record<string, { label: string; color: string }> = {
   expired: { label: 'Expired', color: 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.4)]' },
@@ -51,40 +49,22 @@ const SOURCE_CONFIG: Record<string, { label: string; color: string }> = {
 };
 
 export default function ContactsPage() {
-  const { user } = useUser();
-  const firestore = useFirestore();
   const [selectedContact, setSelectedContact] = React.useState<any | null>(null);
   const [sheetOpen, setSheetOpen] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
 
-  const contactsQuery = useMemoFirebase(() => {
-    if (!user || !firestore) return null;
-    const base = collection(firestore, 'users', user.uid, 'contacts');
-    
-    if (activeTab === "all") {
-      return query(base, orderBy('name', 'asc'));
-    }
-    
-    return query(
-      base, 
-      where('archagent_source', '==', activeTab),
-      orderBy('name', 'asc')
-    );
-  }, [user, firestore, activeTab]);
-
-  const { data: contacts, loading, hasMore, loadMore } = usePaginatedCollection(contactsQuery, 25);
+  const { 
+    data: contacts, 
+    loading, 
+    hasMore, 
+    loadMore 
+  } = useContacts({ source: activeTab, searchQuery });
 
   const handleViewDetails = (contact: any) => {
     setSelectedContact(contact);
     setSheetOpen(true);
   };
-
-  const filteredContacts = (contacts || []).filter(c => {
-    const matchesSearch = c.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                         c.propertyAddress?.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesSearch;
-  });
 
   return (
     <SidebarProvider>
@@ -153,8 +133,8 @@ export default function ContactsPage() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {filteredContacts.length > 0 ? (
-                            filteredContacts.map((contact) => (
+                          {contacts.length > 0 ? (
+                            contacts.map((contact) => (
                               <TableRow key={contact.id} className="cursor-pointer hover:bg-primary/[0.02] transition-colors" onClick={() => handleViewDetails(contact)}>
                                 <TableCell className="py-4 px-6">
                                   <div className="flex flex-col">
@@ -230,7 +210,7 @@ export default function ContactsPage() {
 
                     {/* MOBILE CARD VIEW */}
                     <div className="md:hidden mt-6 space-y-4">
-                      {filteredContacts.map((contact) => (
+                      {contacts.map((contact) => (
                         <Card key={contact.id} className="border-none shadow-md overflow-hidden" onClick={() => handleViewDetails(contact)}>
                           <CardContent className="p-4 space-y-4">
                             <div className="flex justify-between items-start">
@@ -262,7 +242,7 @@ export default function ContactsPage() {
                           </CardContent>
                         </Card>
                       ))}
-                      {!loading && filteredContacts.length === 0 && (
+                      {!loading && contacts.length === 0 && (
                         <div className="text-center py-20 px-4 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
                           <p className="text-xs text-muted-foreground italic">No results found.</p>
                         </div>

@@ -1,13 +1,13 @@
+
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useMemo } from "react";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import {
   Users,
   Target,
-  Phone,
   TrendingUp,
   Clock,
   Activity,
@@ -37,36 +37,14 @@ import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 import Link from "next/link";
-import { useUser, useFirestore, useCollection, useMemoFirebase, useDoc } from "@/firebase";
-import { collection, query, limit, orderBy } from "firebase/firestore";
+import { useUser, useDoc, useMemoFirebase } from "@/firebase";
+import { useContacts, useTasks } from "@/hooks/useFirestoreData";
 import { StatsSkeleton, TasksSkeleton, QuotaSkeleton } from "@/components/dashboard/dashboard-skeletons";
 
 export default function DashboardPage() {
   const { user, isUserLoading } = useUser();
-  const firestore = useFirestore();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  const tasksQuery = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
-    return query(collection(firestore, "users", user.uid, "tasks"), orderBy("due_date", "asc"), limit(20));
-  }, [firestore, user]);
-
-  const contactsQuery = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
-    return query(collection(firestore, "users", user.uid, "contacts"));
-  }, [firestore, user]);
-
-  const { data: allTasks, isLoading: tasksLoading } = useCollection(tasksQuery);
-  const { data: allContacts, isLoading: contactsLoading } = useCollection(contactsQuery);
-
-  const liveTasks = useMemo(() => {
-    if (!allTasks) return [];
-    return allTasks.filter((t) => t.status === "pending").slice(0, 5);
-  }, [allTasks]);
+  const { data: allContacts, isLoading: contactsLoading } = useContacts();
+  const { data: allTasks, isLoading: tasksLoading } = useTasks('pending');
 
   const pipelineValue = useMemo(() => {
     if (!allContacts) return 0;
@@ -76,7 +54,7 @@ export default function DashboardPage() {
   const stats = [
     { label: "Active Pipeline", value: `$${(pipelineValue / 1000).toFixed(1)}k`, icon: Target, color: "text-primary" },
     { label: "Total Leads", value: allContacts?.length || 0, icon: Users, color: "text-blue-600" },
-    { label: "Tasks Due", value: liveTasks.length, icon: CheckCircle, color: "text-green-600" },
+    { label: "Tasks Due", value: (allTasks || []).length, icon: CheckCircle, color: "text-green-600" },
     { label: "ICP Hot Leads", value: allContacts?.filter((c) => (c.icpScore || 0) >= 80).length || 0, icon: Zap, color: "text-accent" },
   ];
 
@@ -108,7 +86,7 @@ export default function DashboardPage() {
           <main className="flex-1 space-y-6 md:space-y-8 p-4 md:p-8 max-w-7xl mx-auto w-full">
             <MorningBriefingCard />
 
-            {!mounted || isUserLoading || contactsLoading ? (
+            {isUserLoading || contactsLoading ? (
               <StatsSkeleton />
             ) : (
               <div className="grid gap-4 md:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
@@ -175,7 +153,7 @@ export default function DashboardPage() {
                     </div>
                   </div>
 
-                  {!mounted || quotaLoading ? (
+                  {quotaLoading ? (
                     <QuotaSkeleton />
                   ) : (
                     <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
@@ -237,15 +215,15 @@ export default function DashboardPage() {
                       <CardTitle className="text-lg">Today's Game Plan</CardTitle>
                       <CardDescription className="text-xs">Monica's Top Priorities</CardDescription>
                     </div>
-                    {mounted && <Badge className="bg-primary text-[10px] h-5">{liveTasks.length} Actions</Badge>}
+                    <Badge className="bg-primary text-[10px] h-5">{(allTasks || []).length} Actions</Badge>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {!mounted || tasksLoading ? (
+                  {tasksLoading ? (
                     <TasksSkeleton />
-                  ) : liveTasks.length > 0 ? (
+                  ) : allTasks && allTasks.length > 0 ? (
                     <div className="space-y-3">
-                      {liveTasks.map((task) => (
+                      {allTasks.map((task) => (
                         <div
                           key={task.id}
                           className="bg-white p-3 rounded-xl border flex items-center gap-3 shadow-sm hover:shadow-md transition-shadow group"
@@ -295,7 +273,7 @@ export default function DashboardPage() {
                   </div>
                 </CardHeader>
                 <CardContent className="h-[300px] md:h-[350px]">
-                  {mounted && !contactsLoading ? (
+                  {!contactsLoading ? (
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart
                         data={[

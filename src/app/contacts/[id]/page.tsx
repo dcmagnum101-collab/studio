@@ -1,16 +1,14 @@
 
 "use client"
 
-import React, { useState, useEffect, useMemo } from "react"
+import React, { useState, useEffect } from "react"
 import { useParams } from "next/navigation"
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/layout/app-sidebar"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Progress } from "@/components/ui/progress"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Separator } from "@/components/ui/separator"
 import { 
   Phone, 
   Mail, 
@@ -30,10 +28,11 @@ import {
   ClipboardList
 } from "lucide-react"
 import Link from "next/link"
-import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase, addDocumentNonBlocking } from "@/firebase"
-import { collection, query, orderBy, where } from "firebase/firestore"
+import { useUser, useFirestore, useDoc, useMemoFirebase, addDocumentNonBlocking } from "@/firebase"
+import { collection } from "firebase/firestore"
 import { format } from "date-fns"
 import { LeadNurtureEngine } from "@/components/contacts/nurture-engine"
+import { useConversationHistory } from "@/hooks/useFirestoreData"
 
 export default function ContactProfilePage() {
   const params = useParams();
@@ -51,27 +50,7 @@ export default function ContactProfilePage() {
   }, [user, firestore, params.id]);
 
   const { data: contact, isLoading: contactLoading } = useDoc(contactRef);
-
-  const messagesQuery = useMemoFirebase(() => {
-    if (!user || !firestore || !params.id) return null;
-    return query(
-      collection(firestore, 'users', user.uid, 'messages'),
-      where('leadId', '==', params.id),
-      orderBy('created_at', 'desc')
-    );
-  }, [user, firestore, params.id]);
-
-  const { data: gmailMessages } = useCollection(messagesQuery);
-
-  const logsQuery = useMemoFirebase(() => {
-    if (!user || !firestore || !params.id) return null;
-    return query(
-      collection(firestore, 'users', user.uid, 'contacts', params.id as string, 'activityLogs'),
-      orderBy('date', 'desc')
-    );
-  }, [user, firestore, params.id]);
-
-  const { data: activityLogs } = useCollection(logsQuery);
+  const { data: history, isLoading: historyLoading } = useConversationHistory(params.id as string);
 
   const handleLogActivity = (type: 'call' | 'sms' | 'email') => {
     if (!user || !firestore || !params.id) return;
@@ -86,7 +65,7 @@ export default function ContactProfilePage() {
     });
   };
 
-  if (!mounted || contactLoading) return <div className="p-8 text-center text-slate-400 italic">Syncing Lead Intelligence...</div>;
+  if (contactLoading) return <div className="p-8 text-center text-slate-400 italic">Syncing Lead Intelligence...</div>;
   if (!contact) return <div className="p-8 text-center">Lead not found in database.</div>;
 
   const sentimentColors: Record<string, string> = {
@@ -122,7 +101,6 @@ export default function ContactProfilePage() {
           </header>
           
           <main className="flex flex-col lg:flex-row h-[calc(100vh-64px)] overflow-hidden">
-            {/* PROFILE SIDEBAR / TOP INFO */}
             <aside className="w-full lg:w-80 border-b lg:border-b-0 lg:border-r bg-slate-50/50 p-4 md:p-6 flex flex-col gap-6 md:gap-8 overflow-y-auto no-scrollbar">
               <div className="flex flex-col items-center text-center gap-4">
                 <div className="h-20 w-20 md:h-24 md:w-24 rounded-3xl bg-primary flex items-center justify-center text-white text-3xl font-black relative shadow-2xl">
@@ -179,40 +157,43 @@ export default function ContactProfilePage() {
               </div>
             </aside>
 
-            {/* MAIN CONTENT AREA */}
             <div className="flex-1 flex flex-col bg-white overflow-hidden">
               <ScrollArea className="flex-1">
                 <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-10">
-                  {/* AI Nurture Engine Integration */}
                   <LeadNurtureEngine 
                     contactId={params.id as string} 
                     contactName={contact.name} 
                   />
 
-                  {/* Gmail Conversation History */}
                   <section className="space-y-6">
                     <div className="flex items-center justify-between">
                       <h2 className="text-base md:text-lg font-black flex items-center gap-2 text-primary">
                         <Inbox className="h-5 w-5 text-primary" />
-                        Gmail Correspondence
+                        Conversation History
                       </h2>
-                      <Badge variant="outline" className="bg-primary/5 text-primary text-[9px] font-bold h-5 border-primary/10">LIVE SYNC ACTIVE</Badge>
+                      <Badge variant="outline" className="bg-primary/5 text-primary text-[9px] font-bold h-5 border-primary/10 uppercase tracking-widest">Unified Sync</Badge>
                     </div>
                     
                     <div className="space-y-4">
-                      {gmailMessages && gmailMessages.length > 0 ? (
-                        gmailMessages.map((msg) => (
-                          <div key={msg.id} className="p-4 rounded-2xl border border-slate-100 bg-slate-50/30 space-y-2 hover:border-primary/20 transition-colors group">
+                      {historyLoading ? (
+                        <div className="text-center py-12"><RefreshCw className="h-6 w-6 animate-spin mx-auto text-slate-300" /></div>
+                      ) : history && history.length > 0 ? (
+                        history.map((item) => (
+                          <div key={item.id} className="p-4 rounded-2xl border border-slate-100 bg-slate-50/30 space-y-2 hover:border-primary/20 transition-colors group">
                             <div className="flex justify-between items-center">
-                              <span className="text-xs font-black text-primary group-hover:text-accent transition-colors">{msg.subject}</span>
-                              <span className="text-[9px] font-bold text-muted-foreground uppercase">{msg.created_at ? format(msg.created_at.toDate(), 'MMM d, h:mm a') : ''}</span>
-                            </div>
-                            <p className="text-xs text-slate-600 line-clamp-3 leading-relaxed">{msg.body}</p>
-                            <div className="flex items-center justify-between pt-1">
                               <div className="flex items-center gap-2">
-                                <Badge className="bg-green-500 text-[8px] h-4 font-black">DELIVERED</Badge>
-                                {msg.threadId && <span className="text-[8px] text-muted-foreground font-medium">Thread ID: {msg.threadId.slice(0, 8)}...</span>}
+                                <div className={`h-6 w-6 rounded-lg flex items-center justify-center ${item.type === 'email' ? 'bg-blue-100 text-blue-600' : item.type === 'call' ? 'bg-green-100 text-green-600' : 'bg-slate-100 text-slate-600'}`}>
+                                  {item.type === 'email' ? <Mail className="h-3 w-3" /> : item.type === 'call' ? <Phone className="h-3 w-3" /> : <MessageSquare className="h-3 w-3" />}
+                                </div>
+                                <span className="text-xs font-black text-primary group-hover:text-accent transition-colors">
+                                  {item.subject || item.outcome || 'Interaction Logged'}
+                                </span>
                               </div>
+                              <span className="text-[9px] font-bold text-muted-foreground uppercase">{format(new Date(item.date), 'MMM d, h:mm a')}</span>
+                            </div>
+                            <p className="text-xs text-slate-600 line-clamp-3 leading-relaxed">{item.content}</p>
+                            <div className="flex items-center justify-between pt-1">
+                              <Badge className={`${sentimentColors[item.sentiment] || 'bg-slate-400'} text-[8px] h-4 font-black uppercase`}>{item.source}</Badge>
                               <Button variant="ghost" size="icon" className="h-6 w-6 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <ArrowRight className="h-3 w-3" />
                               </Button>
@@ -221,8 +202,7 @@ export default function ContactProfilePage() {
                         ))
                       ) : (
                         <div className="text-center py-12 bg-slate-50/50 rounded-2xl border-2 border-dashed border-slate-200">
-                          <Mail className="h-8 w-8 text-slate-300 mx-auto mb-2" />
-                          <p className="text-xs text-muted-foreground italic">No linked Gmail conversations found for this contact.</p>
+                          <p className="text-xs text-muted-foreground italic">No communication history found for this contact.</p>
                         </div>
                       )}
                     </div>
@@ -251,43 +231,6 @@ export default function ContactProfilePage() {
                         <p className="text-sm font-bold leading-relaxed">{contact.ai_next_best_action || "Initiate initial discovery call to gauge timeline."}</p>
                       </CardContent>
                     </Card>
-                  </section>
-
-                  {/* CRM TIMELINE */}
-                  <section className="space-y-6">
-                    <div className="flex items-center justify-between">
-                      <h2 className="text-base md:text-lg font-black flex items-center gap-2 text-primary">
-                        <History className="h-5 w-5 text-accent" />
-                        CRM Activity Log
-                      </h2>
-                    </div>
-
-                    <div className="space-y-8 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-slate-200 before:to-transparent">
-                      {activityLogs && activityLogs.length > 0 ? (
-                        activityLogs.map((log) => (
-                          <div key={log.id} className="relative pl-12">
-                            <div className={`absolute left-0 h-10 w-10 rounded-2xl border-4 border-white flex items-center justify-center shadow-md z-10 ${log.type === 'call' ? 'bg-blue-600 text-white' : log.type === 'ai_note' ? 'bg-accent text-white' : 'bg-slate-800 text-white'}`}>
-                              {log.type === 'call' ? <Phone className="h-4 w-4" /> : log.type === 'email' ? <Mail className="h-4 w-4" /> : <BrainCircuit className="h-4 w-4" />}
-                            </div>
-                            <div className="space-y-2 pt-1">
-                              <div className="flex items-center justify-between">
-                                <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
-                                  <Clock className="h-3 w-3" />
-                                  {log.date ? format(new Date(log.date), 'MMM d, yyyy h:mm a') : ''}
-                                </span>
-                                {log.sentiment && <Badge className={`h-4 text-[8px] font-black uppercase ${sentimentColors[log.sentiment]}`}>{log.sentiment}</Badge>}
-                              </div>
-                              <h4 className="font-bold text-slate-800 text-sm">{log.outcome}</h4>
-                              <p className="text-xs text-slate-600 leading-relaxed bg-slate-50 p-4 rounded-2xl border border-slate-100 italic">"{log.summary}"</p>
-                            </div>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="text-center py-12 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
-                          <p className="text-xs text-muted-foreground italic">No events logged in the CRM timeline yet.</p>
-                        </div>
-                      )}
-                    </div>
                   </section>
                 </div>
               </ScrollArea>
