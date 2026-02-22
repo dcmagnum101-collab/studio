@@ -4,7 +4,7 @@ import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getAuth, Auth } from 'firebase/auth';
 import { getFirestore, Firestore } from 'firebase/firestore';
 import { getFunctions, Functions } from 'firebase/functions';
-import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check';
+import { initializeAppCheck, ReCaptchaEnterpriseProvider } from 'firebase/app-check';
 import { firebaseConfig } from './config';
 
 // Module-level instances to ensure true singleton behavior across the client
@@ -31,12 +31,13 @@ export function initializeFirebase(): {
     }
 
     // App Check — only initialize on client side
+    // ReCaptchaEnterpriseProvider is the correct provider for Enterprise scripts
     if (typeof window !== 'undefined') {
       const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
       if (siteKey) {
         try {
           initializeAppCheck(firebaseAppInstance, {
-            provider: new ReCaptchaV3Provider(siteKey),
+            provider: new ReCaptchaEnterpriseProvider(siteKey),
             isTokenAutoRefreshEnabled: true,
           });
         } catch (err) {
