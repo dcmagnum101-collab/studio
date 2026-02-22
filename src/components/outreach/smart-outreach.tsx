@@ -2,7 +2,6 @@
 "use client"
 
 import * as React from "react"
-import { Contact } from "@/lib/mock-data"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -11,12 +10,9 @@ import {
   Mail, 
   MessageSquare, 
   PhoneCall, 
-  CheckCircle2, 
-  XCircle,
   Wand2,
   RefreshCw,
   Send,
-  Loader2,
   FileText
 } from "lucide-react"
 import { 
@@ -46,6 +42,7 @@ export function SmartOutreach() {
   const [loading, setLoading] = React.useState(false)
   const [callActive, setCallActive] = React.useState(false)
   const [loggingProgress, setLoggingProgress] = React.useState(false)
+  const [sending, setSending] = React.useState(false)
   const [generatedContent, setGeneratedContent] = React.useState<{
     email?: GeneratePersonalizedEmailOutput;
     sms?: GeneratePersonalizedSMSOutput;
@@ -93,20 +90,48 @@ export function SmartOutreach() {
         })
         setGeneratedContent(prev => ({ ...prev, voice: res }))
       }
+      toast({ title: "Grok Intelligence Ready", description: "Personalized outreach has been drafted." });
     } catch (error) {
       toast({
         variant: "destructive",
-        title: "Grok Generation Failed",
-        description: "Could not connect to xAI at this time."
+        title: "Generation Failed",
+        description: "Monica could not connect to Grok. Please try again."
       })
     } finally {
       setLoading(false)
     }
   }
 
+  const handleSendEmail = async () => {
+    if (!selectedContact || !generatedContent.email || !user) return;
+    setSending(true);
+    try {
+      const res = await fetch('/api/gmail/send', {
+        method: 'POST',
+        body: JSON.stringify({
+          userId: user.uid,
+          to: selectedContact.email,
+          subject: generatedContent.email.subject,
+          body: generatedContent.email.body,
+          leadId: selectedContact.id
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast({ title: "Message Delivered", description: `Outreach sent to ${selectedContact.name}.` });
+        setGeneratedContent(prev => ({ ...prev, email: undefined }));
+      } else {
+        throw new Error(data.error);
+      }
+    } catch (err: any) {
+      toast({ variant: "destructive", title: "Send Failed", description: err.message || "Gmail transmission failed." });
+    } finally {
+      setSending(false);
+    }
+  };
+
   const handleStartCall = () => {
     setCallActive(true)
-    // Simulated Vapi call logic using Grok brain
     toast({
       title: "Grok-Powered Call Initiated",
       description: `Connecting Vapi AI (Grok-4 brain) to ${selectedContact?.name}...`
@@ -237,7 +262,10 @@ export function SmartOutreach() {
                         </div>
                         <div className="flex justify-end gap-3">
                           <Button variant="outline" size="sm" onClick={() => setGeneratedContent(prev => ({...prev, email: undefined}))}>Regenerate</Button>
-                          <Button size="sm" className="gap-2 bg-accent"><Send className="h-4 w-4" /> Send Now</Button>
+                          <Button size="sm" className="gap-2 bg-accent" onClick={handleSendEmail} disabled={sending}>
+                            {sending ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                            Send Now
+                          </Button>
                         </div>
                       </div>
                     )}

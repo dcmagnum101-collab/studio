@@ -7,11 +7,14 @@ export async function POST(request: NextRequest) {
     const { userId, to, subject, body, leadId, threadId } = await request.json();
 
     if (!userId || !to) {
+      console.warn('[Gmail Send] Missing required fields for send');
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
+    console.log(`[Gmail Send] Checking unsubscribe status for ${to}`);
     const isUnsubscribed = await checkUnsubscribe(userId, to);
     if (isUnsubscribed) {
+      console.warn(`[Gmail Send] Blocking outreach to unsubscribed recipient: ${to}`);
       return NextResponse.json({ error: 'Recipient unsubscribed' }, { status: 403 });
     }
 
@@ -34,6 +37,7 @@ export async function POST(request: NextRequest) {
       .replace(/\//g, '_')
       .replace(/=+$/, '');
 
+    console.log(`[Gmail Send] Attempting transmission via Google API for user ${userId}`);
     const res = await gmail.users.messages.send({
       userId: 'me',
       requestBody: {
@@ -41,6 +45,8 @@ export async function POST(request: NextRequest) {
         threadId: threadId
       },
     });
+
+    console.log(`[Gmail Send] Success! Message ID: ${res.data.id}`);
 
     await logMessage(userId, {
       leadId,
@@ -53,7 +59,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, messageId: res.data.id });
   } catch (error: any) {
-    console.error('Gmail Send Error:', error);
+    console.error('[Gmail Send] Critical failure:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

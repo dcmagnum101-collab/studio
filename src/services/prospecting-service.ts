@@ -1,3 +1,4 @@
+
 'use server';
 
 /**
@@ -31,6 +32,7 @@ interface EnrichmentResult {
  * Creates a prospecting job and initiates extraction via Grok.
  */
 export async function runProspectingJob(userId: string, url: string): Promise<string> {
+  console.log(`[Prospecting] Initiating job for URL: ${url}`);
   const userRef = db.collection('users').doc(userId);
   const jobRef = await userRef.collection('prospecting_jobs').add({
     url,
@@ -49,6 +51,7 @@ export async function runProspectingJob(userId: string, url: string): Promise<st
  * Uses Grok to extract data from the target URL.
  */
 async function processEnrichmentJob(userId: string, jobId: string, url: string) {
+  console.log(`[Prospecting Worker] Processing Job ID: ${jobId}`);
   const userRef = db.collection('users').doc(userId);
   const jobRef = userRef.collection('prospecting_jobs').doc(jobId);
 
@@ -64,38 +67,38 @@ async function processEnrichmentJob(userId: string, jobId: string, url: string) 
     Focus on name, email, phone, and property address if visible. 
     If this is a social profile, extract location and bio indicators of moving.`;
 
+    console.log(`[Prospecting Worker] Calling Grok intelligence for URL: ${url}`);
     const extracted = await grokJSON<EnrichmentResult>(system, userPrompt, userId);
+    console.log(`[Prospecting Worker] Intelligence extracted successfully for ${extracted.name || 'Unknown'}`);
 
     // ─── DEDUPLICATION LOGIC ───
     let existingContactId: string | null = null;
 
     if (extracted.email) {
       const emailMatch = await userRef.collection('contacts').where('email', '==', extracted.email).limit(1).get();
-      if (!emailMatch.empty) existingContactId = emailMatch.docs[0].id;
+      if (!emailMatch.empty) {
+        existingContactId = emailMatch.docs[0].id;
+        console.log(`[Prospecting Worker] Dedupe hit on email: ${extracted.email}`);
+      }
     }
 
     if (!existingContactId && extracted.phone) {
       const phoneMatch = await userRef.collection('contacts').where('phone', '==', extracted.phone).limit(1).get();
-      if (!phoneMatch.empty) existingContactId = phoneMatch.docs[0].id;
-    }
-
-    if (!existingContactId && extracted.name && extracted.propertyAddress) {
-      const fuzzyMatch = await userRef.collection('contacts')
-        .where('name', '==', extracted.name)
-        .where('propertyAddress', '==', extracted.propertyAddress)
-        .limit(1).get();
-      if (!fuzzyMatch.empty) existingContactId = fuzzyMatch.docs[0].id;
+      if (!phoneMatch.empty) {
+        existingContactId = phoneMatch.docs[0].id;
+        console.log(`[Prospecting Worker] Dedupe hit on phone: ${extracted.phone}`);
+      }
     }
 
     // ─── UPSERT LEAD ───
     if (existingContactId) {
-      // Update existing
+      console.log(`[Prospecting Worker] Updating existing contact: ${existingContactId}`);
       await userRef.collection('contacts').doc(existingContactId).update({
         source_evidence: admin.firestore.FieldValue.arrayUnion(url),
         updated_at: admin.firestore.FieldValue.serverTimestamp()
       });
     } else {
-      // Create new
+      console.log(`[Prospecting Worker] Creating new contact record`);
       const newContact = await userRef.collection('contacts').add({
         name: extracted.name || 'Unknown Contact',
         firstName: extracted.firstName || '',
@@ -127,9 +130,10 @@ async function processEnrichmentJob(userId: string, jobId: string, url: string) 
       status: 'completed', 
       result_contact_id: existingContactId 
     });
+    console.log(`[Prospecting Worker] Job ${jobId} completed successfully`);
 
   } catch (error: any) {
-    console.error('Prospecting Job Error:', error);
+    console.error(`[Prospecting Worker] Critical failure for job ${jobId}:`, error);
     await jobRef.update({ status: 'failed', error: error.message });
   }
 }
