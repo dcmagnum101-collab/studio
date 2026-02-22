@@ -1,4 +1,3 @@
-
 "use client"
 
 import React, { useState, useEffect } from "react";
@@ -24,12 +23,17 @@ import {
   Home,
   BrainCircuit,
   PieChart,
-  CheckCircle2
+  CheckCircle2,
+  PhoneCall,
+  Download,
+  Upload,
+  FileSpreadsheet
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useUser, useDoc, useMemoFirebase, useCollection, useFirestore } from "@/firebase";
 import { collection, query, orderBy, limit, doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { useSearchParams } from "next/navigation";
+import { syncVulcan7Leads, getContactsForVulcan7Export, pushToVulcan7DialQueue } from "@/app/actions/vulcan7";
 
 export default function SettingsPage() {
   const { user } = useUser();
@@ -38,14 +42,12 @@ export default function SettingsPage() {
   const searchParams = useSearchParams();
   const [saving, setSaving] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [syncingVulcan, setSyncingVulcan] = useState(false);
+  const [exportingQueue, setExportingQueue] = useState(false);
 
   useEffect(() => {
     setMounted(true);
-    
-    // Handle Gmail callback success
     if (searchParams.get('gmail_success') === 'true' && user) {
-      // In a real app, the server would handle this token exchange more directly
-      // Here we assume the temp cookie logic or a simple re-auth
       toast({ title: "Gmail Connected", description: "Your outreach engine is now linked." });
     }
   }, [searchParams, user]);
@@ -82,6 +84,55 @@ export default function SettingsPage() {
     window.location.href = '/api/auth/gmail/connect';
   };
 
+  const handleVulcanUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!user || !e.target.files?.[0]) return;
+    setSyncingVulcan(true);
+    const file = e.target.files[0];
+    const reader = new FileReader();
+    
+    reader.onload = async (event) => {
+      const text = event.target?.result as string;
+      try {
+        const result = await syncVulcan7Leads(user.uid, text);
+        toast({ 
+          title: "Import Complete", 
+          description: `Imported: ${result.imported}, Skipped DNC: ${result.skipped_dnc}, Duplicates: ${result.duplicates}` 
+        });
+      } catch (err) {
+        toast({ variant: "destructive", title: "Import Failed", description: "Could not parse Vulcan7 CSV." });
+      } finally {
+        setSyncingVulcan(false);
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const handleExportDialQueue = async () => {
+    if (!user) return;
+    setExportingQueue(true);
+    try {
+      const contactIds = await getContactsForVulcan7Export(user.uid);
+      if (contactIds.length === 0) {
+        toast({ title: "Queue Empty", description: "No leads currently meet the dialing criteria (Score >= 70, not called in 3 days)." });
+        return;
+      }
+      const csv = await pushToVulcan7DialQueue(user.uid, contactIds);
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `monica_dial_queue_${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      toast({ title: "Export Ready", description: `${contactIds.length} leads prepared for Vulcan7.` });
+    } catch (err) {
+      toast({ variant: "destructive", title: "Export Failed", description: "Could not generate dial queue." });
+    } finally {
+      setExportingQueue(false);
+    }
+  };
+
   const bookmarkletCode = "javascript:(function(){var text=window.getSelection().toString()||document.body.innerText.substring(0,500);var url=window.location.href;window.open('https://monica-ai-hub.vercel.app/quick-capture?url='+encodeURIComponent(url)+'&text='+encodeURIComponent(text),'_blank','width=500,height=600');})();";
 
   if (!mounted) return null;
@@ -101,20 +152,92 @@ export default function SettingsPage() {
           </header>
           
           <main className="p-8 max-w-4xl mx-auto w-full">
-            <Tabs defaultValue="outreach">
+            <Tabs defaultValue="vulcan7">
               <TabsList className="mb-8 w-full justify-start gap-4 h-auto p-0 bg-transparent overflow-x-auto no-scrollbar">
                 <TabsTrigger value="general" className="data-[state=active]:bg-secondary rounded-lg px-4 py-2">Business</TabsTrigger>
+                <TabsTrigger value="vulcan7" className="data-[state=active]:bg-secondary rounded-lg px-4 py-2 flex gap-2">
+                  <PhoneCall className="h-4 w-4" /> Vulcan7
+                </TabsTrigger>
                 <TabsTrigger value="ai" className="data-[state=active]:bg-secondary rounded-lg px-4 py-2 flex gap-2">
                   <BrainCircuit className="h-4 w-4" /> Grok AI Hub
+                </TabsTrigger>
+                <TabsTrigger value="outreach" className="data-[state=active]:bg-secondary rounded-lg px-4 py-2 flex gap-2">
+                  <Mail className="h-4 w-4" /> Gmail API
                 </TabsTrigger>
                 <TabsTrigger value="apis" className="data-[state=active]:bg-secondary rounded-lg px-4 py-2 flex gap-2">
                   <Database className="h-4 w-4" /> Data Pipelines
                 </TabsTrigger>
-                <TabsTrigger value="free-sources" className="data-[state=active]:bg-secondary rounded-lg px-4 py-2">Quick Capture</TabsTrigger>
-                <TabsTrigger value="outreach" className="data-[state=active]:bg-secondary rounded-lg px-4 py-2 flex gap-2">
-                  <Mail className="h-4 w-4" /> Gmail API
-                </TabsTrigger>
               </TabsList>
+
+              <TabsContent value="vulcan7" className="space-y-6">
+                <div className="grid gap-6 md:grid-cols-2">
+                  <Card className="border-none shadow-md">
+                    <CardHeader>
+                      <CardTitle className="text-sm font-bold flex items-center gap-2">
+                        <Upload className="h-4 w-4 text-primary" />
+                        Lead Synchronization
+                      </CardTitle>
+                      <CardDescription>Upload your CSV exports from Vulcan7 to keep the CRM updated.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="p-8 border-2 border-dashed rounded-2xl bg-slate-50 text-center space-y-4 group hover:bg-slate-100 transition-colors relative">
+                        <Input 
+                          type="file" 
+                          accept=".csv" 
+                          onChange={handleVulcanUpload} 
+                          className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                          disabled={syncingVulcan}
+                        />
+                        <div className="h-12 w-12 bg-white rounded-full flex items-center justify-center mx-auto shadow-sm">
+                          {syncingVulcan ? <RefreshCw className="h-6 w-6 text-primary animate-spin" /> : <FileSpreadsheet className="h-6 w-6 text-primary" />}
+                        </div>
+                        <div className="space-y-1">
+                          <h3 className="font-bold text-primary">Upload Vulcan7 Export</h3>
+                          <p className="text-[10px] text-muted-foreground uppercase font-bold">Standard format (Expired, FSBO, etc.)</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between p-4 bg-primary/5 rounded-xl border border-primary/10">
+                        <div className="space-y-0.5">
+                          <p className="text-sm font-bold">Auto-DNC Scrub</p>
+                          <p className="text-xs text-muted-foreground">Always skip numbers flagged as DNC in CSV.</p>
+                        </div>
+                        <Switch checked disabled />
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border-none shadow-md">
+                    <CardHeader>
+                      <CardTitle className="text-sm font-bold flex items-center gap-2">
+                        <Download className="h-4 w-4 text-primary" />
+                        Export Dial Queue
+                      </CardTitle>
+                      <CardDescription>Prepare a clean list for your next Vulcan7 session.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                      <div className="p-4 bg-slate-50 rounded-xl border space-y-3">
+                        <div className="flex justify-between items-center text-xs font-bold">
+                          <span className="text-slate-500 uppercase">Export Criteria</span>
+                          <Badge variant="outline" className="bg-white">Dynamic</Badge>
+                        </div>
+                        <div className="space-y-2">
+                          <p className="text-[10px] text-slate-600 flex items-center gap-2"><CheckCircle2 className="h-3 w-3 text-green-500" /> ICP Score ≥ 70</p>
+                          <p className="text-[10px] text-slate-600 flex items-center gap-2"><CheckCircle2 className="h-3 w-3 text-green-500" /> No calls in last 3 days</p>
+                          <p className="text-[10px] text-slate-600 flex items-center gap-2"><CheckCircle2 className="h-3 w-3 text-green-500" /> Exclude DNC & Unsubscribes</p>
+                        </div>
+                      </div>
+                      <Button 
+                        onClick={handleExportDialQueue} 
+                        disabled={exportingQueue} 
+                        className="w-full bg-accent hover:bg-accent/90 text-primary font-bold h-12 shadow-lg shadow-accent/20"
+                      >
+                        {exportingQueue ? <RefreshCw className="h-4 w-4 animate-spin mr-2" /> : <Download className="h-4 w-4 mr-2" />}
+                        Download Dial Queue CSV
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </div>
+              </TabsContent>
 
               <TabsContent value="outreach" className="space-y-6">
                 <Card className="border-none shadow-md">
@@ -293,34 +416,6 @@ export default function SettingsPage() {
                     </CardContent>
                   </Card>
                 </div>
-              </TabsContent>
-
-              <TabsContent value="free-sources" className="space-y-6">
-                <Card className="border-none shadow-md">
-                  <CardHeader>
-                    <CardTitle>Quick Capture Tool</CardTitle>
-                    <CardDescription>Install the Monica bookmarklet to capture leads from any website.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div className="p-6 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 text-center">
-                      <div className="h-12 w-12 bg-primary text-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
-                        <Zap className="h-6 w-6" />
-                      </div>
-                      <h3 className="font-bold text-primary mb-2">Install Bookmarklet</h3>
-                      <p className="text-sm text-muted-foreground mb-6 max-w-sm mx-auto">
-                        Drag this button to your bookmarks bar. Click it while on Nextdoor, Facebook, or any site to extract leads.
-                      </p>
-                      <a 
-                        href={bookmarkletCode}
-                        className="inline-flex items-center gap-2 bg-primary text-white px-6 py-3 rounded-full font-bold shadow-md hover:scale-105 transition-transform"
-                        onClick={(e) => e.preventDefault()}
-                      >
-                        <Smartphone className="h-4 w-4" />
-                        Monica Quick Capture
-                      </a>
-                    </div>
-                  </CardContent>
-                </Card>
               </TabsContent>
             </Tabs>
           </main>
