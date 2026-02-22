@@ -37,6 +37,7 @@ export function FirebaseProvider({
   });
 
   // Track if a sign-in is currently in flight to prevent token invalidation race conditions
+  // This is critical for preventing auth/firebase-app-check-token-is-invalid errors
   const isSigningIn = useRef(false);
 
   useEffect(() => {
