@@ -1,16 +1,13 @@
 
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import {
   Users,
   Target,
-  TrendingUp,
-  Clock,
-  Activity,
   CheckCircle,
   Zap,
   Trello,
@@ -20,6 +17,9 @@ import {
   ArrowRight,
   Plus,
   RefreshCw,
+  Activity,
+  Clock,
+  Sparkles
 } from "lucide-react";
 import {
   BarChart,
@@ -34,17 +34,18 @@ import { Badge } from "@/components/ui/badge";
 import { MorningBriefingCard } from "@/components/morning-briefing/morning-briefing-card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Skeleton } from "@/components/ui/skeleton";
-import { format } from "date-fns";
 import Link from "next/link";
 import { useUser, useDoc, useMemoFirebase } from "@/firebase";
 import { useContacts, useTasks } from "@/hooks/useFirestoreData";
 import { StatsSkeleton, TasksSkeleton, QuotaSkeleton } from "@/components/dashboard/dashboard-skeletons";
+import { useToast } from "@/hooks/use-toast";
 
 export default function DashboardPage() {
   const { user, isUserLoading } = useUser();
+  const { toast } = useToast();
   const { data: allContacts, isLoading: contactsLoading } = useContacts();
   const { data: allTasks, isLoading: tasksLoading } = useTasks('pending');
+  const [runningNurture, setRunningNurture] = useState(false);
 
   const pipelineValue = useMemo(() => {
     if (!allContacts) return 0;
@@ -68,6 +69,26 @@ export default function DashboardPage() {
   const emailSentToday = emailQuota?.count || 0;
   const quotaPercentage = Math.min(100, (emailSentToday / 500) * 100);
 
+  const handleRunNurture = async () => {
+    if (!user) return;
+    setRunningNurture(true);
+    try {
+      const res = await fetch('/api/run-nurture-sequence', {
+        method: 'POST',
+        body: JSON.stringify({ userId: user.uid }),
+      });
+      const data = await res.json();
+      toast({
+        title: "Nurture Run Complete",
+        description: `Processed ${data.processed} contacts: ${data.emailsSent} emails sent, ${data.tasksCreated} tasks created.`
+      });
+    } catch (err) {
+      toast({ variant: "destructive", title: "Run Failed", description: "Could not process nurture sequence." });
+    } finally {
+      setRunningNurture(false);
+    }
+  };
+
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full">
@@ -76,9 +97,10 @@ export default function DashboardPage() {
           <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4 md:px-6 bg-white shadow-sm sticky top-0 z-10">
             <SidebarTrigger className="-ml-1" />
             <h1 className="text-base md:text-xl font-bold font-headline text-primary truncate">Monica Executive Dashboard</h1>
-            <div className="ml-auto hidden md:flex items-center gap-2">
-              <Button size="sm" variant="outline" className="gap-2">
-                <Plus className="h-4 w-4" /> Quick Lead
+            <div className="ml-auto flex items-center gap-2">
+              <Button size="sm" onClick={handleRunNurture} disabled={runningNurture} className="gap-2 bg-accent hover:bg-accent/90 text-primary font-bold shadow-md h-9 px-4">
+                {runningNurture ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                Run Nurture Sequence
               </Button>
             </div>
           </header>
@@ -234,7 +256,7 @@ export default function DashboardPage() {
                           <div className="flex-1 min-w-0">
                             <p className="text-xs font-bold truncate text-primary">{task.title}</p>
                             <p className="text-[10px] text-muted-foreground">
-                              {task.contact_name} • {task.due_date ? format(new Date(task.due_date), "h:mm a") : ""}
+                              {task.contact_name}
                             </p>
                           </div>
                           <Link href={`/contacts/${task.contactId}`}>
