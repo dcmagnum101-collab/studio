@@ -32,7 +32,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ContactDetailsSheet } from "@/components/contacts/contact-details-sheet";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { SocialLeadCapture } from "@/components/prospecting/social-lead-capture";
+import { EnrichmentTool } from "@/components/prospecting/enrichment-tool";
 import { useUser, useFirestore, usePaginatedCollection, useMemoFirebase } from "@/firebase";
 import { collection, query, orderBy, where } from "firebase/firestore";
 
@@ -41,6 +41,7 @@ const SOURCE_CONFIG: Record<string, { label: string; color: string }> = {
   fsbo: { label: 'FSBO', color: 'bg-orange-500' },
   preforeclosure: { label: 'Pre-Fore', color: 'bg-yellow-600' },
   probate: { label: 'Probate', color: 'bg-purple-600' },
+  url_enrichment: { label: 'Enriched', color: 'bg-blue-500' },
   social_capture: { label: 'Social', color: 'bg-pink-500' },
 };
 
@@ -52,7 +53,6 @@ export default function ContactsPage() {
   const [activeTab, setActiveTab] = React.useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Optimized base query with server-side filtering
   const contactsQuery = useMemoFirebase(() => {
     if (!user || !firestore) return null;
     const base = collection(firestore, 'users', user.uid, 'contacts');
@@ -61,7 +61,6 @@ export default function ContactsPage() {
       return query(base, orderBy('name', 'asc'));
     }
     
-    // Uses composite index: archagent_source ASC, name ASC
     return query(
       base, 
       where('archagent_source', '==', activeTab),
@@ -76,7 +75,6 @@ export default function ContactsPage() {
     setSheetOpen(true);
   };
 
-  // Search remains in-memory for immediate UX responsiveness
   const filteredContacts = (contacts || []).filter(c => {
     const matchesSearch = c.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
                          c.propertyAddress?.toLowerCase().includes(searchQuery.toLowerCase());
@@ -154,7 +152,7 @@ export default function ContactsPage() {
                                   <div className="flex flex-col">
                                     <span className="font-bold text-primary flex items-center gap-1.5">
                                       {contact.name}
-                                      {contact.status === 'Urgent' && <Flame className="h-3.5 w-3.5 text-red-500 fill-red-500" />}
+                                      {contact.ai_urgency === 'hot' && <Flame className="h-3.5 w-3.5 text-red-500 fill-red-500" />}
                                     </span>
                                     <span className="text-xs text-muted-foreground">{contact.phone}</span>
                                     <Badge className={`w-fit mt-1 text-[9px] h-4 py-0 font-normal ${SOURCE_CONFIG[contact.archagent_source]?.color || 'bg-slate-500'}`}>
@@ -238,7 +236,7 @@ export default function ContactsPage() {
                 </div>
 
                 <div className="space-y-8">
-                  <SocialLeadCapture />
+                  <EnrichmentTool />
                   <Card className="border-none shadow-md bg-gradient-to-br from-slate-900 to-slate-800 text-white">
                     <CardHeader>
                       <CardTitle className="text-sm font-bold flex items-center gap-2">
@@ -248,7 +246,7 @@ export default function ContactsPage() {
                     </CardHeader>
                     <CardContent className="space-y-4">
                       <div className="p-3 bg-white/5 rounded-xl border border-white/10 text-xs italic">
-                        "Pagination optimized. Data fetch cost reduced by 85% for large lists."
+                        "URL Enrichment active. Monica is now extracting lead signals from pasted links."
                       </div>
                       <Button variant="outline" className="w-full text-white border-white/20 hover:bg-white/10">View Insights</Button>
                     </CardContent>
