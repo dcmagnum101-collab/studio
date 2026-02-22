@@ -27,10 +27,13 @@ import {
   ChevronRight,
   ArrowUpRight,
   Home,
-  ShieldCheck
+  ShieldCheck,
+  ArrowRight,
+  Search
 } from "lucide-react"
-import { useUser, useFirestore, addDocumentNonBlocking } from "@/firebase"
+import { useUser, useFirestore, addDocumentNonBlocking, useDoc, useMemoFirebase } from "@/firebase"
 import { syncLVRListings, fetchNeighborhoodStats, getExpiringLeadsAction } from "@/app/actions/lvr-mls"
+import { unifiedMLSSync } from "@/services/mls-sync-orchestrator"
 import { useToast } from "@/hooks/use-toast"
 import { collection } from "firebase/firestore"
 
@@ -51,6 +54,9 @@ export default function MLSIntelligencePage() {
   const [results, setResults] = useState<any[]>([]);
   const [vitals, setVitals] = useState<any[]>([]);
 
+  const rapidApiRef = useMemoFirebase(() => user ? `users/${user.uid}/settings/rapidapi` : null, [user]);
+  const { data: rapidSettings } = useDoc(rapidApiRef);
+
   useEffect(() => {
     if (user) {
       handleLoadVitals();
@@ -67,6 +73,20 @@ export default function MLSIntelligencePage() {
     }
   };
 
+  const handleSyncNow = async () => {
+    if (!user) return;
+    setLoading('global');
+    try {
+      const res = await unifiedMLSSync(user.uid, 'las_vegas', 'all');
+      setResults(res.data);
+      toast({ title: "Sync Complete", description: `Pulled ${res.data.length} listings via ${res.source.toUpperCase()}.` });
+    } catch (err: any) {
+      toast({ variant: "destructive", title: "Sync Failed", description: err.message });
+    } finally {
+      setLoading(null);
+    }
+  };
+
   const handleSync = async (type: 'active' | 'expired' | 'pending' | 'sold') => {
     if (!user) return;
     setLoading(type);
@@ -76,7 +96,6 @@ export default function MLSIntelligencePage() {
         title: `Sync Complete: ${type.toUpperCase()}`,
         description: `Imported ${res.imported} new prospects. ${res.duplicates} duplicates skipped.`,
       });
-      // Optionally refresh a local results preview if needed
     } catch (err: any) {
       toast({ variant: "destructive", title: "Sync Failed", description: err.message });
     } finally {
@@ -225,26 +244,26 @@ export default function MLSIntelligencePage() {
                   <CardHeader className="bg-slate-50/50 border-b">
                     <div className="flex items-center justify-between">
                       <div>
-                        <CardTitle className="text-lg">Recent Sync Results</CardTitle>
-                        <CardDescription className="text-xs">Intelligence matches from LVR feed</CardDescription>
+                        <CardTitle className="text-lg">Sync Results</CardTitle>
+                        <CardDescription className="text-xs">Intelligence matches from live feeds</CardDescription>
                       </div>
                       <Sparkles className="h-5 w-5 text-accent animate-pulse" />
                     </div>
                   </CardHeader>
                   <CardContent className="p-0">
-                    <Table>
-                      <TableHeader className="bg-slate-50/50">
-                        <TableRow>
-                          <TableHead className="font-bold text-xs uppercase">Property</TableHead>
-                          <TableHead className="font-bold text-xs uppercase">Price</TableHead>
-                          <TableHead className="font-bold text-xs uppercase">DOM</TableHead>
-                          <TableHead className="text-right font-bold text-xs uppercase">Action</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {results.length > 0 ? (
-                          results.map((item) => (
-                            <TableRow key={item.mlsNumber} className="hover:bg-slate-50/50 transition-colors">
+                    {results.length > 0 ? (
+                      <Table>
+                        <TableHeader className="bg-slate-50/50">
+                          <TableRow>
+                            <TableHead className="font-bold text-xs uppercase">Property</TableHead>
+                            <TableHead className="font-bold text-xs uppercase">Price</TableHead>
+                            <TableHead className="font-bold text-xs uppercase">DOM</TableHead>
+                            <TableHead className="text-right font-bold text-xs uppercase">Action</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {results.map((item) => (
+                            <TableRow key={item.mlsNumber || item.id} className="hover:bg-slate-50/50 transition-colors">
                               <TableCell className="py-4">
                                 <div className="flex items-center gap-3">
                                   <div className="h-10 w-14 rounded-lg bg-slate-100 overflow-hidden shrink-0">
@@ -253,16 +272,16 @@ export default function MLSIntelligencePage() {
                                     ) : <Home className="h-full w-full p-2 text-slate-300" />}
                                   </div>
                                   <div className="min-w-0">
-                                    <p className="text-sm font-bold text-primary truncate">{item.propertyAddress}</p>
+                                    <p className="text-sm font-bold text-primary truncate">{item.propertyAddress || item.address}</p>
                                     <p className="text-[10px] text-muted-foreground uppercase">{item.zip} • {item.beds}bd/{item.baths}ba</p>
                                   </div>
                                 </div>
                               </TableCell>
                               <TableCell>
-                                <span className="text-sm font-black text-slate-700">${item.listPrice?.toLocaleString()}</span>
+                                <span className="text-sm font-black text-slate-700">${(item.listPrice || item.list_price)?.toLocaleString()}</span>
                               </TableCell>
                               <TableCell>
-                                <Badge variant="outline" className="text-[10px] font-bold border-slate-200">{item.daysOnMarket} Days</Badge>
+                                <Badge variant="outline" className="text-[10px] font-bold border-slate-200">{item.daysOnMarket || item.days_on_market} Days</Badge>
                               </TableCell>
                               <TableCell className="text-right">
                                 <Button size="sm" variant="ghost" className="h-8 gap-2 text-xs font-bold text-primary">
@@ -270,16 +289,30 @@ export default function MLSIntelligencePage() {
                                 </Button>
                               </TableCell>
                             </TableRow>
-                          ))
-                        ) : (
-                          <TableRow>
-                            <TableCell colSpan={4} className="text-center py-20 text-muted-foreground italic text-xs">
-                              Select a sync category to preview real-time LVR data.
-                            </TableCell>
-                          </TableRow>
-                        )}
-                      </TableBody>
-                    </Table>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-24 px-6 text-center space-y-6">
+                        <div className="h-16 w-16 bg-slate-50 rounded-full flex items-center justify-center">
+                          <Search className="h-8 w-8 text-slate-200" />
+                        </div>
+                        <div className="space-y-2">
+                          <h3 className="text-xl font-bold text-slate-900">No listings synced yet</h3>
+                          <p className="text-xs text-slate-500 max-w-xs mx-auto">
+                            Monica will use {rapidSettings?.apiKey ? 'RapidAPI (Trulia/Realtor)' : 'LVR MLS'} to pull the latest Las Vegas market data.
+                          </p>
+                        </div>
+                        <Button 
+                          onClick={handleSyncNow} 
+                          disabled={!!loading}
+                          className="bg-primary h-12 px-8 rounded-xl font-black gap-2 shadow-lg"
+                        >
+                          {loading === 'global' ? <RefreshCw className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                          Sync Now
+                        </Button>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </div>
