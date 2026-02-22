@@ -55,6 +55,7 @@ const SOURCE_CONFIG: Record<string, { label: string; color: string }> = {
   expired: { label: 'Expired', color: 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.4)]' },
   fsbo: { label: 'FSBO', color: 'bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.4)]' },
   preforeclosure: { label: 'Pre-Fore', color: 'bg-yellow-600' },
+  divorce: { label: 'Divorce', color: 'bg-rose-600 shadow-[0_0_8px_rgba(225,29,72,0.4)]' },
   probate: { label: 'Probate', color: 'bg-purple-600' },
   url_enrichment: { label: 'Enriched', color: 'bg-blue-500' },
   social_capture: { label: 'Social', color: 'bg-pink-500' },

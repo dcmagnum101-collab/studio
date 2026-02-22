@@ -31,6 +31,7 @@ Review the following real estate outreach content for violations of:
 6. Deceptive claims — no guaranteed price promises or misleading market data.
 7. DNC compliance language — SMS must include opt-out instructions (e.g., "Reply STOP to unsubscribe").
 8. Nevada Non-Disclosure State Rule: Nevada does not publicly record home sale prices. Any outreach that states a specific sold price as if it is public knowledge violates ethical standards and could be misleading. Flag any content that says 'your neighbor sold for $X' or 'recent sale price of $X' as a HIGH risk violation. Acceptable alternatives are: 'recent market activity suggests strong values in your area', 'based on current market estimates', or 'comparable properties indicate strong value' — without stating a specific price.
+9. Divorce Lead Rule: Never reference the divorce directly in outreach unless the contact has brought it up first. Frame all outreach around 'planning' and 'options'. Never take sides or imply fault. Always offer to work professionally with both parties.
 
 Return ONLY valid JSON:
 { 

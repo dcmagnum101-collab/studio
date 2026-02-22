@@ -10,6 +10,7 @@ export type LeadStatus =
   | 'fsbo'
   | 'pre-foreclosure'
   | 'frbo'
+  | 'divorce'
   | 'rec'
   | 'circle'
   | 'open-house'
@@ -36,6 +37,7 @@ export type LeadSource =
   | 'open-house'
   | 'referral'
   | 'social-media'
+  | 'divorce-filing'
   | 'manual'
   | 'other';
 
@@ -181,6 +183,20 @@ export const FOLLOW_UP_CADENCES: Record<LeadStatus, FollowUpCadence> = {
       { stage: 6, daysAfterPrevious: 14, method: 'email', messageTemplate: 'preforeclosure_month1_email', notes: 'Email with equity analysis - help them see they may have options.' },
       { stage: 7, daysAfterPrevious: 14, method: 'call', messageTemplate: 'preforeclosure_month1_call', notes: 'Urgency call if auction date is approaching.' },
     ],
+  },
+
+  divorce: {
+    status: 'divorce',
+    name: 'Divorce / Life Transition Cadence',
+    description: 'Legally motivated sellers. Sensitive, solution-focused, always both-party neutral.',
+    stages: [
+      { stage: 1, daysAfterPrevious: 0, method: 'email', messageTemplate: 'divorce_day1_email', notes: 'Neutral introduction. Do NOT reference the divorce. Offer a free home valuation as a resource for their planning.' },
+      { stage: 2, daysAfterPrevious: 3, method: 'call', messageTemplate: 'divorce_day3_call', notes: 'Gentle call. Frame as helping them understand their options. Ask if they have a timeline in mind.' },
+      { stage: 3, daysAfterPrevious: 5, method: 'email', messageTemplate: 'divorce_day5_email', notes: 'Send equity analysis. Help them see what proceeds from a sale would look like.' },
+      { stage: 4, daysAfterPrevious: 7, method: 'call', messageTemplate: 'divorce_week1_call', notes: 'Check in. Have they decided to sell? Offer to work with both parties professionally.' },
+      { stage: 5, daysAfterPrevious: 14, method: 'email', messageTemplate: 'divorce_month1_email', notes: 'Market update. Time is often a factor in divorce settlements.' },
+      { stage: 6, daysAfterPrevious: 14, method: 'call', messageTemplate: 'divorce_month1_call', notes: 'Final push. Court timelines often force a decision. Be the solution.' },
+    ]
   },
 
   frbo: {
@@ -345,6 +361,7 @@ export function getLeadStatusLabel(status: LeadStatus): string {
     fsbo: 'FSBO',
     'pre-foreclosure': 'Pre-Foreclosure',
     frbo: 'FRBO',
+    divorce: 'Divorce',
     rec: 'REC/REO',
     circle: 'Circle',
     'open-house': 'Open House',
@@ -365,6 +382,7 @@ export function getLeadStatusColor(status: LeadStatus): string {
     fsbo: 'bg-orange-100 text-orange-800',
     'pre-foreclosure': 'bg-purple-100 text-purple-800',
     frbo: 'bg-yellow-100 text-yellow-800',
+    divorce: 'bg-rose-100 text-rose-800',
     rec: 'bg-blue-100 text-blue-800',
     circle: 'bg-green-100 text-green-800',
     'open-house': 'bg-teal-100 text-teal-800',
@@ -399,6 +417,7 @@ export function calculateAIScore(lead: Partial<Lead>): number {
     'pre-foreclosure': 85,
     fsbo: 70,
     frbo: 55,
+    divorce: 75,
     circle: 45,
     'open-house': 65,
     'past-client': 90,
@@ -406,6 +425,29 @@ export function calculateAIScore(lead: Partial<Lead>): number {
   };
   if (lead.status && statusScores[lead.status] !== undefined) {
     score = statusScores[lead.status]!;
+  }
+
+  // Pahrump-specific signals
+  if (lead.city?.toLowerCase().includes('pahrump') || lead.zip === '89048' || lead.zip === '89060') {
+    // Long-term owners in Pahrump are often retirement-motivated
+    if (lead.lastSaleDate) {
+      const yearsOwned = (Date.now() - new Date(lead.lastSaleDate).getTime()) / (1000 * 60 * 60 * 24 * 365);
+      if (yearsOwned > 15) score += 15; // Very long-term Pahrump owner = likely ready
+      if (yearsOwned > 10) score += 8;
+    }
+    // Free & clear properties in Pahrump are high value targets
+    if (lead.loanBalance === 0 || lead.equity === lead.estimatedValue) score += 12;
+  }
+
+  // Boulder City signals  
+  if (lead.city?.toLowerCase().includes('boulder city') || lead.zip === '89005') {
+    // Boulder City has limited inventory and strong demand — any motivated seller is valuable
+    score += 5; // Base boost for Boulder City
+    // Historic district properties are unique — flag for special handling
+    if (lead.tags?.includes('historic_district')) {
+      score += 5;
+      lead.aiNotes = (lead.aiNotes || '') + ' NOTE: Boulder City historic district — verify renovation restrictions before listing conversation.';
+    }
   }
 
   // Equity boost
