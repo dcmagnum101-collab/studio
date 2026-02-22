@@ -45,17 +45,18 @@ export function FirebaseProvider({
     // Single source of truth for auth state and automatic anonymous sign-in
     const unsubscribe = onAuthStateChanged(
       auth,
-      async (user) => {
+      (user) => {
         if (!user && !isSigningIn.current) {
           isSigningIn.current = true;
-          try {
-            // Initiate anonymous sign-in only if no user is present and no sign-in is active.
-            await signInAnonymously(auth);
-          } catch (err) {
-            console.error('Firebase Anonymous Sign-in Error:', err);
-          } finally {
-            isSigningIn.current = false;
-          }
+          // Initiate anonymous sign-in only if no user is present and no sign-in is active.
+          // We do not 'await' this inside the listener to prevent recursive state updates.
+          signInAnonymously(auth)
+            .catch((err) => {
+              console.error('Firebase Anonymous Sign-in Error:', err);
+            })
+            .finally(() => {
+              isSigningIn.current = false;
+            });
         }
         setUserState({ user, loading: false, error: null });
       },

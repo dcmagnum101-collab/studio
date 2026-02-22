@@ -1,12 +1,12 @@
+'use client';
 
 import { 
   GoogleAuthProvider, 
   signInWithPopup, 
-  getAuth,
   type UserCredential 
 } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { db, auth } from '@/lib/firebase';
 
 /**
  * Initiates the Gmail OAuth flow via Firebase.
@@ -26,7 +26,6 @@ export async function connectGmailAccount(userId: string): Promise<void> {
     access_type: 'offline',
   });
 
-  const auth = getAuth();
   const result: UserCredential = await signInWithPopup(auth, provider);
   const credential = GoogleAuthProvider.credentialFromResult(result);
 
