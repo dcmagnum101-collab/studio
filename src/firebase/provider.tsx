@@ -37,11 +37,16 @@ export function FirebaseProvider({
   });
 
   useEffect(() => {
+    // Single source of truth for auth state and automatic anonymous sign-in
     const unsubscribe = onAuthStateChanged(
       auth,
       (user) => {
         if (!user) {
-          signInAnonymously(auth);
+          // If no user is present, initiate anonymous sign-in.
+          // The SDK handles subsequent state changes.
+          signInAnonymously(auth).catch((err) => {
+            console.error('Firebase Anonymous Sign-in Error:', err);
+          });
         }
         setUserState({ user, loading: false, error: null });
       },
