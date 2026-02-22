@@ -3,18 +3,8 @@
 
 /**
  * @fileOverview Grok (xAI) completion service.
- * OpenAI-compatible format using native fetch.
- * All usage is scoped to users/{userId}/ai_usage.
+ * Refactored to be SDK-agnostic. Logs usage via internal API.
  */
-
-import * as admin from 'firebase-admin';
-
-// Initialize Firebase Admin if not already initialized
-if (!admin.apps.length) {
-  admin.initializeApp();
-}
-
-const db = admin.firestore();
 
 const GROK_API_KEY = process.env.GROK_API_KEY!;
 const GROK_BASE_URL = process.env.GROK_BASE_URL || 'https://api.x.ai/v1';
@@ -65,20 +55,21 @@ export async function grokComplete(
 
   const data = await response.json();
   
-  // Log usage to Firestore for the AI Dashboard - Scoped to User
+  // Log usage via internal API route (non-blocking)
   if (options.userId) {
-    try {
-      await db.collection('users').doc(options.userId).collection('ai_usage').add({
+    const logUrl = `${process.env.NEXT_PUBLIC_APP_URL || ''}/api/log-ai-usage`;
+    fetch(logUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: options.userId,
         model: GROK_MODEL,
-        prompt_tokens: data.usage?.prompt_tokens || 0,
-        completion_tokens: data.usage?.completion_tokens || 0,
-        total_tokens: data.usage?.total_tokens || 0,
-        called_at: admin.firestore.FieldValue.serverTimestamp(),
-        feature: messages[0]?.content.slice(0, 50) || 'unknown',
-      });
-    } catch (e) {
-      console.error('Failed to log AI usage:', e);
-    }
+        prompt_tokens: data.usage?.prompt_tokens,
+        completion_tokens: data.usage?.completion_tokens,
+        total_tokens: data.usage?.total_tokens,
+        feature: messages[0]?.content.slice(0, 50) || 'chat',
+      }),
+    }).catch(err => console.error('[Grok] Failed to fire usage log:', err));
   }
 
   return data.choices[0].message.content;
@@ -117,7 +108,6 @@ export async function grokJSON<T = any>(
   try {
     return JSON.parse(result) as T;
   } catch {
-    // Strip any accidental markdown backticks
     const clean = result
       .replace(/```json/g, '')
       .replace(/```/g, '')
