@@ -22,5 +22,12 @@ All data is strictly isolated per user following this hierarchy:
   - `/outreach_log/{id}`: History of sent communications (Append-only)
   - `/trulia_cache/{hash}`: Market data cache
 
+## Query Optimization Rules
+To maintain performance and keep costs low:
+1. **Lists**: Use `usePaginatedCollection` for tables and infinite lists. Default page size is 20-25.
+2. **Filtering**: Favor server-side filtering (`where` clauses) over in-memory filtering.
+3. **Indexes**: Any query combining `where` and `orderBy` requires a composite index defined in `firestore.indexes.json`.
+4. **Realtime**: Use `realtime: true` only for mission-critical dashboards. Secondary views should use one-shot fetches.
+
 ## Security
 Firestore rules ensure that users can only access data where the document path matches their `auth.uid`. Critical audit logs are set to append-only to prevent tampering.
