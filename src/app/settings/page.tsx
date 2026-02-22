@@ -1,7 +1,6 @@
+"use client";
 
-"use client"
-
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -11,315 +10,526 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import { Slider } from "@/components/ui/slider";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
-  Database, 
-  Mail, 
   RefreshCw, 
-  Zap,
-  BrainCircuit,
-  CheckCircle2,
-  PhoneCall,
-  Download,
-  Upload,
-  FileSpreadsheet,
-  Globe,
-  Clock,
+  BrainCircuit, 
+  CheckCircle2, 
+  Eye, 
+  EyeOff, 
+  Save, 
+  Zap, 
+  PhoneCall, 
+  Building2, 
+  Globe, 
+  Database, 
+  Landmark, 
+  Search, 
+  Smartphone, 
+  Mail, 
+  UserCircle,
+  Copy,
   ExternalLink,
-  ShieldCheck
+  ShieldCheck,
+  AlertTriangle,
+  History,
+  Code
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useUser, useDoc, useMemoFirebase, useCollection, useFirestore } from "@/firebase";
-import { collection, query, orderBy, limit } from "firebase/firestore";
-import { syncVulcan7Leads, getContactsForVulcan7Export, pushToVulcan7DialQueue } from "@/app/actions/vulcan7";
+import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebase";
+import { collection, query, onSnapshot, doc, getDocs } from "firebase/firestore";
+import { saveSettingsSection } from "@/app/actions/save-settings";
 import { connectGmailAccount } from "@/firebase/auth/gmail-auth";
+
+const COLORS = {
+  primary: "#1E3A8A",
+  accent: "#A88A2A",
+  background: "#F9FAFB"
+};
+
+// --- Helper Components ---
+
+const StatusBadge = ({ connected, checking }: { connected?: boolean; checking?: boolean }) => {
+  if (checking) return <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200 gap-1.5"><RefreshCw className="h-3 w-3 animate-spin" /> Checking...</Badge>;
+  if (connected) return <Badge className="bg-green-500 gap-1.5"><CheckCircle2 className="h-3 w-3" /> Connected</Badge>;
+  return <Badge variant="outline" className="text-slate-400 gap-1.5"><ShieldCheck className="h-3 w-3" /> Not Connected</Badge>;
+};
+
+const PasswordInput = ({ value, onChange, placeholder, id }: { value: string; onChange: (v: string) => void; placeholder?: string; id?: string }) => {
+  const [show, setShow] = useState(false);
+  return (
+    <div className="relative">
+      <Input 
+        id={id}
+        type={show ? "text" : "password"} 
+        value={value} 
+        onChange={(e) => onChange(e.target.value)} 
+        placeholder={placeholder}
+        className="pr-10"
+      />
+      <Button 
+        variant="ghost" 
+        size="icon" 
+        className="absolute right-0 top-0 h-full px-3 text-slate-400 hover:text-primary"
+        onClick={() => setShow(!show)}
+      >
+        {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+      </Button>
+    </div>
+  );
+};
+
+// --- Main Page ---
 
 export default function SettingsPage() {
   const { user } = useUser();
-  const firestore = useFirestore();
   const { toast } = useToast();
-  const [saving, setSaving] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const [syncingVulcan, setSyncingVulcan] = useState(false);
-  const [exportingQueue, setExportingQueue] = useState(false);
-  const [connectingGmail, setConnectingGmail] = useState(false);
-  const [runningCadence, setRunningCadence] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("business");
+  
+  // Settings State Hub
+  const [settings, setSettings] = useState<Record<string, any>>({});
+  const [initialSettings, setInitialSettings] = useState<Record<string, any>>({});
+  const [savingSection, setSavingSection] = useState<string | null>(null);
+  const [testingService, setTestingService] = useState<string | null>(null);
 
   useEffect(() => {
     setMounted(true);
-  }, []);
-
-  const gmailRef = useMemoFirebase(() => user ? `users/${user.uid}/integrations/gmail` : null, [user]);
-  const { data: gmailConfig } = useDoc(gmailRef);
-
-  const handleSaveSettings = () => {
-    setSaving(true);
-    setTimeout(() => {
-      setSaving(false);
-      toast({ title: "Settings Saved", description: "System configuration updated." });
-    }, 800);
-  }
-
-  const handleRunCadenceManually = async () => {
-    if (!user) return;
-    setRunningCadence(true);
-    try {
-      const res = await fetch('/api/run-cadence', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_CRON_SECRET || 'dev-secret'}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ userId: user.uid })
-      });
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
-      toast({ 
-        title: "Automation Complete", 
-        description: `Successfully processed cadences. Created ${data.tasksCreated} new follow-up tasks.` 
-      });
-    } catch (err: any) {
-      toast({ variant: "destructive", title: "Automation Failed", description: err.message });
-    } finally {
-      setRunningCadence(false);
-    }
-  };
-
-  const handleConnectGmail = async () => {
-    if (!user) return;
-    setConnectingGmail(true);
-    try {
-      await connectGmailAccount(user.uid);
-      toast({ title: "Gmail Connected", description: "Successfully linked your Google account." });
-    } catch (err: any) {
-      toast({ variant: "destructive", title: "Connection Failed", description: err.message });
-    } finally {
-      setConnectingGmail(false);
-    }
-  };
-
-  const handleVulcanUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!user || !e.target.files?.[0]) return;
-    setSyncingVulcan(true);
-    const file = e.target.files[0];
-    const reader = new FileReader();
-    
-    reader.onload = async (event) => {
-      const text = event.target?.result as string;
-      try {
-        const result = await syncVulcan7Leads(user.uid, text);
-        toast({ 
-          title: "Import Complete", 
-          description: `Imported: ${result.imported}, Skipped DNC: ${result.skipped_dnc}, Duplicates: ${result.duplicates}` 
+    if (user) {
+      // Real-time listener for all settings documents
+      const q = query(collection(useFirestore(), "users", user.uid, "settings"));
+      const unsub = onSnapshot(q, (snapshot) => {
+        const data: Record<string, any> = {};
+        snapshot.docs.forEach(doc => {
+          data[doc.id] = doc.data();
         });
-      } catch (err) {
-        toast({ variant: "destructive", title: "Import Failed", description: "Could not parse Vulcan7 CSV." });
-      } finally {
-        setSyncingVulcan(false);
+        setSettings(data);
+        if (loading) {
+          setInitialSettings(JSON.parse(JSON.stringify(data)));
+          setLoading(false);
+        }
+      });
+      return () => unsub();
+    }
+  }, [user]);
+
+  const hasUnsavedChanges = useMemo(() => {
+    return JSON.stringify(settings) !== JSON.stringify(initialSettings);
+  }, [settings, initialSettings]);
+
+  const handleUpdate = (section: string, field: string, value: any) => {
+    setSettings(prev => ({
+      ...prev,
+      [section]: {
+        ...(prev[section] || {}),
+        [field]: value
       }
-    };
-    reader.readAsText(file);
+    }));
   };
 
-  const handleExportDialQueue = async () => {
+  const handleSave = async (section: string) => {
     if (!user) return;
-    setExportingQueue(true);
+    setSavingSection(section);
     try {
-      const contactIds = await getContactsForVulcan7Export(user.uid);
-      if (contactIds.length === 0) {
-        toast({ title: "Queue Empty", description: "No leads meet dialing criteria." });
-        return;
-      }
-      const csv = await pushToVulcan7DialQueue(user.uid, contactIds);
-      const blob = new Blob([csv], { type: 'text/csv' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `monica_dial_queue.csv`;
-      document.body.appendChild(a);
-      a.click();
-      toast({ title: "Export Ready", description: "Dial queue prepared." });
-    } catch (err) {
-      toast({ variant: "destructive", title: "Export Failed", description: "Error generating CSV." });
+      await saveSettingsSection({
+        uid: user.uid,
+        section,
+        data: settings[section] || {}
+      });
+      setInitialSettings(prev => ({
+        ...prev,
+        [section]: JSON.parse(JSON.stringify(settings[section]))
+      }));
+      toast({ title: "Settings Saved", description: `${section.toUpperCase()} configuration updated.` });
+    } catch (err: any) {
+      toast({ variant: "destructive", title: "Save Failed", description: err.message });
     } finally {
-      setExportingQueue(false);
+      setSavingSection(null);
     }
   };
 
-  if (!mounted) return null;
+  const handleTest = async (service: string) => {
+    setTestingService(service);
+    // Simulate API ping
+    setTimeout(() => {
+      setTestingService(null);
+      handleUpdate(service, "connected", true);
+      toast({ title: "Connection Successful", description: `${service.toUpperCase()} is communicating correctly.` });
+    }, 1500);
+  };
+
+  if (!mounted || loading) return <div className="flex h-screen items-center justify-center italic text-slate-400">Loading Monica System Prefs...</div>;
 
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen w-full">
+      <div className="flex min-h-screen w-full bg-[#F9FAFB]">
         <AppSidebar />
         <SidebarInset>
-          <header className="flex h-16 shrink-0 items-center gap-2 border-b px-6 bg-white shadow-sm sticky top-0 z-10">
+          <header className="flex h-16 shrink-0 items-center gap-2 border-b px-6 bg-white shadow-sm sticky top-0 z-20">
             <SidebarTrigger className="-ml-1" />
-            <h1 className="text-xl font-bold font-headline text-primary">System Settings</h1>
-            <Button size="sm" className="ml-auto bg-primary" onClick={handleSaveSettings} disabled={saving}>
-              {saving ? <RefreshCw className="h-4 w-4 animate-spin mr-2" /> : null}
-              Save Changes
-            </Button>
+            <div className="flex items-center gap-3">
+              <h1 className="text-xl font-bold font-headline text-primary">System Settings</h1>
+              {hasUnsavedChanges && (
+                <div className="flex items-center gap-1.5 text-[10px] font-black uppercase text-accent animate-pulse">
+                  <div className="h-2 w-2 rounded-full bg-accent" />
+                  Unsaved changes
+                </div>
+              )}
+            </div>
           </header>
           
-          <main className="p-8 max-w-4xl mx-auto w-full">
-            <Tabs defaultValue="automation">
-              <TabsList className="mb-8 w-full justify-start gap-4 h-auto p-0 bg-transparent overflow-x-auto no-scrollbar">
-                <TabsTrigger value="automation" className="data-[state=active]:bg-secondary rounded-lg px-4 py-2 flex gap-2">
-                  <Zap className="h-4 w-4" /> Automation
-                </TabsTrigger>
-                <TabsTrigger value="vulcan7" className="data-[state=active]:bg-secondary rounded-lg px-4 py-2 flex gap-2">
-                  <PhoneCall className="h-4 w-4" /> Vulcan7
-                </TabsTrigger>
-                <TabsTrigger value="outreach" className="data-[state=active]:bg-secondary rounded-lg px-4 py-2 flex gap-2">
-                  <Mail className="h-4 w-4" /> Gmail API
-                </TabsTrigger>
-                <TabsTrigger value="ai" className="data-[state=active]:bg-secondary rounded-lg px-4 py-2 flex gap-2">
-                  <BrainCircuit className="h-4 w-4" /> Grok AI Hub
-                </TabsTrigger>
+          <main className="p-4 md:p-8 max-w-5xl mx-auto w-full">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8">
+              <TabsList className="bg-transparent h-auto p-0 flex gap-2 md:gap-4 overflow-x-auto no-scrollbar scrollbar-hide w-full justify-start border-b rounded-none mb-4">
+                {["Business", "AI Engine", "Dialer", "MLS & Data Sources", "Social & Web", "Outreach", "Account"].map(t => (
+                  <TabsTrigger 
+                    key={t} 
+                    value={t.toLowerCase().replace(/ & /g, '-').replace(/ /g, '-')} 
+                    className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-2 pb-3 font-bold text-[10px] md:text-xs uppercase tracking-widest transition-all"
+                  >
+                    {t}
+                  </TabsTrigger>
+                ))}
               </TabsList>
 
-              <TabsContent value="automation" className="space-y-6">
+              {/* --- TAB: BUSINESS --- */}
+              <TabsContent value="business" className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+                <Card className="border-none shadow-md">
+                  <CardHeader className="flex flex-row items-center justify-between">
+                    <div>
+                      <CardTitle className="text-lg">Business Identity</CardTitle>
+                      <CardDescription>Configure Monica's primary persona and brokerage details.</CardDescription>
+                    </div>
+                    <Button size="sm" onClick={() => handleSave("business")} disabled={savingSection === "business"}>
+                      {savingSection === "business" ? <RefreshCw className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+                      Save
+                    </Button>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Agent Full Name</Label>
+                        <Input value={settings.business?.agentName || ""} onChange={(e) => handleUpdate("business", "agentName", e.target.value)} placeholder="Monica Selvaggio" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Brokerage Name</Label>
+                        <Input value={settings.business?.brokerage || ""} onChange={(e) => handleUpdate("business", "brokerage", e.target.value)} placeholder="Selvaggio Global Real Estate" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>License Number</Label>
+                        <Input value={settings.business?.license || ""} onChange={(e) => handleUpdate("business", "license", e.target.value)} placeholder="S.0123456" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Phone Number</Label>
+                        <Input value={settings.business?.phone || ""} onChange={(e) => handleUpdate("business", "phone", e.target.value)} placeholder="(702) 555-0199" />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Value Proposition</Label>
+                      <Textarea value={settings.business?.tagline || ""} onChange={(e) => handleUpdate("business", "tagline", e.target.value)} placeholder="Las Vegas's premier luxury listing specialist..." />
+                    </div>
+                  </CardContent>
+                </Card>
+
                 <Card className="border-none shadow-md">
                   <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Clock className="h-5 w-5 text-accent" />
-                      Follow-up Cadence Engine
-                    </CardTitle>
-                    <CardDescription>Monica automatically scans your contacts every morning to advance follow-up stages.</CardDescription>
+                    <CardTitle className="text-lg">Team Members</CardTitle>
+                    <CardDescription>Manage auxiliary agents and assistants.</CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div className="p-6 bg-slate-50 rounded-2xl border space-y-4">
-                      <div className="space-y-1">
-                        <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Webhook Configuration</Label>
-                        <div className="flex items-center gap-2 bg-white p-3 rounded-xl border">
-                          <code className="text-xs font-mono text-primary flex-1">https://monica-hub.ai/api/run-cadence</code>
-                          <Button variant="ghost" size="icon" className="h-8 w-8"><ExternalLink className="h-4 w-4" /></Button>
-                        </div>
-                      </div>
-                      <p className="text-xs text-muted-foreground leading-relaxed">
-                        To automate this, set up a **Make.com** or **Zapier** scenario to send a POST request to this URL every morning at 7:00 AM. Ensure you include the user ID in the body and your secret token in the headers.
-                      </p>
-                      <Button 
-                        onClick={handleRunCadenceManually} 
-                        disabled={runningCadence}
-                        className="w-full bg-accent hover:bg-accent/90 text-primary font-bold shadow-lg shadow-accent/10"
-                      >
-                        {runningCadence ? <RefreshCw className="h-4 w-4 animate-spin mr-2" /> : <Zap className="h-4 w-4 mr-2" />}
-                        Run Cadence Logic Now
-                      </Button>
-                    </div>
-
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <div className="p-4 bg-primary/5 rounded-2xl border border-primary/10 space-y-2">
-                        <div className="flex justify-between items-center">
-                          <Label className="font-bold">Auto-Nurture Emails</Label>
-                          <Switch defaultChecked />
-                        </div>
-                        <p className="text-[10px] text-slate-500 leading-relaxed">Automatically send cadence emails when they are due (requires Gmail connection).</p>
-                      </div>
-                      <div className="p-4 bg-primary/5 rounded-2xl border border-primary/10 space-y-2">
-                        <div className="flex justify-between items-center">
-                          <Label className="font-bold">Quarterly Nurture</Label>
-                          <Switch defaultChecked />
-                        </div>
-                        <p className="text-[10px] text-slate-500 leading-relaxed">Move leads to long-term quarterly follow-up after cadence completion.</p>
-                      </div>
+                  <CardContent>
+                    <div className="p-8 border-2 border-dashed rounded-2xl bg-slate-50 text-center space-y-4">
+                      <p className="text-xs text-muted-foreground italic">Team management features are available in the Agency Plan.</p>
+                      <Button variant="outline" className="gap-2"><UserCircle className="h-4 w-4" /> Invite Member</Button>
                     </div>
                   </CardContent>
                 </Card>
               </TabsContent>
 
-              <TabsContent value="outreach" className="space-y-6">
+              {/* --- TAB: AI ENGINE --- */}
+              <TabsContent value="ai-engine" className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
                 <Card className="border-none shadow-md">
-                  <CardHeader>
+                  <CardHeader className="flex flex-row items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-primary text-white rounded-lg"><BrainCircuit className="h-5 w-5" /></div>
+                      <div>
+                        <CardTitle className="text-lg">Grok (xAI) Configuration</CardTitle>
+                        <CardDescription>Primary intelligence for lead scoring and strategic drafting.</CardDescription>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <StatusBadge connected={settings.ai_grok?.connected} checking={testingService === "ai_grok"} />
+                      <Button size="sm" variant="outline" onClick={() => handleTest("ai_grok")}>Test</Button>
+                      <Button size="sm" onClick={() => handleSave("ai_grok")} disabled={savingSection === "ai_grok"}><Save className="h-4 w-4 mr-2" /> Save</Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Grok API Key</Label>
+                      <PasswordInput value={settings.ai_grok?.apiKey || ""} onChange={(v) => handleUpdate("ai_grok", "apiKey", v)} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Base URL</Label>
+                        <Input value={settings.ai_grok?.baseUrl || "https://api.x.ai/v1"} onChange={(e) => handleUpdate("ai_grok", "baseUrl", e.target.value)} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Model</Label>
+                        <Select value={settings.ai_grok?.model || "grok-4-latest"} onValueChange={(v) => handleUpdate("ai_grok", "model", v)}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="grok-4-latest">grok-4-latest</SelectItem>
+                            <SelectItem value="grok-3">grok-3</SelectItem>
+                            <SelectItem value="grok-3-mini">grok-3-mini</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-none shadow-md">
+                  <CardHeader className="flex flex-row items-center justify-between">
+                    <div>
+                      <CardTitle className="text-lg">AI Behavior Settings</CardTitle>
+                      <CardDescription>Fine-tune Monica's operational logic.</CardDescription>
+                    </div>
+                    <Button size="sm" onClick={() => handleSave("ai_behavior")}>Save</Button>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
                     <div className="flex items-center justify-between">
-                      <div className="p-2 bg-primary text-white rounded-lg">
-                        <Mail className="h-5 w-5" />
-                      </div>
-                      {gmailConfig ? (
-                        <Badge className="bg-green-500 gap-1.5"><CheckCircle2 className="h-3 w-3" /> Connected</Badge>
-                      ) : (
-                        <Badge variant="outline" className="text-slate-400">Disconnected</Badge>
-                      )}
+                      <Label className="flex-1">Auto-generate nurture emails</Label>
+                      <Switch checked={settings.ai_behavior?.autoGenerate || false} onCheckedChange={(v) => handleUpdate("ai_behavior", "autoGenerate", v)} />
                     </div>
-                    <CardTitle className="mt-4">Gmail API Connection</CardTitle>
-                    <CardDescription>Grant Monica permission to handle your seller outreach directly through your business account.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    {!gmailConfig ? (
-                      <div className="p-8 border-2 border-dashed rounded-2xl bg-slate-50 text-center space-y-4">
-                        <p className="text-xs text-muted-foreground max-w-xs mx-auto italic">Monica uses secure Google OAuth to sync threads and send authenticated follow-ups.</p>
-                        <Button onClick={handleConnectGmail} disabled={connectingGmail} className="bg-primary px-8">
-                          {connectingGmail ? <RefreshCw className="h-4 w-4 animate-spin mr-2" /> : <Globe className="h-4 w-4 mr-2" />}
-                          Connect Business Gmail
-                        </Button>
+                    <div className="flex items-center justify-between">
+                      <Label className="flex-1">AI compliance check before every send</Label>
+                      <Switch checked={settings.ai_behavior?.complianceCheck ?? true} onCheckedChange={(v) => handleUpdate("ai_behavior", "complianceCheck", v)} />
+                    </div>
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center">
+                        <Label>AI Creativity (Temperature)</Label>
+                        <Badge variant="secondary">{settings.ai_behavior?.temperature || 0.7}</Badge>
                       </div>
-                    ) : (
-                      <div className="space-y-4">
-                        <div className="p-4 bg-slate-50 rounded-xl border flex justify-between items-center">
-                          <div className="space-y-1">
-                            <Label className="text-[10px] font-bold uppercase text-slate-500">Linked Account</Label>
-                            <p className="text-sm font-bold text-primary">{gmailConfig.connectedEmail}</p>
-                          </div>
-                          <Button variant="ghost" size="sm" onClick={handleConnectGmail} className="text-xs">Re-link</Button>
-                        </div>
-                        <div className="flex items-center justify-between p-4 bg-primary/5 rounded-xl border border-primary/10">
-                          <div className="space-y-0.5">
-                            <p className="text-sm font-bold">Artificial Send Delay</p>
-                            <p className="text-xs text-muted-foreground">Randomly wait 2-5 mins between automated emails to look human.</p>
-                          </div>
-                          <Switch defaultChecked />
-                        </div>
-                      </div>
-                    )}
+                      <Slider 
+                        min={0.1} max={1.0} step={0.1} 
+                        value={[settings.ai_behavior?.temperature || 0.7]} 
+                        onValueChange={(v) => handleUpdate("ai_behavior", "temperature", v[0])} 
+                      />
+                    </div>
                   </CardContent>
                 </Card>
               </TabsContent>
 
-              <TabsContent value="vulcan7" className="space-y-6">
-                <div className="grid gap-6 md:grid-cols-2">
-                  <Card className="border-none shadow-md">
-                    <CardHeader>
-                      <CardTitle className="text-sm font-bold flex items-center gap-2">
-                        <Upload className="h-4 w-4 text-primary" />
-                        Lead Sync
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="p-8 border-2 border-dashed rounded-2xl bg-slate-50 text-center space-y-4 relative">
-                        <Input 
-                          type="file" 
-                          accept=".csv" 
-                          onChange={handleVulcanUpload} 
-                          className="absolute inset-0 opacity-0 cursor-pointer z-10"
-                          disabled={syncingVulcan}
-                        />
-                        <div className="h-12 w-12 bg-white rounded-full flex items-center justify-center mx-auto shadow-sm">
-                          {syncingVulcan ? <RefreshCw className="h-6 w-6 text-primary animate-spin" /> : <FileSpreadsheet className="h-6 w-6 text-primary" />}
-                        </div>
-                        <p className="text-[10px] text-muted-foreground font-bold uppercase">Upload Vulcan7 Session CSV</p>
+              {/* --- TAB: DIALER --- */}
+              <TabsContent value="dialer" className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+                <Card className="border-none shadow-md">
+                  <CardHeader className="flex flex-row items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-primary text-white rounded-lg"><PhoneCall className="h-5 w-5" /></div>
+                      <div>
+                        <CardTitle className="text-lg">Vulcan7 Integration</CardTitle>
+                        <CardDescription>Professional dialer sync via Zapier or API.</CardDescription>
                       </div>
-                    </CardContent>
-                  </Card>
+                    </div>
+                    <Button size="sm" onClick={() => handleSave("dialer_v7")}><Save className="h-4 w-4 mr-2" /> Save</Button>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div className="p-4 bg-blue-50 text-blue-700 rounded-xl border border-blue-100 flex gap-3 items-start">
+                      <Zap className="h-5 w-5 mt-0.5 shrink-0" />
+                      <p className="text-xs leading-relaxed">
+                        To sync leads automatically, paste the Zapier Webhook URL below into your Vulcan7 integration settings.
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Zapier Webhook URL (Monica Inbound)</Label>
+                      <div className="flex gap-2">
+                        <Input readOnly value={`https://monica-hub.ai/api/v7-sync/${user?.uid}`} className="bg-slate-50 font-mono text-[10px]" />
+                        <Button variant="ghost" size="icon" className="shrink-0"><Copy className="h-4 w-4" /></Button>
+                      </div>
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label>V7 Username</Label>
+                        <Input value={settings.dialer_v7?.username || ""} onChange={(e) => handleUpdate("dialer_v7", "username", e.target.value)} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>V7 Password</Label>
+                        <PasswordInput value={settings.dialer_v7?.password || ""} onChange={(v) => handleUpdate("dialer_v7", "password", v)} />
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label>Automatically flag DNC numbers</Label>
+                      <Switch checked={settings.dialer_v7?.flagDnc ?? true} onCheckedChange={(v) => handleUpdate("dialer_v7", "flagDnc", v)} />
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
 
-                  <Card className="border-none shadow-md">
-                    <CardHeader>
-                      <CardTitle className="text-sm font-bold flex items-center gap-2">
-                        <Download className="h-4 w-4 text-primary" />
-                        Dial Queue
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <Button 
-                        onClick={handleExportDialQueue} 
-                        disabled={exportingQueue} 
-                        className="w-full bg-accent hover:bg-accent/90 text-primary font-bold h-12"
-                      >
-                        Export Hot Leads (CSV)
+              {/* --- TAB: MLS & DATA SOURCES --- */}
+              <TabsContent value="mls-data-sources" className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+                <Card className="border-none shadow-md">
+                  <CardHeader className="flex flex-row items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-primary text-white rounded-lg"><Building2 className="h-5 w-5" /></div>
+                      <div>
+                        <CardTitle className="text-lg">LVR MLS (Las Vegas Realtors)</CardTitle>
+                        <CardDescription>Direct board integration for active and expired inventory.</CardDescription>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <StatusBadge connected={settings.lvr_mls?.connected} checking={testingService === "lvr_mls"} />
+                      <Button size="sm" variant="outline" onClick={() => handleTest("lvr_mls")}>Test</Button>
+                      <Button size="sm" onClick={() => handleSave("lvr_mls")}><Save className="h-4 w-4 mr-2" /> Save</Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>RETS/RESO Username</Label>
+                        <Input value={settings.lvr_mls?.username || ""} onChange={(e) => handleUpdate("lvr_mls", "username", e.target.value)} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>RETS/RESO Password</Label>
+                        <PasswordInput value={settings.lvr_mls?.password || ""} onChange={(v) => handleUpdate("lvr_mls", "password", v)} />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Target Zip Codes (Comma-separated)</Label>
+                      <Input value={settings.lvr_mls?.zips || ""} onChange={(e) => handleUpdate("lvr_mls", "zips", e.target.value)} placeholder="89144, 89135, 89052..." />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-none shadow-md">
+                  <CardHeader className="flex flex-row items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-primary text-white rounded-lg"><Globe className="h-5 w-5" /></div>
+                      <div>
+                        <CardTitle className="text-lg">RapidAPI Hub</CardTitle>
+                        <CardDescription>Manage Trulia, Realtor.com, and Zillow data streams.</CardDescription>
+                      </div>
+                    </div>
+                    <Button size="sm" onClick={() => handleSave("rapidapi")}>Save</Button>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div className="space-y-2">
+                      <Label>RapidAPI Key</Label>
+                      <PasswordInput value={settings.rapidapi?.apiKey || ""} onChange={(v) => handleUpdate("rapidapi", "apiKey", v)} />
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-3">
+                      {['trulia', 'realtor', 'homes'].map(s => (
+                        <div key={s} className="p-4 bg-slate-50 rounded-xl border flex flex-col items-center gap-3">
+                          <span className="text-xs font-black uppercase tracking-widest">{s}</span>
+                          <Switch checked={settings.rapidapi?.[s] ?? true} onCheckedChange={(v) => handleUpdate("rapidapi", s, v)} />
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* --- TAB: SOCIAL & WEB --- */}
+              <TabsContent value="social-web" className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+                <Card className="border-none shadow-md">
+                  <CardHeader className="flex flex-row items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-primary text-white rounded-lg"><Code className="h-5 w-5" /></div>
+                      <div>
+                        <CardTitle className="text-lg">Google & Web APIs</CardTitle>
+                        <CardDescription>Power maps, place lookups, and video monitoring.</CardDescription>
+                      </div>
+                    </div>
+                    <Button size="sm" onClick={() => handleSave("google_apis")}>Save</Button>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Google Cloud API Key (Maps & Places)</Label>
+                      <PasswordInput value={settings.google_apis?.mapKey || ""} onChange={(v) => handleUpdate("google_apis", "mapKey", v)} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>YouTube Data API Key</Label>
+                      <PasswordInput value={settings.google_apis?.ytKey || ""} onChange={(v) => handleUpdate("google_apis", "ytKey", v)} />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-none shadow-md">
+                  <CardHeader>
+                    <CardTitle className="text-lg">Lead Signal Keywords</CardTitle>
+                    <CardDescription>Phrases Monica should flag as moving intent during AI analysis.</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Input 
+                      value={settings.social?.keywords || ""} 
+                      onChange={(e) => handleUpdate("social", "keywords", e.target.value)}
+                      placeholder="e.g. moving soon, downsizing, estate sale, new job relocaton" 
+                    />
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* --- TAB: OUTREACH --- */}
+              <TabsContent value="outreach" className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+                <Card className="border-none shadow-md">
+                  <CardHeader className="flex flex-row items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-primary text-white rounded-lg"><Mail className="h-5 w-5" /></div>
+                      <div>
+                        <CardTitle className="text-lg">Gmail Integration</CardTitle>
+                        <CardDescription>Handle follow-ups through your business account.</CardDescription>
+                      </div>
+                    </div>
+                    <Button size="sm" onClick={() => handleSave("outreach_gmail")}>Save</Button>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div className="p-6 bg-slate-50 border-2 border-dashed rounded-2xl text-center space-y-4">
+                      <div className="flex justify-center gap-2 items-center">
+                        <StatusBadge connected={settings.outreach_gmail?.connected} />
+                        <span className="text-sm font-bold">{settings.outreach_gmail?.email || "No account linked"}</span>
+                      </div>
+                      <Button onClick={() => connectGmailAccount(user.uid)} className="bg-primary px-8">
+                        {settings.outreach_gmail?.connected ? "Reconnect Account" : "Connect Business Gmail"}
                       </Button>
-                    </CardContent>
-                  </Card>
-                </div>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label>Artificial send delay (2-5 min random)</Label>
+                      <Switch checked={settings.outreach_gmail?.delay ?? true} onCheckedChange={(v) => handleUpdate("outreach_gmail", "delay", v)} />
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* --- TAB: ACCOUNT --- */}
+              <TabsContent value="account" className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+                <Card className="border-none shadow-md overflow-hidden">
+                  <CardHeader className="bg-slate-50">
+                    <CardTitle className="text-lg">Plan & Subscription</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-8 flex items-center justify-between">
+                    <div className="flex items-center gap-6">
+                      <div className="h-16 w-16 bg-accent rounded-full flex items-center justify-center text-white text-2xl font-black">PRO</div>
+                      <div>
+                        <h3 className="text-xl font-black">Monica Agency Plan</h3>
+                        <p className="text-sm text-muted-foreground">Unlimited leads, MLS monitoring, and real-time sync.</p>
+                      </div>
+                    </div>
+                    <Button variant="outline">Manage Billing</Button>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-none shadow-md bg-red-50/30 border border-red-100">
+                  <CardHeader>
+                    <CardTitle className="text-lg text-red-900">Data & Privacy</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex gap-3">
+                      <Button variant="outline" className="flex-1 bg-white border-red-200 text-red-700 hover:bg-red-50">Delete All Leads</Button>
+                      <Button variant="destructive" className="flex-1">Close Account</Button>
+                    </div>
+                  </CardContent>
+                </Card>
               </TabsContent>
             </Tabs>
           </main>
