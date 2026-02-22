@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, ReactNode, useMemo, useState, useEffect } from 'react';
+import React, { createContext, useContext, ReactNode, useMemo, useState, useEffect, useRef } from 'react';
 import { FirebaseApp } from 'firebase/app';
 import { Firestore } from 'firebase/firestore';
 import { Auth, User, onAuthStateChanged, signInAnonymously } from 'firebase/auth';
@@ -36,17 +36,26 @@ export function FirebaseProvider({
     error: null,
   });
 
+  // Track if a sign-in is currently in flight to prevent token invalidation race conditions
+  const isSigningIn = useRef(false);
+
   useEffect(() => {
+    if (!auth) return;
+
     // Single source of truth for auth state and automatic anonymous sign-in
     const unsubscribe = onAuthStateChanged(
       auth,
-      (user) => {
-        if (!user) {
-          // If no user is present, initiate anonymous sign-in.
-          // The SDK handles subsequent state changes.
-          signInAnonymously(auth).catch((err) => {
+      async (user) => {
+        if (!user && !isSigningIn.current) {
+          isSigningIn.current = true;
+          try {
+            // Initiate anonymous sign-in only if no user is present and no sign-in is active.
+            await signInAnonymously(auth);
+          } catch (err) {
             console.error('Firebase Anonymous Sign-in Error:', err);
-          });
+          } finally {
+            isSigningIn.current = false;
+          }
         }
         setUserState({ user, loading: false, error: null });
       },

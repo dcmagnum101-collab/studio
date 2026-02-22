@@ -5,25 +5,35 @@ import { getAuth, Auth } from 'firebase/auth';
 import { getFirestore, Firestore } from 'firebase/firestore';
 import { firebaseConfig } from './config';
 
+// Module-level instances to ensure true singleton behavior across the client
+let firebaseAppInstance: FirebaseApp | undefined;
+let authInstance: Auth | undefined;
+let firestoreInstance: Firestore | undefined;
+
 /**
  * Initializes and returns Firebase service instances.
  * Ensures services are only initialized once and uses real SDK only.
  */
 export function initializeFirebase(): { firebaseApp: FirebaseApp; auth: Auth; firestore: Firestore } {
-  let app: FirebaseApp;
-  
-  if (getApps().length === 0) {
-    app = initializeApp(firebaseConfig);
-  } else {
-    app = getApp();
+  if (!firebaseAppInstance) {
+    if (getApps().length === 0) {
+      firebaseAppInstance = initializeApp(firebaseConfig);
+    } else {
+      firebaseAppInstance = getApp();
+    }
   }
 
-  const auth = getAuth(app);
-  const firestore = getFirestore(app);
+  if (!authInstance) {
+    authInstance = getAuth(firebaseAppInstance);
+  }
+
+  if (!firestoreInstance) {
+    firestoreInstance = getFirestore(firebaseAppInstance);
+  }
 
   return {
-    firebaseApp: app,
-    auth,
-    firestore
+    firebaseApp: firebaseAppInstance,
+    auth: authInstance,
+    firestore: firestoreInstance
   };
 }
