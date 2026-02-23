@@ -15,7 +15,7 @@
         "property_type": { "type": "string", "enum": ["single_family", "condo", "multi_family", "townhouse", "other"] },
         "pipeline_stage": {
           "type": "string",
-          "enum": ["new_lead", "attempted_contact", "conversation_had", "follow_up_scheduled", "appointment_set", "listed", "closed", "long_term_nurture", "dnc"]
+          "enum": ["new_lead", "attempted_contact", "conversation_had", "follow_up_scheduled", "appointment_set", "listed", "under_contract", "closed", "long_term_nurture", "dnc"]
         },
         "icpScore": { "type": "number" },
         "archagent_source": { "type": "string" },

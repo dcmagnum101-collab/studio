@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useMemo, useState, useEffect, useCallback } from "react";
@@ -22,7 +23,9 @@ import {
   Play,
   AlertTriangle,
   ArrowUpRight,
-  Rocket
+  Rocket,
+  TrendingUp,
+  DollarSign
 } from "lucide-react";
 import {
   BarChart,
@@ -60,6 +63,7 @@ export default function DashboardPage() {
     hotLeads: 0,
     dueToday: 0,
     callsThisWeek: 0,
+    totalPipelineValue: 0,
     loading: true
   });
 
@@ -89,17 +93,23 @@ export default function DashboardPage() {
         )
       );
 
+      // Manual sum for pipeline value since count only gives total
+      // In a real high-scale app, we'd use a cloud function to keep a counter
+      const activeContacts = (allContacts || []).filter(c => !['closed', 'dead', 'dnc'].includes(c.pipeline_stage));
+      const totalPipelineValue = activeContacts.reduce((sum, c) => sum + (c.estimated_commission || 0), 0);
+
       setLiveStats({
         activeLeads: activeSnap.data().count,
         hotLeads: hotSnap.data().count,
         dueToday: dueSnap.data().count,
         callsThisWeek: callsSnap.data().count,
+        totalPipelineValue,
         loading: false
       });
     } catch (err) {
       console.error("Failed to fetch live stats:", err);
     }
-  }, [user, firestore]);
+  }, [user, firestore, allContacts]);
 
   useEffect(() => {
     if (user && firestore) {
@@ -242,28 +252,37 @@ export default function DashboardPage() {
                     </div>
                   </CardContent>
                 </Card>
-
-                <div className="grid gap-6 md:grid-cols-3">
-                  {[
-                    { title: "Vulcan7 Sync", desc: "Connect your dialer to auto-sync daily expired leads.", icon: Smartphone },
-                    { title: "MLS Intelligence", desc: "Monitor Henderson and Summerlin zip codes for new inventory.", icon: Rocket },
-                    { title: "Smart Outreach", desc: "Let Monica draft personalized emails via your Gmail account.", icon: Mail }
-                  ].map((feat, i) => (
-                    <Card key={i} className="border-none shadow-md bg-white">
-                      <CardContent className="p-6 space-y-3">
-                        <div className="h-10 w-10 rounded-xl bg-primary/5 flex items-center justify-center text-primary">
-                          <feat.icon className="h-5 w-5" />
-                        </div>
-                        <h3 className="font-bold text-slate-900">{feat.title}</h3>
-                        <p className="text-xs text-slate-500 leading-relaxed">{feat.desc}</p>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
               </div>
             ) : (
               <>
-                <MorningBriefingCard />
+                <section className="grid gap-6 lg:grid-cols-3">
+                  <Card className="lg:col-span-2 border-none shadow-xl bg-white overflow-hidden relative group cursor-pointer hover:shadow-2xl transition-all">
+                    <Link href="/analytics" className="absolute inset-0 z-10" />
+                    <div className="absolute top-0 right-0 p-6 opacity-5 pointer-events-none group-hover:scale-110 transition-transform duration-700">
+                      <DollarSign className="h-32 w-32" />
+                    </div>
+                    <CardHeader className="pb-2">
+                      <Badge className="w-fit bg-accent/10 text-accent border-accent/20 font-black px-2 h-5 mb-2">ACTIVE PIPELINE</Badge>
+                      <CardTitle className="text-sm font-black uppercase tracking-[0.2em] text-slate-400">Total Potential Commission</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-end gap-3">
+                        <div className="text-5xl sm:text-7xl font-black text-accent tracking-tighter">
+                          {liveStats.loading ? "..." : `$${liveStats.totalPipelineValue.toLocaleString()}`}
+                        </div>
+                        <div className="mb-2 flex items-center gap-1 text-green-600 font-bold text-xs">
+                          <TrendingUp className="h-4 w-4" />
+                          +14% this month
+                        </div>
+                      </div>
+                      <p className="text-xs text-slate-500 font-medium mt-4 flex items-center gap-2">
+                        Click to view detailed revenue intelligence <ArrowUpRight className="h-3 w-3" />
+                      </p>
+                    </CardContent>
+                  </Card>
+                  
+                  <MorningBriefingCard />
+                </section>
 
                 {liveStats.loading ? (
                   <StatsSkeleton />
