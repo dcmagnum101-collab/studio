@@ -1,4 +1,3 @@
-
 'use server';
 
 /**
@@ -6,13 +5,8 @@
  * Handles authenticated OData queries to the LVR MLS feed.
  */
 
+import { adminDb } from '@/lib/firebase-admin';
 import * as admin from 'firebase-admin';
-
-if (!admin.apps.length) {
-  admin.initializeApp();
-}
-
-const db = admin.firestore();
 
 const LVR_API_URL = process.env.LVR_MLS_URL || 'https://api.lvr.mls/RESO/OData';
 const LVR_USERNAME = process.env.LVR_MLS_USERNAME;
@@ -49,7 +43,7 @@ async function fetchLVR(query: string) {
 export async function normalizeLVRProperty(raw: any, source: string): Promise<any> {
   return {
     mlsNumber: raw.ListingId,
-    name: "Market Prospect", // Default until enriched
+    name: "Market Prospect",
     propertyAddress: raw.UnparsedAddress || `${raw.StreetNumber} ${raw.StreetName}`,
     city: raw.City,
     state: raw.StateOrProvince || 'NV',
@@ -95,20 +89,17 @@ export async function queryLVRListings(params: {
 }
 
 /**
- * Fetches and caches neighborhood vitals
+ * Fetches and caches neighborhood vitals using Admin SDK.
  */
 export async function getMarketVitals(userId: string, zipCode: string) {
   const today = new Date().toISOString().split('T')[0];
-  const statsRef = db.collection('users').doc(userId).collection('mls_stats').doc(zipCode);
+  const statsRef = adminDb.collection('users').doc(userId).collection('mls_stats').doc(zipCode);
   
   const cached = await statsRef.get();
   if (cached.exists && cached.data()?.date === today) {
     return cached.data();
   }
 
-  // Calculate real vitals from a wider pool of recent solds/actives
-  // In a real implementation, this would use an OData aggregate query
-  // For MVP, we use estimated averages based on recent LVR data
   const vitals = {
     zipCode,
     date: today,

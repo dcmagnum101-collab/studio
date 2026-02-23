@@ -1,21 +1,27 @@
-
-import * as admin from 'firebase-admin';
+import { initializeApp, getApps, cert } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
+import { getAuth } from 'firebase-admin/auth';
 
 /**
- * Initializes the Firebase Admin SDK.
- * Uses the service account JSON from environment variables.
+ * Initializes the Firebase Admin SDK for server-side use.
  */
-if (!admin.apps.length) {
+const serviceAccount = JSON.parse(
+  process.env.FIREBASE_SERVICE_ACCOUNT_JSON || '{}'
+);
+
+if (!getApps().length) {
   try {
     if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
-      const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
-      admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
+      initializeApp({
+        credential: cert(serviceAccount),
+        projectId: 'studio-7266015203-e5837'
       });
       console.log('[Admin SDK] Initialized with Service Account');
     } else {
-      // Fallback for environments where ADC or default initialization is configured
-      admin.initializeApp();
+      // Fallback for environments with ADC (Application Default Credentials)
+      initializeApp({
+        projectId: 'studio-7266015203-e5837'
+      });
       console.log('[Admin SDK] Initialized with Default Credentials');
     }
   } catch (error) {
@@ -23,5 +29,5 @@ if (!admin.apps.length) {
   }
 }
 
-export const adminDb = admin.firestore();
-export const adminAuth = admin.auth();
+export const adminDb = getFirestore();
+export const adminAuth = getAuth();

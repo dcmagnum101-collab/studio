@@ -5,26 +5,26 @@
  * Handles property search and normalization as a backup source.
  */
 
-import { db } from '@/lib/firebase';
-import { collection, doc, getDoc, setDoc, increment, serverTimestamp } from 'firebase/firestore';
+import { adminDb } from '@/lib/firebase-admin';
+import * as admin from 'firebase-admin';
 
-const RAPIDAPI_KEY = process.env.RAPIDAPI_REALTOR_KEY;
+const RAPIDAPI_KEY = process.env.RAPIDAPI_REALTOR_KEY || process.env.RAPIDAPI_KEY;
 const RAPIDAPI_HOST = process.env.RAPIDAPI_REALTOR_HOST || 'realtor-stable.p.rapidapi.com';
 const BASE_URL = `https://${RAPIDAPI_HOST}`;
 
 const headers = {
   'Content-Type': 'application/json',
   'x-rapidapi-host': RAPIDAPI_HOST,
-  'x-rapidapi-key': RAPIDAPI_KEY!,
+  'x-rapidapi-key': RAPIDAPI_KEY || '',
 };
 
 async function trackApiCall(userId: string) {
   const month = new Date().toISOString().slice(0, 7);
-  const quotaRef = doc(db, 'users', userId, 'rapidapi_quota', month);
-  await setDoc(quotaRef, { 
-    realtor_calls: increment(1), 
+  const quotaRef = adminDb.collection('users').doc(userId).collection('rapidapi_quota').doc(month);
+  await quotaRef.set({ 
+    realtor_calls: admin.firestore.FieldValue.increment(1), 
     month,
-    updated_at: serverTimestamp()
+    updated_at: admin.firestore.FieldValue.serverTimestamp()
   }, { merge: true });
 }
 
@@ -36,6 +36,7 @@ export async function searchRealtor(userId: string, params: {
   sort?: 'relevance' | 'newest' | 'price_low' | 'price_high';
 }) {
   if (!userId) throw new Error("User ID required for Realtor service");
+  if (!RAPIDAPI_KEY) throw new Error("RapidAPI key not configured for Realtor.com");
 
   const endpoint = 'properties/v2/list-for-sale';
   const queryParams = new URLSearchParams({
@@ -76,7 +77,7 @@ export async function normalizeRealtorListing(raw: any) {
     baths: raw.baths || 0,
     sqft: raw.building_size?.size || 0,
     days_on_market: raw.days_on_market || 0,
-    is_fsbo: false, // Realtor Stable API usually covers MLS
+    is_fsbo: false,
     is_foreclosure: false,
     price_reduced: raw.price_reduced_amount > 0,
     status: raw.prop_status === 'for_sale' ? 'FOR_SALE' : 'OFF_MARKET',

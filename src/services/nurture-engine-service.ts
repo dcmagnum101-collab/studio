@@ -7,13 +7,8 @@
 
 import { grokJSON } from './grok-service';
 import { monicaSystemPrompt } from '@/config/monica-system-prompt';
+import { adminDb } from '@/lib/firebase-admin';
 import * as admin from 'firebase-admin';
-
-if (!admin.apps.length) {
-  admin.initializeApp();
-}
-
-const db = admin.firestore();
 
 export interface NurtureAnalysis {
   summary: string;
@@ -39,11 +34,10 @@ export interface NurtureAnalysis {
 }
 
 /**
- * Generates a structured nurture plan for a lead.
- * Scoped to users/{userId}/contacts/{contactId}/ai_runs
+ * Generates a structured nurture plan for a lead using Admin SDK.
  */
 export async function generateNurturePlan(userId: string, contactId: string): Promise<NurtureAnalysis> {
-  const contactRef = db.collection('users').doc(userId).collection('contacts').doc(contactId);
+  const contactRef = adminDb.collection('users').doc(userId).collection('contacts').doc(contactId);
   const contactDoc = await contactRef.get();
 
   if (!contactDoc.exists) {
@@ -53,7 +47,7 @@ export async function generateNurturePlan(userId: string, contactId: string): Pr
   const lead = contactDoc.data()!;
   
   // Fetch recent messages for context
-  const messagesSnap = await db.collection('users')
+  const messagesSnap = await adminDb.collection('users')
     .doc(userId)
     .collection('messages')
     .where('leadId', '==', contactId)

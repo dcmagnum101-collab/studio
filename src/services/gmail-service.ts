@@ -1,15 +1,9 @@
-
 'use server';
 
 import { google } from 'googleapis';
+import { adminDb } from '@/lib/firebase-admin';
 import * as admin from 'firebase-admin';
 import { createHash } from 'crypto';
-
-if (!admin.apps.length) {
-  admin.initializeApp();
-}
-
-const db = admin.firestore();
 
 const oauth2Client = new google.auth.OAuth2(
   process.env.GOOGLE_CLIENT_ID,
@@ -18,7 +12,7 @@ const oauth2Client = new google.auth.OAuth2(
 );
 
 export async function getGmailClient(userId: string) {
-  const tokenDoc = await db.collection('users').doc(userId).collection('integrations').doc('gmail').get();
+  const tokenDoc = await adminDb.collection('users').doc(userId).collection('integrations').doc('gmail').get();
   
   if (!tokenDoc.exists) {
     throw new Error('Gmail not connected');
@@ -29,7 +23,7 @@ export async function getGmailClient(userId: string) {
 
   oauth2Client.on('tokens', (newTokens) => {
     if (newTokens.refresh_token) {
-      db.collection('users').doc(userId).collection('integrations').doc('gmail').set({
+      adminDb.collection('users').doc(userId).collection('integrations').doc('gmail').set({
         tokens: newTokens,
         updated_at: admin.firestore.FieldValue.serverTimestamp()
       }, { merge: true });
@@ -41,7 +35,7 @@ export async function getGmailClient(userId: string) {
 
 export async function checkUnsubscribe(userId: string, email: string): Promise<boolean> {
   const hashedEmail = createHash('sha256').update(email.toLowerCase()).digest('hex');
-  const unsubDoc = await db.collection('users').doc(userId).collection('unsubscribes').doc(hashedEmail).get();
+  const unsubDoc = await adminDb.collection('users').doc(userId).collection('unsubscribes').doc(hashedEmail).get();
   return unsubDoc.exists;
 }
 
@@ -53,7 +47,7 @@ export async function logMessage(userId: string, messageData: {
   to: string;
   status: 'sent' | 'received' | 'failed';
 }) {
-  await db.collection('users').doc(userId).collection('messages').add({
+  await adminDb.collection('users').doc(userId).collection('messages').add({
     ...messageData,
     created_at: admin.firestore.FieldValue.serverTimestamp()
   });

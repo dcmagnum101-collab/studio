@@ -7,14 +7,9 @@
 
 import { grokJSON } from './grok-service';
 import { monicaSystemPrompt } from '@/config/monica-system-prompt';
+import { adminDb } from '@/lib/firebase-admin';
 import * as admin from 'firebase-admin';
 import { normalizePhone } from '@/lib/utils';
-
-if (!admin.apps.length) {
-  admin.initializeApp();
-}
-
-const db = admin.firestore();
 
 interface EnrichmentResult {
   firstName?: string;
@@ -32,27 +27,21 @@ interface EnrichmentResult {
  * Creates a prospecting job and initiates extraction via Grok.
  */
 export async function runProspectingJob(userId: string, url: string): Promise<string> {
-  console.log(`[Prospecting] Initiating job for URL: ${url}`);
-  const userRef = db.collection('users').doc(userId);
+  const userRef = adminDb.collection('users').doc(userId);
   const jobRef = await userRef.collection('prospecting_jobs').add({
     url,
     status: 'pending',
     created_at: admin.firestore.FieldValue.serverTimestamp()
   });
 
-  // Start processing (simulated async worker)
+  // Start processing (async background task)
   processEnrichmentJob(userId, jobRef.id, url);
 
   return jobRef.id;
 }
 
-/**
- * Async processing worker for enrichment.
- * Uses Grok to extract data from the target URL.
- */
 async function processEnrichmentJob(userId: string, jobId: string, url: string) {
-  console.log(`[Prospecting Worker] Processing Job ID: ${jobId}`);
-  const userRef = db.collection('users').doc(userId);
+  const userRef = adminDb.collection('users').doc(userId);
   const jobRef = userRef.collection('prospecting_jobs').doc(jobId);
 
   try {
@@ -67,20 +56,15 @@ async function processEnrichmentJob(userId: string, jobId: string, url: string) 
     Focus on name, email, phone, and property address if visible. 
     If this is a social profile, extract location and bio indicators of moving.`;
 
-    console.log(`[Prospecting Worker] Calling Grok intelligence for URL: ${url}`);
     const extracted = await grokJSON<EnrichmentResult>(system, userPrompt, userId);
-    console.log(`[Prospecting Worker] Intelligence extracted successfully for ${extracted.name || 'Unknown'}`);
-
     const normalizedPhone = extracted.phone ? normalizePhone(extracted.phone) : '';
 
-    // ─── DEDUPLICATION LOGIC ───
     let existingContactId: string | null = null;
 
     if (extracted.email) {
       const emailMatch = await userRef.collection('contacts').where('email', '==', extracted.email).limit(1).get();
       if (!emailMatch.empty) {
         existingContactId = emailMatch.docs[0].id;
-        console.log(`[Prospecting Worker] Dedupe hit on email: ${extracted.email}`);
       }
     }
 
@@ -88,19 +72,15 @@ async function processEnrichmentJob(userId: string, jobId: string, url: string) 
       const phoneMatch = await userRef.collection('contacts').where('phone', '==', normalizedPhone).limit(1).get();
       if (!phoneMatch.empty) {
         existingContactId = phoneMatch.docs[0].id;
-        console.log(`[Prospecting Worker] Dedupe hit on phone: ${normalizedPhone}`);
       }
     }
 
-    // ─── UPSERT LEAD ───
     if (existingContactId) {
-      console.log(`[Prospecting Worker] Updating existing contact: ${existingContactId}`);
       await userRef.collection('contacts').doc(existingContactId).update({
         source_evidence: admin.firestore.FieldValue.arrayUnion(url),
         updated_at: admin.firestore.FieldValue.serverTimestamp()
       });
     } else {
-      console.log(`[Prospecting Worker] Creating new contact record`);
       const newContact = await userRef.collection('contacts').add({
         name: extracted.name || 'Unknown Contact',
         firstName: extracted.firstName || '',
@@ -109,7 +89,7 @@ async function processEnrichmentJob(userId: string, jobId: string, url: string) 
         phone: normalizedPhone,
         propertyAddress: extracted.propertyAddress || '',
         motivation: extracted.motivation || 'Extracted from URL enrichment',
-        icpScore: 50, // Default mid score
+        icpScore: 50,
         archagent_source: 'url_enrichment',
         source_evidence: [url],
         pipeline_stage: 'new_lead',
@@ -120,7 +100,6 @@ async function processEnrichmentJob(userId: string, jobId: string, url: string) 
       existingContactId = newContact.id;
     }
 
-    // Log source evidence
     await userRef.collection('lead_sources').add({
       url,
       extracted_data: extracted,
@@ -132,10 +111,9 @@ async function processEnrichmentJob(userId: string, jobId: string, url: string) 
       status: 'completed', 
       result_contact_id: existingContactId 
     });
-    console.log(`[Prospecting Worker] Job ${jobId} completed successfully`);
 
   } catch (error: any) {
-    console.error(`[Prospecting Worker] Critical failure for job ${jobId}:`, error);
+    console.error(`[Prospecting Worker] failure for job ${jobId}:`, error);
     await jobRef.update({ status: 'failed', error: error.message });
   }
 }

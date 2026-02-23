@@ -1,15 +1,8 @@
-
 'use server';
 
 import * as nodemailer from 'nodemailer';
+import { adminDb } from '@/lib/firebase-admin';
 import * as admin from 'firebase-admin';
-
-// Initialize Firebase Admin if not already initialized
-if (!admin.apps.length) {
-  admin.initializeApp();
-}
-
-const db = admin.firestore();
 
 // Create Gmail transporter
 const transporter = nodemailer.createTransport({
@@ -30,16 +23,15 @@ export interface EmailOptions {
 }
 
 /**
- * Sends a single email using Gmail and logs it to Firestore.
- * Scoped to users/{userId}/outreach_log and users/{userId}/email_quota.
+ * Sends a single email using Gmail and logs it to Firestore using Admin SDK.
  */
 export async function sendEmail(
   options: EmailOptions
 ): Promise<{ success: boolean; messageId?: string; error?: string }> {
 
-  const userDocRef = db.collection('users').doc(options.userId);
+  const userDocRef = adminDb.collection('users').doc(options.userId);
 
-  // Check unsubscribe status if contactId is provided - Scoped to User
+  // Check unsubscribe status if contactId is provided
   if (options.contactId) {
     try {
       const contact = await userDocRef
@@ -56,7 +48,7 @@ export async function sendEmail(
     }
   }
 
-  // Check daily quota (max 500/day for standard Gmail) - Scoped to User
+  // Check daily quota
   const today = new Date().toISOString().split('T')[0];
   const quotaRef = userDocRef.collection('email_quota').doc(today);
   
@@ -66,13 +58,11 @@ export async function sendEmail(
     const dailyLimit = 500;
 
     if (currentCount >= dailyLimit) {
-      // Queue for tomorrow if limit reached - Scoped to User
       await userDocRef.collection('email_queue').add({
         ...options,
         queued_at: admin.firestore.FieldValue.serverTimestamp(),
         status: 'queued',
       });
-      console.log(`Email to ${options.to} queued - daily limit reached (${currentCount}/${dailyLimit}).`);
       return { success: false, error: 'limit_reached' };
     }
 
@@ -85,13 +75,17 @@ export async function sendEmail(
       replyTo: options.replyTo || process.env.GMAIL_USER,
     });
 
-    // Increment daily quota count - Scoped to User
+    // Increment daily quota count
     await quotaRef.set(
-      { count: admin.firestore.FieldValue.increment(1), date: today, last_sent: admin.firestore.FieldValue.serverTimestamp() },
+      { 
+        count: admin.firestore.FieldValue.increment(1), 
+        date: today, 
+        last_sent: admin.firestore.FieldValue.serverTimestamp() 
+      },
       { merge: true }
     );
 
-    // Log the successful send - Scoped to User
+    // Log the successful send
     await userDocRef.collection('outreach_log').add({
       type: 'email',
       to: options.to,
@@ -107,7 +101,6 @@ export async function sendEmail(
   } catch (error: any) {
     console.error('Email send failure:', error);
     
-    // Log the failure - Scoped to User
     await userDocRef.collection('outreach_log').add({
       type: 'email',
       to: options.to,
@@ -122,9 +115,6 @@ export async function sendEmail(
   }
 }
 
-/**
- * Sends bulk emails with a small delay to avoid Gmail anti-spam flags.
- */
 export async function sendBulkEmail(
   recipients: EmailOptions[]
 ): Promise<{ sent: number; failed: number; queued: number }> {
@@ -146,7 +136,6 @@ export async function sendBulkEmail(
     } catch (error) {
       failed++;
     }
-    // 250ms artificial delay between sends
     await new Promise(resolve => setTimeout(resolve, 250));
   }
 
