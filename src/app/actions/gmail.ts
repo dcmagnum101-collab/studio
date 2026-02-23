@@ -1,4 +1,3 @@
-
 'use server';
 
 import { adminDb } from '@/lib/firebase-admin';
@@ -74,7 +73,8 @@ export async function sendNurtureEmail(payload: {
     source: 'gmail_api',
     messageId: result.id,
     threadId: result.threadId,
-    sentiment: 'neutral'
+    sentiment: 'neutral',
+    ownerId: userId
   });
 
   // 5. Quota Management

@@ -1,7 +1,6 @@
-
 "use client";
 
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useCallback } from "react";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -43,7 +42,7 @@ import { useUser, useDoc, useMemoFirebase, useCollection } from "@/firebase";
 import { useContacts, useTasks } from "@/hooks/useFirestoreData";
 import { StatsSkeleton, TasksSkeleton, QuotaSkeleton } from "@/components/dashboard/dashboard-skeletons";
 import { useToast } from "@/hooks/use-toast";
-import { collection, query, limit, onSnapshot } from "firebase/firestore";
+import { collection, query, limit, onSnapshot, getCountFromServer, where, collectionGroup } from "firebase/firestore";
 import { useFirestore } from "@/firebase";
 
 export default function DashboardPage() {
@@ -54,6 +53,61 @@ export default function DashboardPage() {
   const { data: allTasks, isLoading: tasksLoading } = useTasks('pending');
   const [runningNurture, setRunningNurture] = useState(false);
   const [settings, setSettings] = useState<Record<string, any>>({});
+
+  // Live Stats State
+  const [liveStats, setLiveStats] = useState({
+    activeLeads: 0,
+    hotLeads: 0,
+    dueToday: 0,
+    callsThisWeek: 0,
+    loading: true
+  });
+
+  const fetchLiveStats = useCallback(async () => {
+    if (!user || !firestore) return;
+    try {
+      const contactsRef = collection(firestore, "users", user.uid, "contacts");
+      const today = new Date().toISOString().split("T")[0];
+      
+      // Calls this week (from last Sunday)
+      const weekStart = new Date();
+      weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+      weekStart.setHours(0, 0, 0, 0);
+
+      const [activeSnap, hotSnap, dueSnap] = await Promise.all([
+        getCountFromServer(query(contactsRef, where("pipeline_stage", "not-in", ["closed", "dnc"]))),
+        getCountFromServer(query(contactsRef, where("icpScore", ">=", 80))),
+        getCountFromServer(query(contactsRef, where("nextFollowUpDate", "<=", today)))
+      ]);
+
+      const callsRef = collectionGroup(firestore, "activityLogs");
+      const callsSnap = await getCountFromServer(
+        query(callsRef, 
+          where("ownerId", "==", user.uid),
+          where("type", "==", "call"),
+          where("date", ">=", weekStart.toISOString())
+        )
+      );
+
+      setLiveStats({
+        activeLeads: activeSnap.data().count,
+        hotLeads: hotSnap.data().count,
+        dueToday: dueSnap.data().count,
+        callsThisWeek: callsSnap.data().count,
+        loading: false
+      });
+    } catch (err) {
+      console.error("Failed to fetch live stats:", err);
+    }
+  }, [user, firestore]);
+
+  useEffect(() => {
+    if (user && firestore) {
+      fetchLiveStats();
+      const interval = setInterval(fetchLiveStats, 5 * 60 * 1000); // 5 minutes
+      return () => clearInterval(interval);
+    }
+  }, [user, firestore, fetchLiveStats]);
 
   // Settings for onboarding check
   useEffect(() => {
@@ -86,23 +140,18 @@ export default function DashboardPage() {
     };
   }, [settings, isEmpty]);
 
-  const pipelineValue = useMemo(() => {
-    if (!allContacts) return 0;
-    return allContacts.reduce((sum, c) => sum + (c.estimated_commission || 0), 0);
-  }, [allContacts]);
-
   const stats = [
-    { label: "Pipeline", value: `$${(pipelineValue / 1000).toFixed(1)}k`, icon: Target, color: "text-primary" },
-    { label: "Leads", value: allContacts?.length || 0, icon: Users, color: "text-blue-600" },
-    { label: "Tasks", value: (allTasks || []).length, icon: CheckCircle, color: "text-green-600" },
-    { label: "ICP Hot", value: allContacts?.filter((c) => (c.icpScore || 0) >= 80).length || 0, icon: Zap, color: "text-accent" },
+    { label: "Active Leads", value: liveStats.activeLeads, icon: Target, color: "text-primary" },
+    { label: "ICP Hot", value: liveStats.hotLeads, icon: Zap, color: "text-accent" },
+    { label: "Due Today", value: liveStats.dueToday, icon: Clock, color: "text-blue-600" },
+    { label: "Calls Week", value: liveStats.callsThisWeek, icon: Smartphone, color: "text-green-600" },
   ];
 
-  const today = new Date().toISOString().split("T")[0];
+  const todayStr = new Date().toISOString().split("T")[0];
   const quotaRef = useMemoFirebase(() => {
     if (!user) return null;
-    return `users/${user.uid}/email_quota/${today}`;
-  }, [user, today]);
+    return `users/${user.uid}/email_quota/${todayStr}`;
+  }, [user, todayStr]);
   const { data: emailQuota, isLoading: quotaLoading } = useDoc(quotaRef);
 
   const emailSentToday = emailQuota?.count || 0;
@@ -216,7 +265,7 @@ export default function DashboardPage() {
               <>
                 <MorningBriefingCard />
 
-                {isUserLoading || contactsLoading ? (
+                {liveStats.loading ? (
                   <StatsSkeleton />
                 ) : (
                   <div className="grid gap-4 md:gap-6 grid-cols-2 lg:grid-cols-4">
