@@ -1,4 +1,3 @@
-
 "use client"
 
 import React, { useState, useEffect, useMemo } from "react"
@@ -45,7 +44,8 @@ import {
   Camera,
   Printer,
   FileBadge,
-  Wand2
+  Wand2,
+  FileBarChart
 } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
@@ -68,6 +68,7 @@ import { doc } from "firebase/firestore"
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { connectGmailAccount } from "@/firebase/auth/gmail-auth"
+import Link from "next/link"
 
 interface ContactDetailsSheetProps {
   contact: any | null;
@@ -97,7 +98,6 @@ export function ContactDetailsSheet({ contact: initialContact, open, onOpenChang
   const contactPath = useMemo(() => user && contactId ? `users/${user.uid}/contacts/${contactId}` : null, [user, contactId]);
   const { data: contact, isLoading: contactLoading } = useDoc(contactPath);
   const { data: history } = useConversationHistory(contactId || "");
-  const { data: appointments } = useAppointments();
 
   const handleOpenCompose = async () => {
     if (!user || !contact) return;
@@ -114,7 +114,6 @@ export function ContactDetailsSheet({ contact: initialContact, open, onOpenChang
       return;
     }
 
-    // Determine Template
     let template = "";
     let subject = "Quick question regarding your property";
     
@@ -243,14 +242,26 @@ export function ContactDetailsSheet({ contact: initialContact, open, onOpenChang
                 
                 <TabsContent value="overview" className="m-0 space-y-6">
                   <section className="grid grid-cols-1 gap-4">
-                    <Button 
-                      onClick={handleGenerateBrief} 
-                      disabled={generatingBrief}
-                      className="w-full h-12 bg-accent hover:bg-accent/90 text-primary font-black uppercase tracking-widest shadow-lg gap-2 rounded-xl"
-                    >
-                      {generatingBrief ? <RefreshCw className="h-5 w-5 animate-spin" /> : <FileBadge className="h-5 w-5" />}
-                      Strategic Listing Brief
-                    </Button>
+                    <div className="grid grid-cols-2 gap-4">
+                      <Button 
+                        onClick={handleGenerateBrief} 
+                        disabled={generatingBrief}
+                        variant="secondary"
+                        className="h-14 font-black uppercase text-[10px] tracking-widest gap-2 rounded-xl border border-slate-200"
+                      >
+                        {generatingBrief ? <RefreshCw className="h-4 w-4 animate-spin" /> : <FileBadge className="h-4 w-4 text-primary" />}
+                        Listing Brief
+                      </Button>
+                      
+                      <Link href={`/cma/${contactId}`} className="contents">
+                        <Button 
+                          className="h-14 bg-accent hover:bg-accent/90 text-primary font-black uppercase text-[10px] tracking-widest shadow-lg gap-2 rounded-xl"
+                        >
+                          <FileBarChart className="h-4 w-4" />
+                          Generate CMA
+                        </Button>
+                      </Link>
+                    </div>
                     
                     <div className="grid grid-cols-2 gap-4">
                       {contact.phone && (
@@ -413,14 +424,14 @@ export function ContactDetailsSheet({ contact: initialContact, open, onOpenChang
         </DialogContent>
       </Dialog>
 
-      {/* Appointment Briefing Modal (Existing) */}
+      {/* Appointment Briefing Modal */}
       <Dialog open={briefingOpen} onOpenChange={setBriefingOpen}>
         <DialogContent className="max-w-4xl max-h-[95vh] overflow-y-auto p-0 border-none shadow-2xl rounded-2xl">
           <header className="bg-primary text-white p-8 relative overflow-hidden">
             <div className="absolute top-0 right-0 p-8 opacity-10"><FileBadge className="h-24 w-24" /></div>
-            <DialogTitle className="text-3xl font-black font-headline">Strategy Brief: {contact.name}</DialogTitle>
+            <DialogTitle className="text-3xl font-black font-headline">Strategy Brief: {contact?.name}</DialogTitle>
             <DialogDescription className="text-primary-foreground/70 flex items-center gap-2 mt-2">
-              <MapPin className="h-4 w-4" /> {contact.propertyAddress}
+              <MapPin className="h-4 w-4" /> {contact?.propertyAddress}
             </DialogDescription>
           </header>
           <div className="p-8 bg-white space-y-8">
