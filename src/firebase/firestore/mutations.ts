@@ -11,15 +11,20 @@ import {
   WithFieldValue,
   DocumentData
 } from 'firebase/firestore';
+import { errorEmitter } from '../error-emitter';
+import { FirestorePermissionError } from '../errors';
 
 /**
  * Initiates a non-blocking Firestore add operation.
- * Optimized for UI responsiveness by not awaiting the promise.
  */
 export function addDocumentNonBlocking<T = DocumentData>(ref: CollectionReference<T>, data: WithFieldValue<T>) {
-  addDoc(ref, data).catch(err => {
-    // Silently fail or log locally; global error listener handles permissions
-    console.error("Non-blocking add failed:", err);
+  addDoc(ref, data).catch(async (serverError) => {
+    const permissionError = new FirestorePermissionError({
+      path: ref.path,
+      operation: 'create',
+      requestResourceData: data,
+    });
+    errorEmitter.emit('permission-error', permissionError);
   });
 }
 
@@ -27,8 +32,13 @@ export function addDocumentNonBlocking<T = DocumentData>(ref: CollectionReferenc
  * Initiates a non-blocking Firestore update operation.
  */
 export function updateDocumentNonBlocking<T = DocumentData>(ref: DocumentReference<T>, data: UpdateData<T>) {
-  updateDoc(ref, data).catch(err => {
-    console.error("Non-blocking update failed:", err);
+  updateDoc(ref, data).catch(async (serverError) => {
+    const permissionError = new FirestorePermissionError({
+      path: ref.path,
+      operation: 'update',
+      requestResourceData: data,
+    });
+    errorEmitter.emit('permission-error', permissionError);
   });
 }
 
@@ -36,8 +46,13 @@ export function updateDocumentNonBlocking<T = DocumentData>(ref: DocumentReferen
  * Initiates a non-blocking Firestore set operation with merge.
  */
 export function setDocumentNonBlocking<T = DocumentData>(ref: DocumentReference<T>, data: WithFieldValue<T>) {
-  setDoc(ref, data, { merge: true }).catch(err => {
-    console.error("Non-blocking set failed:", err);
+  setDoc(ref, data, { merge: true }).catch(async (serverError) => {
+    const permissionError = new FirestorePermissionError({
+      path: ref.path,
+      operation: 'write',
+      requestResourceData: data,
+    });
+    errorEmitter.emit('permission-error', permissionError);
   });
 }
 
@@ -45,7 +60,11 @@ export function setDocumentNonBlocking<T = DocumentData>(ref: DocumentReference<
  * Initiates a non-blocking Firestore delete operation.
  */
 export function deleteDocumentNonBlocking(ref: DocumentReference) {
-  deleteDoc(ref).catch(err => {
-    console.error("Non-blocking delete failed:", err);
+  deleteDoc(ref).catch(async (serverError) => {
+    const permissionError = new FirestorePermissionError({
+      path: ref.path,
+      operation: 'delete',
+    });
+    errorEmitter.emit('permission-error', permissionError);
   });
 }

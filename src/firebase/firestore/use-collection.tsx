@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import { collection, query, onSnapshot, getDocs, Query, DocumentData } from 'firebase/firestore';
 import { useFirestore } from '../provider';
+import { errorEmitter } from '../error-emitter';
+import { FirestorePermissionError } from '../errors';
 
 interface UseCollectionOptions {
   realtime?: boolean;
@@ -43,15 +45,18 @@ export function useCollection<T = DocumentData>(
           setData(docs);
           setLoading(false);
         },
-        (err) => {
-          console.error("Firestore useCollection Error:", err);
-          setError(err);
+        async (serverError) => {
+          const permissionError = new FirestorePermissionError({
+            path: (q as any)._query?.path?.toString() || 'unknown/collection',
+            operation: 'list',
+          });
+          errorEmitter.emit('permission-error', permissionError);
+          setError(permissionError);
           setLoading(false);
         }
       );
       return () => unsubscribe();
     } else {
-      // One-shot fetch for non-critical data
       getDocs(q as Query<T>)
         .then((snapshot) => {
           const docs = snapshot.docs.map((doc) => ({
@@ -61,9 +66,13 @@ export function useCollection<T = DocumentData>(
           setData(docs);
           setLoading(false);
         })
-        .catch((err) => {
-          console.error("Firestore useCollection (One-shot) Error:", err);
-          setError(err);
+        .catch(async (serverError) => {
+          const permissionError = new FirestorePermissionError({
+            path: (q as any)._query?.path?.toString() || 'unknown/collection',
+            operation: 'list',
+          });
+          errorEmitter.emit('permission-error', permissionError);
+          setError(permissionError);
           setLoading(false);
         });
     }
