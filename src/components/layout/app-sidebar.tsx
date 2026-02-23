@@ -1,4 +1,3 @@
-
 "use client"
 
 import * as React from "react"
@@ -31,7 +30,8 @@ import {
 } from "@/components/ui/sidebar"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { getAuth, signOut } from 'firebase/auth'
+import { useAuth } from "@/firebase"
+import { signOut } from 'firebase/auth'
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -52,11 +52,13 @@ const navigation = [
 export function AppSidebar() {
   const pathname = usePathname()
   const router = useRouter()
+  const auth = useAuth()
 
   const handleSignOut = async () => {
     try {
-      const auth = getAuth();
       await signOut(auth);
+      // Explicitly clear the session cookie for the middleware
+      document.cookie = "monica-session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
       router.push('/login');
     } catch (error) {
       console.error('Error signing out:', error);
@@ -70,7 +72,7 @@ export function AppSidebar() {
           <div className="bg-accent rounded-lg p-2 text-accent-foreground shadow-lg">
             <Sparkles className="w-6 h-6" />
           </div>
-          <span className="font-headline font-bold text-xl tracking-tight group-data-[collapsible=icon]:hidden">
+          <span className="font-headline font-bold text-xl tracking-tight group-data-[collapsible=icon]:hidden text-primary">
             Monica AI Hub
           </span>
         </div>
@@ -99,7 +101,7 @@ export function AppSidebar() {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton 
-              className="text-red-300 hover:text-red-100 hover:bg-red-900/20"
+              className="text-red-600 hover:text-red-700 hover:bg-red-50"
               onClick={handleSignOut}
             >
               <LogOut />

@@ -3,7 +3,7 @@
 import React, { createContext, useContext, ReactNode, useMemo, useState, useEffect, useRef } from 'react';
 import { FirebaseApp } from 'firebase/app';
 import { Firestore } from 'firebase/firestore';
-import { Auth, User, onAuthStateChanged, signInAnonymously } from 'firebase/auth';
+import { Auth, User, onAuthStateChanged } from 'firebase/auth';
 
 interface FirebaseProviderProps {
   children: ReactNode;
@@ -36,29 +36,21 @@ export function FirebaseProvider({
     error: null,
   });
 
-  // Track if a sign-in is currently in flight to prevent token invalidation race conditions
-  // This is critical for preventing auth/firebase-app-check-token-is-invalid errors
-  const isSigningIn = useRef(false);
-
   useEffect(() => {
     if (!auth) return;
 
-    // Single source of truth for auth state and automatic anonymous sign-in
+    // Single source of truth for auth state
     const unsubscribe = onAuthStateChanged(
       auth,
       (user) => {
-        if (!user && !isSigningIn.current) {
-          isSigningIn.current = true;
-          // Initiate anonymous sign-in only if no user is present and no sign-in is active.
-          // We do not 'await' this inside the listener to prevent recursive state updates.
-          signInAnonymously(auth)
-            .catch((err) => {
-              console.error('Firebase Anonymous Sign-in Error:', err);
-            })
-            .finally(() => {
-              isSigningIn.current = false;
-            });
+        // Sync middleware cookie with client auth state
+        if (user && !user.isAnonymous) {
+          document.cookie = "monica-session=active; path=/; max-age=86400; samesite=lax";
+        } else if (!user) {
+          // Clear cookie on logout
+          document.cookie = "monica-session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
         }
+        
         setUserState({ user, loading: false, error: null });
       },
       (error) => {
