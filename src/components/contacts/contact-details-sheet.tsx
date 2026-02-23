@@ -69,6 +69,7 @@ import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { connectGmailAccount } from "@/firebase/auth/gmail-auth"
 import Link from "next/link"
+import { ObjectionCoachContent } from "@/components/objection-coach/objection-coach-content"
 
 interface ContactDetailsSheetProps {
   contact: any | null;
@@ -230,7 +231,10 @@ export function ContactDetailsSheet({ contact: initialContact, open, onOpenChang
               <TabsList className="w-full justify-start gap-4 sm:gap-6 h-12 bg-transparent p-0 rounded-none overflow-x-auto no-scrollbar scrollbar-hide">
                 <TabsTrigger value="overview" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-0 font-bold text-[10px] sm:text-xs uppercase tracking-widest whitespace-nowrap">Overview</TabsTrigger>
                 <TabsTrigger value="ai-steps" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-0 font-bold text-[10px] sm:text-xs uppercase tracking-widest gap-2 whitespace-nowrap">
-                  <Sparkles className="h-3 w-3 text-accent" /> AI Steps
+                  <Sparkles className="h-3 w-3 text-accent" /> AI Strategy
+                </TabsTrigger>
+                <TabsTrigger value="objection" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-0 font-bold text-[10px] sm:text-xs uppercase tracking-widest gap-2 whitespace-nowrap">
+                  <BrainCircuit className="h-3 w-3 text-accent" /> Objections
                 </TabsTrigger>
                 <TabsTrigger value="property" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-0 font-bold text-[10px] sm:text-xs uppercase tracking-widest whitespace-nowrap">Property</TabsTrigger>
                 <TabsTrigger value="history" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-0 font-bold text-[10px] sm:text-xs uppercase tracking-widest whitespace-nowrap">History</TabsTrigger>
@@ -302,6 +306,10 @@ export function ContactDetailsSheet({ contact: initialContact, open, onOpenChang
                       <p className="text-xs text-slate-600 leading-relaxed italic">"{contact.motivation || 'Standard profile — monitoring for specific signals.'}"</p>
                     </div>
                   </Card>
+                </TabsContent>
+
+                <TabsContent value="objection" className="m-0 space-y-6">
+                  <ObjectionCoachContent />
                 </TabsContent>
 
                 <TabsContent value="property" className="m-0 space-y-8">

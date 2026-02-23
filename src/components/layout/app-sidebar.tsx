@@ -17,7 +17,8 @@ import {
   Building2,
   Wrench,
   MessageSquare,
-  FileBarChart
+  FileBarChart,
+  BrainCircuit
 } from "lucide-react"
 
 import {
@@ -56,6 +57,7 @@ export function AppSidebar() {
     { name: "Dashboard", href: "/", icon: LayoutDashboard },
     { name: "Setup Guide", href: "/setup-guide", icon: Wrench },
     { name: "Inbox", href: "/inbox", icon: MessageSquare, badge: unreadCount },
+    { name: "Objection Coach", href: "/objection-coach", icon: BrainCircuit },
     { name: "Prospector", href: "/contacts", icon: Users },
     { name: "MLS Intel", href: "/mls-intelligence", icon: Building2 },
     { name: "Market Reports", href: "/market-report", icon: FileBarChart },

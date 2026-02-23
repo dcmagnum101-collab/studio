@@ -6,6 +6,7 @@ import { FEATURES } from '@/lib/feature-flags';
 import { AlertTriangle } from 'lucide-react';
 import { NotificationListener } from '@/components/layout/notification-listener';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener';
+import { ObjectionCoachFloating } from '@/components/objection-coach/objection-coach-floating';
 
 export const metadata: Metadata = {
   title: 'Monica AI Hub | Intelligent Seller Outreach',
@@ -37,6 +38,7 @@ export default function RootLayout({
           
           <NotificationListener />
           {children}
+          <ObjectionCoachFloating />
           <Toaster />
         </FirebaseClientProvider>
       </body>
