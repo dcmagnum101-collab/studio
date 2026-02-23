@@ -10,6 +10,9 @@ export const FEATURES = {
   // Trulia or Realtor.com APIs via RapidAPI
   mlsData: !!(process.env.RAPIDAPI_TRULIA_KEY || process.env.RAPIDAPI_REALTOR_KEY || process.env.RAPIDAPI_KEY),
   
+  // Spark API for LVR MLS (Las Vegas)
+  sparkMLS: !!process.env.SPARK_API_KEY,
+
   // Google Maps for Farm Zone parcel visualization
   maps: !!process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY,
   

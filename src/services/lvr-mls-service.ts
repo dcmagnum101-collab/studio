@@ -1,117 +1,209 @@
 'use server';
 
 /**
- * @fileOverview LVR (Las Vegas Realtors) RESO Web API Service.
- * Handles authenticated OData queries to the LVR MLS feed.
+ * @fileOverview LVR (Las Vegas Realtors) Spark API Service.
+ * Handles OpenID Connect authenticated queries to the Spark platform.
  */
 
 import { adminDb } from '@/lib/firebase-admin';
 import * as admin from 'firebase-admin';
 
-const LVR_API_URL = process.env.LVR_MLS_URL || 'https://api.lvr.mls/RESO/OData';
-const LVR_USERNAME = process.env.LVR_MLS_USERNAME;
-const LVR_PASSWORD = process.env.LVR_MLS_PASSWORD;
+const SPARK_API_URL = 'https://sparkapi.com/v1';
+const SPARK_API_KEY = process.env.SPARK_API_KEY;
+
+export interface MLSListing {
+  listingKey: string;
+  standardStatus: string;
+  listPrice: number;
+  listAgentName: string;
+  listOfficeName: string;
+  closePrice?: number;
+  closeDate?: string;
+  address: string;
+  city: string;
+  zip: string;
+  beds: number;
+  baths: number;
+  sqft: number;
+  yearBuilt: number;
+  lat: number;
+  lng: number;
+  daysOnMarket: number;
+  pendingDate?: string;
+  pinColor: string;
+  pinLabel: 'Listed' | 'Pending' | 'FSBO' | 'FRBO' | 'Available';
+}
 
 /**
- * Helper to fetch data from LVR RESO API with Basic Auth
+ * Normalizes an address for fuzzy matching between GIS and MLS
  */
-async function fetchLVR(query: string) {
-  if (!LVR_USERNAME || !LVR_PASSWORD) {
-    throw new Error('LVR MLS Credentials not configured.');
+export function normalizeAddress(addr: string): string {
+  if (!addr) return '';
+  return addr.toLowerCase()
+    .replace(/\./g, '')
+    .replace(/,.*$/, '') // remove city/state if present
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Maps Spark Status to Monica's Tactical Map Logic
+ */
+function getPinAttributes(raw: any): { color: string; label: MLSListing['pinLabel'] } {
+  const status = raw.StandardStatus;
+  const office = raw.ListOfficeName?.toLowerCase() || '';
+  const agentKey = raw.ListAgentKey;
+
+  // FSBO Detection
+  if (status === 'Active' && (office.includes('by owner') || !raw.ListOfficeName)) {
+    return { color: '#2563EB', label: 'FSBO' };
   }
 
-  const auth = Buffer.from(`${LVR_USERNAME}:${LVR_PASSWORD}`).toString('base64');
-  const response = await fetch(`${LVR_API_URL}${query}`, {
-    headers: {
-      'Authorization': `Basic ${auth}`,
-      'Accept': 'application/json',
-      'RESO-Entity': 'Property'
+  // Pending / Under Contract
+  if (status === 'Pending' || status === 'Active Under Contract') {
+    return { color: '#EAB308', label: 'Pending' };
+  }
+
+  // Active with another agent
+  if (status === 'Active' && agentKey) {
+    return { color: '#DC2626', label: 'Listed' };
+  }
+
+  // General Available
+  if (status === 'Active') {
+    return { color: '#16A34A', label: 'Available' };
+  }
+
+  return { color: '#6B7280', label: 'Available' };
+}
+
+/**
+ * Fetch from Spark API with Auth
+ */
+async function fetchSpark(endpoint: string, params: Record<string, string> = {}) {
+  if (!SPARK_API_KEY) {
+    console.warn('[Spark Service] SPARK_API_KEY not configured.');
+    return { results: [] };
+  }
+
+  const queryParams = new URLSearchParams(params).toString();
+  const url = `${SPARK_API_URL}${endpoint}${queryParams ? `?${queryParams}` : ''}`;
+
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${SPARK_API_KEY}`,
+        'X-SparkApi-User-Agent': 'MonicaAIHub/1.0',
+        'Accept': 'application/json'
+      },
+      next: { revalidate: 900 } // 15 min cache
+    });
+
+    if (response.status === 401) throw new Error('Spark API key invalid or expired');
+    if (response.status === 429) throw new Error('Spark API rate limit hit');
+    if (!response.ok) throw new Error(`Spark API Error: ${response.status}`);
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('[Spark Service] Fetch failed:', error);
+    throw error;
+  }
+}
+
+export async function getListingsInRadius(userId: string, lat: number, lng: number, radiusMeters: number): Promise<MLSListing[]> {
+  const radiusMiles = radiusMeters * 0.000621371;
+  const cacheKey = `radius_${lat.toFixed(4)}_${lng.toFixed(4)}_${radiusMeters}`;
+  const cacheRef = adminDb.collection('users').doc(userId).collection('mls_cache').doc(cacheKey);
+
+  // Check Firestore Cache (15 min)
+  const cached = await cacheRef.get();
+  if (cached.exists) {
+    const data = cached.data();
+    if (data?.expires_at.toDate() > new Date()) {
+      return data.listings;
     }
+  }
+
+  const params = {
+    '_filter': `Nearby(${lat},${lng},${radiusMiles})`,
+    '_select': 'ListingKey,StandardStatus,ListPrice,ListAgentKey,ListAgentFullName,ListOfficeName,ClosePrice,CloseDate,StreetNumber,StreetName,City,StateOrProvince,PostalCode,BedroomsTotal,BathroomsTotal,LivingArea,YearBuilt,Latitude,Longitude,ModificationTimestamp,BuyerAgentKey,PendingTimestamp,ListingContractDate,DaysOnMarket',
+    '_limit': '200'
+  };
+
+  const response = await fetchSpark('/listings', params);
+  const rawListings = response.results || [];
+
+  const listings: MLSListing[] = rawListings.map((raw: any) => {
+    const attrs = getPinAttributes(raw);
+    return {
+      listingKey: raw.ListingKey,
+      standardStatus: raw.StandardStatus,
+      listPrice: raw.ListPrice,
+      listAgentName: raw.ListAgentFullName,
+      listOfficeName: raw.ListOfficeName,
+      closePrice: raw.ClosePrice,
+      closeDate: raw.CloseDate,
+      address: `${raw.StreetNumber} ${raw.StreetName}`,
+      city: raw.City,
+      zip: raw.PostalCode,
+      beds: raw.BedroomsTotal,
+      baths: raw.BathroomsTotal,
+      sqft: raw.LivingArea,
+      yearBuilt: raw.YearBuilt,
+      lat: raw.Latitude,
+      lng: raw.Longitude,
+      daysOnMarket: raw.DaysOnMarket,
+      pendingDate: raw.PendingTimestamp,
+      pinColor: attrs.color,
+      pinLabel: attrs.label
+    };
   });
 
-  if (!response.ok) {
-    const err = await response.text();
-    throw new Error(`LVR API Error: ${response.status} - ${err}`);
-  }
+  // Persist to Cache
+  await cacheRef.set({
+    listings,
+    expires_at: admin.firestore.Timestamp.fromDate(new Date(Date.now() + 15 * 60 * 1000))
+  });
 
-  return response.json();
+  return listings;
 }
 
-/**
- * Normalizes LVR Property data to the Monica Lead format
- */
-export async function normalizeLVRProperty(raw: any, source: string): Promise<any> {
+export async function getListingByAddress(address: string): Promise<MLSListing | null> {
+  const params = {
+    '_filter': `StreetAddress Eq '${address}'`,
+    '_select': 'ListingKey,StandardStatus,ListPrice,ListAgentKey,ListAgentFullName,ListOfficeName,ClosePrice,CloseDate,StreetNumber,StreetName,City,PostalCode,BedroomsTotal,BathroomsTotal,LivingArea,YearBuilt,Latitude,Longitude,DaysOnMarket',
+    '_limit': '1'
+  };
+
+  const response = await fetchSpark('/listings', params);
+  if (!response.results?.[0]) return null;
+
+  const raw = response.results[0];
+  const attrs = getPinAttributes(raw);
+
   return {
-    mlsNumber: raw.ListingId,
-    name: "Market Prospect",
-    propertyAddress: raw.UnparsedAddress || `${raw.StreetNumber} ${raw.StreetName}`,
+    listingKey: raw.ListingKey,
+    standardStatus: raw.StandardStatus,
+    listPrice: raw.ListPrice,
+    listAgentName: raw.ListAgentFullName,
+    listOfficeName: raw.ListOfficeName,
+    address: `${raw.StreetNumber} ${raw.StreetName}`,
     city: raw.City,
-    state: raw.StateOrProvince || 'NV',
     zip: raw.PostalCode,
     beds: raw.BedroomsTotal,
-    baths: raw.BathroomsTotalInteger,
+    baths: raw.BathroomsTotal,
     sqft: raw.LivingArea,
     yearBuilt: raw.YearBuilt,
-    listPrice: raw.ListPrice,
+    lat: raw.Latitude,
+    lng: raw.Longitude,
     daysOnMarket: raw.DaysOnMarket,
-    listingExpiredDate: raw.ExpirationDate,
-    listingAgent: raw.ListAgentFullName,
-    brokerage: raw.ListOfficeName,
-    remarks: raw.PublicRemarks,
-    photos: raw.Media?.map((m: any) => m.MediaURL) || [],
-    thumbnail: raw.Media?.[0]?.MediaURL || null,
-    listing_status: raw.StandardStatus,
-    archagent_source: source,
-    icpScore: source === 'expired-mls' ? 85 : 50,
-    pipeline_stage: 'new_lead',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
+    pinColor: attrs.color,
+    pinLabel: attrs.label
   };
 }
 
-/**
- * Queries LVR for listings by status and zip codes
- */
-export async function queryLVRListings(params: {
-  status: string[];
-  zipCodes: string[];
-  filter?: string;
-}) {
-  const statusFilter = params.status.map(s => `StandardStatus eq '${s}'`).join(' or ');
-  const zipFilter = params.zipCodes.map(z => `PostalCode eq '${z}'`).join(' or ');
-  
-  let oDataFilter = `(${statusFilter}) and (${zipFilter})`;
-  if (params.filter) oDataFilter += ` and ${params.filter}`;
-
-  const query = `/Property?$filter=${encodeURIComponent(oDataFilter)}&$expand=Media&$top=50&$orderby=ModificationTimestamp desc`;
-  const result = await fetchLVR(query);
-  return result.value || [];
-}
-
-/**
- * Fetches and caches neighborhood vitals using Admin SDK.
- */
-export async function getMarketVitals(userId: string, zipCode: string) {
-  const today = new Date().toISOString().split('T')[0];
-  const statsRef = adminDb.collection('users').doc(userId).collection('mls_stats').doc(zipCode);
-  
-  const cached = await statsRef.get();
-  if (cached.exists && cached.data()?.date === today) {
-    return cached.data();
-  }
-
-  const vitals = {
-    zipCode,
-    date: today,
-    median_price: 485000,
-    avg_dom: 38,
-    active_count: 124,
-    sold_last_30_days: 42,
-    list_to_sale_ratio: 0.98,
-    price_per_sqft: 245,
-    updatedAt: admin.firestore.FieldValue.serverTimestamp()
-  };
-
-  await statsRef.set(vitals);
-  return vitals;
+export async function getListingDetail(listingKey: string): Promise<any> {
+  const response = await fetchSpark(`/listings/${listingKey}`);
+  return response.results?.[0] || null;
 }
