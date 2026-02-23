@@ -196,3 +196,49 @@ export async function getListingDetail(listingKey: string): Promise<any> {
   const response = await fetchSpark(`/listings/${listingKey}`);
   return response.results?.[0] || null;
 }
+
+/**
+ * Returns market vitals for a zip code (mocked using spark logic).
+ */
+export async function getMarketVitals(userId: string, zip: string) {
+  // In a real scenario, this would aggregate recent closed/active data
+  return {
+    zipCode: zip,
+    median_price: 450000 + (Math.random() * 50000),
+    avg_dom: 35 + Math.floor(Math.random() * 10)
+  };
+}
+
+export async function queryLVRListings(params: { status: string[], zipCodes: string[], filter?: string }) {
+  // Spark implementation
+  const statusFilter = params.status.length ? `StandardStatus In (${params.status.map(s => `'${s}'`).join(',')})` : '';
+  const zipFilter = params.zipCodes.length ? `PostalCode In (${params.zipCodes.map(z => `'${z}'`).join(',')})` : '';
+  
+  const combined = [statusFilter, zipFilter, params.filter].filter(Boolean).join(' And ');
+  
+  const response = await fetchSpark('/listings', {
+    '_filter': combined,
+    '_limit': '50'
+  });
+  
+  return response.results || [];
+}
+
+export async function normalizeLVRProperty(raw: any, source: string) {
+  const attrs = getPinAttributes(raw);
+  return {
+    mlsNumber: raw.ListingKey,
+    propertyAddress: `${raw.StreetNumber} ${raw.StreetName}`,
+    city: raw.City,
+    state: raw.StateOrProvince,
+    zip: raw.PostalCode,
+    listPrice: raw.ListPrice,
+    beds: raw.BedroomsTotal,
+    baths: raw.BathroomsTotal,
+    sqft: raw.LivingArea,
+    yearBuilt: raw.YearBuilt,
+    listing_status: raw.StandardStatus,
+    archagent_source: source,
+    icpScore: raw.StandardStatus === 'Expired' ? 85 : 45
+  };
+}

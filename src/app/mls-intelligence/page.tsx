@@ -32,7 +32,7 @@ import {
   Lock
 } from "lucide-react"
 import { useUser, useFirestore, addDocumentNonBlocking, useDoc, useMemoFirebase } from "@/firebase"
-import { syncLVRListings, fetchNeighborhoodStats, getExpiringLeadsAction } from "@/app/actions/lvr-mls"
+import { syncLVRListings, fetchNeighborhoodStats } from "@/app/actions/lvr-mls"
 import { unifiedMLSSync } from "@/services/mls-sync-orchestrator"
 import { useToast } from "@/hooks/use-toast"
 import { FEATURES } from "@/lib/feature-flags"
