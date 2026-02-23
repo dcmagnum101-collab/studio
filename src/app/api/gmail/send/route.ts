@@ -1,7 +1,12 @@
-
 import { NextRequest, NextResponse } from 'next/server';
 import { getGmailClient, checkUnsubscribe, logMessage } from '@/services/gmail-service';
 
+export const dynamic = 'force-dynamic';
+
+/**
+ * API Route to send a Gmail message.
+ * This is the public endpoint used by the outreach builder.
+ */
 export async function POST(request: NextRequest) {
   try {
     const { userId, to, subject, body, leadId, threadId } = await request.json();

@@ -5,6 +5,7 @@ export const dynamic = 'force-dynamic';
 
 /**
  * Triggered at 6 PM daily to audit agent performance.
+ * This route is called by external cron services.
  */
 export async function POST(req: NextRequest) {
   const authHeader = req.headers.get('Authorization');
