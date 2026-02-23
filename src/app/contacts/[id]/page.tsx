@@ -240,6 +240,17 @@ export default function ContactProfilePage() {
               </ScrollArea>
             </div>
           </main>
+
+          <footer className="p-4 bg-white border-t flex flex-col md:flex-row justify-between items-center gap-4 opacity-60">
+            <div className="space-y-1 text-center md:text-left">
+              <p className="text-sm font-black text-primary">Monica Selvaggio</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Licensed Real Estate Professional</p>
+            </div>
+            <div className="flex gap-6 text-[10px] font-black uppercase tracking-widest text-slate-500">
+              <span className="flex items-center gap-2"><Phone className="h-3 w-3" /> (702) 555-0199</span>
+              <span className="flex items-center gap-2"><Mail className="h-3 w-3" /> monicaselvaggio@gmail.com</span>
+            </div>
+          </footer>
         </SidebarInset>
       </div>
     </SidebarProvider>

@@ -80,29 +80,29 @@ export async function generateDailyRecap(userId: string) {
 
     const coachRecap = await grokAsk(system, userPrompt, userId);
     const userDoc = await userRef.get();
-    const userEmail = userDoc.data()?.email;
+    const userEmail = userDoc.data()?.email 
+      || process.env.GMAIL_USER 
+      || 'monicaselvaggio@gmail.com';
 
-    if (userEmail) {
-      await sendNurtureEmail({
-        userId,
-        contactId: 'recap',
-        to: userEmail,
-        subject: `Daily Recap: Monica's Performance Audit`,
-        body: `
-          <div style="font-family: sans-serif; max-width: 600px; color: #1e293b;">
-            <h1 style="color: #1e3a8a;">Today's Recap</h1>
-            <p style="font-size: 16px; line-height: 1.6;">${coachRecap.replace(/\n/g, '<br/>')}</p>
-            <div style="background: #f8fafc; padding: 20px; border-radius: 12px; margin: 20px 0; border: 1px solid #e2e8f0;">
-              <h3 style="margin-top: 0; color: #1e3a8a;">Priority Leads for Tomorrow</h3>
-              <ul style="padding-left: 20px;">
-                ${leads.map(l => `<li><strong>${l.name}</strong> - ${l.address} (ICP: ${l.score})</li>`).join('')}
-              </ul>
-            </div>
-            <p style="font-size: 12px; color: #64748b;">This automated audit helps you maintain elite consistency in the Las Vegas market.</p>
+    await sendNurtureEmail({
+      userId,
+      contactId: 'recap',
+      to: userEmail,
+      subject: `Daily Recap: Monica's Performance Audit`,
+      body: `
+        <div style="font-family: sans-serif; max-width: 600px; color: #1e293b;">
+          <h1 style="color: #1e3a8a;">Today's Recap</h1>
+          <p style="font-size: 16px; line-height: 1.6;">${coachRecap.replace(/\n/g, '<br/>')}</p>
+          <div style="background: #f8fafc; padding: 20px; border-radius: 12px; margin: 20px 0; border: 1px solid #e2e8f0;">
+            <h3 style="margin-top: 0; color: #1e3a8a;">Priority Leads for Tomorrow</h3>
+            <ul style="padding-left: 20px;">
+              ${leads.map(l => `<li><strong>${l.name}</strong> - ${l.address} (ICP: ${l.score})</li>`).join('')}
+            </ul>
           </div>
-        `
-      });
-    }
+          <p style="font-size: 12px; color: #64748b;">This automated audit helps you maintain elite consistency in the Las Vegas market.</p>
+        </div>
+      `
+    });
   }
 
   return { stats, goalsMet };

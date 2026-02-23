@@ -134,9 +134,9 @@ export async function generateWeeklyReport(userId: string, weekStart: string): P
 export async function sendReportToUser(userId: string, report: WeeklyReport) {
   const userDoc = await adminDb.collection('users').doc(userId).get();
   const userData = userDoc.data();
-  const userEmail = userData?.email || process.env.GMAIL_USER;
-
-  if (!userEmail) throw new Error('No target email found for user');
+  const userEmail = userData?.email 
+    || process.env.GMAIL_USER 
+    || 'monicaselvaggio@gmail.com';
 
   const tokenDoc = await adminDb.collection('users').doc(userId).collection('integrations').doc('gmail').get();
   if (!tokenDoc.exists) throw new Error('Gmail not connected');

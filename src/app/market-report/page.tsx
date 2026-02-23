@@ -232,8 +232,8 @@ export default function MarketReportPage() {
                       </div>
                       <div className="flex gap-8 text-[10px] font-black uppercase tracking-widest text-slate-500">
                         <span className="flex items-center gap-2"><Phone className="h-3 w-3 text-accent" /> (702) 555-0199</span>
-                        <span className="flex items-center gap-2"><Mail className="h-3 w-3 text-accent" /> monica@agent.com</span>
-                        <span className="flex items-center gap-2"><Building2 className="h-3 w-3 text-accent" /> NV LIC: S.0123456</span>
+                        <span className="flex items-center gap-2"><Mail className="h-3 w-3" /> monicaselvaggio@gmail.com</span>
+                        <span className="flex items-center gap-2"><Building2 className="h-3 w-3" /> NV LIC: S.0123456</span>
                       </div>
                     </footer>
                   </main>

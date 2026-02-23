@@ -1,4 +1,3 @@
-
 /**
  * Global System Prompt for Monica's Grok AI Assistant.
  */
@@ -11,7 +10,7 @@ MONICA'S PROFILE:
 - Specialty: Listing agent — helps sellers
 - Brokerage: ${process.env.MONICA_BROKERAGE || 'Selvaggio Global Real Estate'}
 - Phone: ${process.env.MONICA_PHONE || '(702) 555-0199'}
-- Email: ${process.env.GMAIL_USER || 'monica@gmail.com'}
+- Email: ${process.env.GMAIL_USER || 'monicaselvaggio@gmail.com'}
 
 YOUR RESPONSIBILITIES:
 - Score leads by motivation to sell (0-99 ICP score)
