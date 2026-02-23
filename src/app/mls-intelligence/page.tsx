@@ -212,7 +212,7 @@ export default function MLSIntelligencePage() {
                           <TableRow>
                             <TableHead className="font-bold text-xs uppercase">Property</TableHead>
                             <TableHead className="font-bold text-xs uppercase">Price</TableHead>
-                            <TableHead className="text-right font-bold text-xs uppercase">Action</TooltipProvider>
+                            <TableHead className="text-right font-bold text-xs uppercase">Action</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>

@@ -7,6 +7,7 @@
 
 import { adminDb } from '@/lib/firebase-admin';
 import * as admin from 'firebase-admin';
+import { normalizeAddress } from '@/utils/address-utils';
 
 const SPARK_API_URL = 'https://sparkapi.com/v1';
 const SPARK_API_KEY = process.env.SPARK_API_KEY;
@@ -32,18 +33,6 @@ export interface MLSListing {
   pendingDate?: string;
   pinColor: string;
   pinLabel: 'Listed' | 'Pending' | 'FSBO' | 'FRBO' | 'Available';
-}
-
-/**
- * Normalizes an address for fuzzy matching between GIS and MLS
- */
-export function normalizeAddress(addr: string): string {
-  if (!addr) return '';
-  return addr.toLowerCase()
-    .replace(/\./g, '')
-    .replace(/,.*$/, '') // remove city/state if present
-    .replace(/\s+/g, ' ')
-    .trim();
 }
 
 /**
