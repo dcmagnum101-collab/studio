@@ -1,3 +1,4 @@
+
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
@@ -9,6 +10,7 @@ export function middleware(request: NextRequest) {
     pathname.startsWith('/login') || 
     pathname.startsWith('/unsubscribe') || 
     pathname.startsWith('/quick-capture') ||
+    pathname.startsWith('/oh/') || // Public Open House sign-ins
     pathname.startsWith('/api') || 
     pathname.startsWith('/_next') || 
     pathname.includes('.');

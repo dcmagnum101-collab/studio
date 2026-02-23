@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "Contact": {
@@ -39,42 +40,29 @@
       },
       "required": ["name", "ownerId"]
     },
-    "ProspectingJob": {
-      "title": "Prospecting Job",
+    "OpenHouse": {
+      "title": "Open House Event",
       "type": "object",
       "properties": {
-        "url": { "type": "string" },
-        "status": { "type": "string", "enum": ["pending", "processing", "completed", "failed"] },
-        "created_at": { "type": "string", "format": "date-time" },
-        "result_contact_id": { "type": "string" },
-        "error": { "type": "string" }
-      }
-    },
-    "LeadSource": {
-      "title": "Lead Source Evidence",
-      "type": "object",
-      "properties": {
-        "url": { "type": "string" },
-        "extracted_data": { "type": "object" },
-        "created_at": { "type": "string", "format": "date-time" }
+        "address": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "ownerId": { "type": "string" },
+        "status": { "type": "string" },
+        "signin_count": { "type": "number" }
       }
     }
   },
   "auth": {
-    "providers": ["password", "anonymous"]
+    "providers": ["password", "anonymous", "google"]
   },
   "firestore": {
     "/users/{userId}/contacts/{contactId}": {
       "schema": { "$ref": "#/backend/entities/Contact" },
       "description": "Master contact records."
     },
-    "/users/{userId}/prospecting_jobs/{jobId}": {
-      "schema": { "$ref": "#/backend/entities/ProspectingJob" },
-      "description": "Background jobs for URL enrichment."
-    },
-    "/users/{userId}/lead_sources/{sourceId}": {
-      "schema": { "$ref": "#/backend/entities/LeadSource" },
-      "description": "Historical evidence for lead origins."
+    "/openHouses/{ohId}": {
+      "schema": { "$ref": "#/backend/entities/OpenHouse" },
+      "description": "Public-facing open house event configurations."
     }
   }
 }

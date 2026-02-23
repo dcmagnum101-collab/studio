@@ -1,3 +1,4 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -12,44 +13,33 @@ service cloud.firestore {
     match /users/{userId} {
       allow read, write: if isOwner(userId);
 
-      // Contacts Collection
       match /contacts/{contactId} {
-        allow read, write: if isOwner(userId);
+        // Allow public creation of contacts from Open House Sign-ins
+        allow create: if request.resource.data.archagent_source == 'open_house';
+        allow read, update, delete: if isOwner(userId);
         
-        // Activity Logs sub-collection
         match /activityLogs/{logId} {
           allow read, write: if isOwner(userId);
         }
       }
 
-      // Tasks Collection
-      match /tasks/{taskId} {
-        allow read, write: if isOwner(userId);
-      }
-
-      // Quota and Stats (Daily/Monthly)
-      match /email_quota/{date} {
-        allow read, write: if isOwner(userId);
-      }
-      match /rapidapi_quota/{month} {
-        allow read, write: if isOwner(userId);
-      }
-
-      // Audit Logs (Append-only for security)
-      match /ai_usage/{usageId} {
-        allow read: if isOwner(userId);
-        allow create: if isOwner(userId);
-        allow update, delete: if false; // Immutable audit log
-      }
-      match /outreach_log/{logId} {
-        allow read: if isOwner(userId);
-        allow create: if isOwner(userId);
-        allow update, delete: if false; // Immutable audit log
-      }
-
-      // Other user-specific data
+      match /tasks/{taskId} { allow read, write: if isOwner(userId); }
+      match /email_quota/{date} { allow read, write: if isOwner(userId); }
+      match /rapidapi_quota/{month} { allow read, write: if isOwner(userId); }
+      
       match /{allPaths=**} {
         allow read, write: if isOwner(userId);
+      }
+    }
+
+    // Public Open House Collection
+    match /openHouses/{ohId} {
+      allow read: if true;
+      allow create, update, delete: if isSignedIn(); // Only agents can manage OH events
+      
+      match /signins/{signinId} {
+        allow create: if true; // Anyone can sign in
+        allow read: if isSignedIn(); // Only agents can see visitor lists
       }
     }
   }
