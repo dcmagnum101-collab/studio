@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -10,10 +9,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Target, TrendingUp, Phone, Mail, Users, Calendar, Save, RefreshCw, Trophy, Rocket } from "lucide-react";
-import { useUser, useDoc, useMemoFirebase } from "@/firebase";
-import { getGoals, saveGoals, DEFAULT_GOALS, type Goals } from "@/app/actions/goals";
+import { useUser } from "@/firebase";
+import { getGoals, saveGoals } from "@/app/actions/goals";
+import { DEFAULT_GOALS, type Goals } from "@/lib/goals-constants";
 import { useToast } from "@/hooks/use-toast";
-import { Progress } from "@/components/ui/progress";
 
 export default function GoalsPage() {
   const { user } = useUser();

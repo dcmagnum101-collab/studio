@@ -1,4 +1,3 @@
-
 'use server';
 
 import { adminDb } from '@/lib/firebase-admin';
@@ -6,21 +5,11 @@ import * as admin from 'firebase-admin';
 import { grokAsk } from '@/services/grok-service';
 import { monicaSystemPrompt } from '@/config/monica-system-prompt';
 import { sendNurtureEmail } from './gmail';
+import { Goals, DEFAULT_GOALS } from '@/lib/goals-constants';
 
-export interface Goals {
-  callsPerDay: number;
-  contactsPerWeek: number;
-  appointmentsPerWeek: number;
-  emailsPerDay: number;
-}
-
-export const DEFAULT_GOALS: Goals = {
-  callsPerDay: 20,
-  contactsPerWeek: 10,
-  appointmentsPerWeek: 3,
-  emailsPerDay: 15,
-};
-
+/**
+ * Saves Monica's daily and weekly activity goals.
+ */
 export async function saveGoals(userId: string, goals: Goals) {
   if (!userId) throw new Error('Unauthorized');
   await adminDb.collection('users').doc(userId).collection('settings').doc('goals').set({
@@ -29,12 +18,18 @@ export async function saveGoals(userId: string, goals: Goals) {
   });
 }
 
+/**
+ * Retrieves the current goals for Monica, falling back to defaults if not set.
+ */
 export async function getGoals(userId: string): Promise<Goals> {
   const doc = await adminDb.collection('users').doc(userId).collection('settings').doc('goals').get();
   if (!doc.exists) return DEFAULT_GOALS;
   return doc.data() as Goals;
 }
 
+/**
+ * Audits daily performance and sends a coaching recap if goals are missed.
+ */
 export async function generateDailyRecap(userId: string) {
   const userRef = adminDb.collection('users').doc(userId);
   const goals = await getGoals(userId);

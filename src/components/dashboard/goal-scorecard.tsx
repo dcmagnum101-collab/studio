@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useMemo } from "react";
@@ -6,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Phone, Mail, Users, Calendar, Target } from "lucide-react";
 import { useUser, useDoc, useMemoFirebase, useCollection } from "@/firebase";
-import { DEFAULT_GOALS, type Goals } from "@/app/actions/goals";
+import { DEFAULT_GOALS, type Goals } from "@/lib/goals-constants";
 import { collection, query, where, collectionGroup } from "firebase/firestore";
 import { useFirestore } from "@/firebase";
 import { startOfWeek, format } from "date-fns";
