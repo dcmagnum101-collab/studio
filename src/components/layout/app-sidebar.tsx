@@ -16,7 +16,8 @@ import {
   Database,
   Building2,
   Wrench,
-  MessageSquare
+  MessageSquare,
+  FileBarChart
 } from "lucide-react"
 
 import {
@@ -57,6 +58,7 @@ export function AppSidebar() {
     { name: "Inbox", href: "/inbox", icon: MessageSquare, badge: unreadCount },
     { name: "Prospector", href: "/contacts", icon: Users },
     { name: "MLS Intel", href: "/mls-intelligence", icon: Building2 },
+    { name: "Market Reports", href: "/market-report", icon: FileBarChart },
     { name: "Sources Hub", href: "/sources", icon: Database },
     { name: "Pipeline", href: "/pipeline", icon: Trello },
     { name: "Tasks", href: "/tasks", icon: CheckSquare },
@@ -72,7 +74,6 @@ export function AppSidebar() {
     try {
       const { auth } = initializeFirebase();
       await signOut(auth);
-      // The FirebaseProvider automatically clears the cookie on auth state change
       router.push('/login');
     } catch (error) {
       console.error('Error signing out:', error);
