@@ -47,6 +47,15 @@
       "fields": [
         { "fieldPath": "called_at", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "sms_thread",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "ownerId", "order": "ASCENDING" },
+        { "fieldPath": "direction", "order": "ASCENDING" },
+        { "fieldPath": "timestamp", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": [

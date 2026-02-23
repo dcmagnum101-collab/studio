@@ -36,12 +36,13 @@ service cloud.firestore {
     }
 
     // Collection Group Rules for Unified Activity and Messaging
+    // These must be outside specific path roots to apply to collectionGroup queries
     match /{path=**}/activityLogs/{logId} {
-      allow read: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow read: if isSignedIn() && (resource == null || resource.data.ownerId == request.auth.uid);
     }
 
     match /{path=**}/sms_thread/{msgId} {
-      allow read: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow read: if isSignedIn() && (resource == null || resource.data.ownerId == request.auth.uid);
     }
 
     // Public Open House Collection
