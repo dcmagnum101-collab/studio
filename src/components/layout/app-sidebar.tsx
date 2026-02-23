@@ -30,7 +30,8 @@ import {
   SidebarSeparator,
 } from "@/components/ui/sidebar"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
+import { getAuth, signOut } from 'firebase/auth'
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -50,6 +51,17 @@ const navigation = [
 
 export function AppSidebar() {
   const pathname = usePathname()
+  const router = useRouter()
+
+  const handleSignOut = async () => {
+    try {
+      const auth = getAuth();
+      await signOut(auth);
+      router.push('/login');
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
 
   return (
     <Sidebar collapsible="icon">
@@ -86,7 +98,10 @@ export function AppSidebar() {
         <SidebarSeparator className="mb-4 opacity-20" />
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton className="text-red-300 hover:text-red-100 hover:bg-red-900/20">
+            <SidebarMenuButton 
+              className="text-red-300 hover:text-red-100 hover:bg-red-900/20"
+              onClick={handleSignOut}
+            >
               <LogOut />
               <span>Sign Out</span>
             </SidebarMenuButton>
