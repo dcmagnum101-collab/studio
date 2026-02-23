@@ -22,7 +22,9 @@ import {
   BrainCircuit,
   Bell,
   RefreshCw,
-  X
+  X,
+  Target,
+  ArrowRight
 } from "lucide-react"
 
 import {
@@ -77,6 +79,7 @@ export function AppSidebar() {
 
   const navigation = [
     { name: "Dashboard", href: "/", icon: LayoutDashboard },
+    { name: "Goals", href: "/goals", icon: Target },
     { name: "Setup Guide", href: "/setup-guide", icon: Wrench },
     { name: "Inbox", href: "/inbox", icon: MessageSquare, badge: unreadSMSCount },
     { name: "Objection Coach", href: "/objection-coach", icon: BrainCircuit },
@@ -122,7 +125,6 @@ export function AppSidebar() {
           </span>
         </div>
 
-        {/* Hot Alert Bell */}
         <div className="group-data-[collapsible=icon]:hidden">
           <Popover>
             <PopoverTrigger asChild>
@@ -181,9 +183,6 @@ export function AppSidebar() {
                   </div>
                 )}
               </div>
-              <footer className="p-3 bg-slate-50 border-t text-center">
-                <Button variant="ghost" className="w-full text-[9px] font-black uppercase text-slate-400 h-6">Clear All Notifications</Button>
-              </footer>
             </PopoverContent>
           </Popover>
         </div>

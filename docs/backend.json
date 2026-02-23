@@ -40,6 +40,17 @@
       },
       "required": ["name", "ownerId"]
     },
+    "Goal": {
+      "title": "Agent Goals",
+      "type": "object",
+      "properties": {
+        "callsPerDay": { "type": "number", "default": 20 },
+        "contactsPerWeek": { "type": "number", "default": 10 },
+        "appointmentsPerWeek": { "type": "number", "default": 3 },
+        "emailsPerDay": { "type": "number", "default": 15 },
+        "updated_at": { "type": "string", "format": "date-time" }
+      }
+    },
     "OpenHouse": {
       "title": "Open House Event",
       "type": "object",
@@ -75,6 +86,10 @@
     "/users/{userId}/alerts/{alertId}": {
       "schema": { "$ref": "#/backend/entities/Alert" },
       "description": "High-intensity intelligence alerts."
+    },
+    "/users/{userId}/settings/goals": {
+      "schema": { "$ref": "#/backend/entities/Goal" },
+      "description": "Performance tracking goals."
     },
     "/openHouses/{ohId}": {
       "schema": { "$ref": "#/backend/entities/OpenHouse" },

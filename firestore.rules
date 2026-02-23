@@ -3,7 +3,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Main user data - covers all subcollections including alerts, contacts, tasks
+    // Main user data - covers all subcollections including alerts, contacts, tasks, morningBriefings, goals
     match /users/{userId}/{allPaths=**} {
       allow read, write: if request.auth != null 
         && request.auth.uid == userId;
