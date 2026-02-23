@@ -21,9 +21,13 @@ export interface ClarkParcel {
   BATHROOMS: number;
   SALE_PRICE: number;
   SALE_DATE: string;
+  geometry?: {
+    x: number;
+    y: number;
+  };
 }
 
-export const calculateICPScore = (parcel: ClarkParcel) => {
+export const calculateICPScore = (parcel: Partial<ClarkParcel>) => {
   let score = 45; // Base
   
   // Out of state
@@ -41,7 +45,7 @@ export const calculateICPScore = (parcel: ClarkParcel) => {
   }
   
   // High equity (TOTAL_AV vs SALE_PRICE appreciation)
-  if (parcel.TOTAL_AV && parcel.SALE_PRICE) {
+  if (parcel.TOTAL_AV && parcel.SALE_PRICE && parcel.SALE_PRICE > 0) {
     const appreciation = (parcel.TOTAL_AV - parcel.SALE_PRICE) / parcel.SALE_PRICE;
     if (appreciation > 0.5) {
       score += 15;
@@ -54,7 +58,7 @@ export const calculateICPScore = (parcel: ClarkParcel) => {
   }
   
   // Residential land use
-  if (parcel.LAND_USE === '10') {
+  if (parcel.LAND_USE === '10' || parcel.LAND_USE === '11') {
     score += 5;
   }
 
@@ -74,6 +78,17 @@ export const fetchParcelAtPoint = async (lat: number, lng: number) => {
   const res = await fetch(`/api/clark-proxy?${new URLSearchParams(params).toString()}`);
   const data = await res.json();
   return data.features?.[0];
+};
+
+export const fetchAssessorDetail = async (apn: string) => {
+  const params = {
+    where: `APN = '${apn}'`,
+    outFields: '*',
+    f: 'json'
+  };
+  const res = await fetch(`/api/clark-proxy?${new URLSearchParams(params).toString()}`);
+  const data = await res.json();
+  return data.features?.[0]?.attributes;
 };
 
 export const searchProperties = async (query: string) => {
@@ -97,8 +112,9 @@ export const pullZoneParcels = async (geometry: any, geometryType: string = 'esr
     geometryType,
     spatialRel: 'esriSpatialRelIntersects',
     outFields: 'APN,OWNER_NAME,OWNER_ADDR,OWNER_CITY,OWNER_STATE,OWNER_ZIP,SITUS_ADDR,SITUS_CITY,SITUS_ZIP,TOTAL_AV,SALE_PRICE,SALE_DATE,LAND_USE,SQFT,BEDROOMS,BATHROOMS,YEAR_BUILT',
-    where: "LAND_USE = '10'",
+    where: "LAND_USE IN ('10', '11')",
     resultRecordCount: '500',
+    returnGeometry: 'true',
     f: 'json'
   };
 
@@ -108,5 +124,10 @@ export const pullZoneParcels = async (geometry: any, geometryType: string = 'esr
   });
   
   const data = await res.json();
-  return data.features || [];
+  return (data.features || []).map((f: any) => ({
+    ...f.attributes,
+    lat: f.geometry.y,
+    lng: f.geometry.x,
+    geometry: f.geometry
+  }));
 };
