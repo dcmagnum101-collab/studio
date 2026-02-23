@@ -30,12 +30,13 @@ import {
   FileText, 
   Send, 
   CheckCircle2, 
-  AlertCircle,
-  Clock,
-  DollarSign,
-  Briefcase,
-  Rocket,
-  ShieldCheck
+  AlertCircle, 
+  Clock, 
+  DollarSign, 
+  Briefcase, 
+  Rocket, 
+  ShieldCheck,
+  Zap
 } from "lucide-react";
 import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from "@/firebase";
 import { collection, query } from "firebase/firestore";
