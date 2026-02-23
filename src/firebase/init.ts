@@ -4,7 +4,6 @@ import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getAuth, Auth } from 'firebase/auth';
 import { getFirestore, Firestore } from 'firebase/firestore';
 import { getFunctions, Functions } from 'firebase/functions';
-import { initializeAppCheck, ReCaptchaEnterpriseProvider } from 'firebase/app-check';
 import { firebaseConfig } from './config';
 
 // Module-level instances to ensure true singleton behavior across the client
@@ -15,7 +14,7 @@ let functionsInstance: Functions | undefined;
 
 /**
  * Initializes and returns Firebase service instances.
- * Ensures services are only initialized once and uses real SDK only.
+ * Removed App Check and reCAPTCHA logic to prevent throttling errors.
  */
 export function initializeFirebase(): { 
   firebaseApp: FirebaseApp; 
@@ -28,23 +27,6 @@ export function initializeFirebase(): {
       firebaseAppInstance = initializeApp(firebaseConfig);
     } else {
       firebaseAppInstance = getApp();
-    }
-
-    // App Check — only initialize on client side
-    // ReCaptchaEnterpriseProvider is the correct provider for Enterprise scripts
-    if (typeof window !== 'undefined') {
-      const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
-      if (siteKey) {
-        try {
-          initializeAppCheck(firebaseAppInstance, {
-            provider: new ReCaptchaEnterpriseProvider(siteKey),
-            isTokenAutoRefreshEnabled: true,
-          });
-        } catch (err) {
-          // Prevent multiple initializations during HMR
-          console.warn('[App Check] Initialization logic bypassed:', err);
-        }
-      }
     }
   }
 

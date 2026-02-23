@@ -1,44 +1,25 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Standard User Data Isolation
-    // Covers all documents and subcollections directly under /users/{userId}
+
+    // Standard reads/writes — covers all subcollections
     match /users/{userId}/{allPaths=**} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if request.auth != null 
+        && request.auth.uid == userId;
     }
 
-    // Public Lead Creation Exception (Open House Digital Guestbook)
-    // Allows unauthenticated creation of contacts ONLY when source is 'open_house'
-    match /users/{userId}/contacts/{contactId} {
-      allow create: if request.resource.data.archagent_source == 'open_house';
-    }
-
-    // Collection Group Security — Scoped by Path Segment Isolation
-    // Path structure: /users/{userId}/contacts/{contactId}/sms_thread/{messageId}
-    // [0]=users, [1]=userId, [2]=contacts, [3]=contactId, [4]=sms_thread, [5]=messageId
-    
+    // collectionGroup queries on sms_thread subcollection
+    // Path: users/{uid}/contacts/{cid}/sms_thread/{msgId}
     match /{path=**}/sms_thread/{messageId} {
-      allow read, write: if request.auth != null && request.auth.uid == path[1];
+      allow read, write: if request.auth != null
+        && request.auth.uid == path[1];
     }
 
-    match /{path=**}/activityLogs/{logId} {
-      allow read, write: if request.auth != null && request.auth.uid == path[1];
-    }
-
+    // collectionGroup queries on tasks subcollection
     match /{path=**}/tasks/{taskId} {
-      allow read, write: if request.auth != null && request.auth.uid == path[1];
+      allow read, write: if request.auth != null
+        && request.auth.uid == path[1];
     }
 
-    // Public Open House Event Registry
-    match /openHouses/{ohId} {
-      allow read: if true; // Digital sign-in pages need to see address/event details
-      allow create, update, delete: if request.auth != null; // Managed by authenticated agents
-      
-      match /signins/{signinId} {
-        allow create: if true; // Anyone can sign in at the event
-        allow read: if request.auth != null; // Only agents can see visitor lists
-      }
-    }
   }
 }
