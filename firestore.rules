@@ -1,53 +1,43 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Helper functions
-    function isSignedIn() {
-      return request.auth != null;
-    }
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-
-    match /users/{userId} {
-      // Allow the owner full access to their document and subcollections
-      allow read, write: if isOwner(userId);
-
-      match /contacts/{contactId} {
-        // Allow public creation of contacts from Open House Sign-ins
-        // This bypasses auth but is restricted to specific guestbook data
-        allow create: if request.resource.data.archagent_source == 'open_house';
-        allow read, update, delete: if isOwner(userId);
-      }
-      
-      match /{allPaths=**} {
-        allow read, write: if isOwner(userId);
-      }
-    }
-
-    // Collection Group Rules - Scoped by Path Segment UID
-    // path[1] matches the userId in /users/{userId}/contacts/...
     
-    match /{path=**}/sms_thread/{msgId} {
-      allow read, write: if isSignedIn() && path[1] == request.auth.uid;
+    // Standard User Data Isolation
+    // Covers all documents and subcollections directly under /users/{userId}
+    match /users/{userId}/{allPaths=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Public Lead Creation Exception (Open House Digital Guestbook)
+    // Allows unauthenticated creation of contacts ONLY when source is 'open_house'
+    match /users/{userId}/contacts/{contactId} {
+      allow create: if request.resource.data.archagent_source == 'open_house';
+    }
+
+    // Collection Group Security — Scoped by Path Segment Isolation
+    // Path structure: /users/{userId}/contacts/{contactId}/sms_thread/{messageId}
+    // [0]=users, [1]=userId, [2]=contacts, [3]=contactId, [4]=sms_thread, [5]=messageId
+    
+    match /{path=**}/sms_thread/{messageId} {
+      allow read, write: if request.auth != null && request.auth.uid == path[1];
     }
 
     match /{path=**}/activityLogs/{logId} {
-      allow read, write: if isSignedIn() && path[1] == request.auth.uid;
+      allow read, write: if request.auth != null && request.auth.uid == path[1];
     }
 
     match /{path=**}/tasks/{taskId} {
-      allow read, write: if isSignedIn() && path[1] == request.auth.uid;
+      allow read, write: if request.auth != null && request.auth.uid == path[1];
     }
 
-    // Public Open House Collection
+    // Public Open House Event Registry
     match /openHouses/{ohId} {
-      allow read: if true; // Public can see event details (address, etc.)
-      allow create, update, delete: if isSignedIn(); // Only agents can manage OH events
+      allow read: if true; // Digital sign-in pages need to see address/event details
+      allow create, update, delete: if request.auth != null; // Managed by authenticated agents
       
       match /signins/{signinId} {
         allow create: if true; // Anyone can sign in at the event
-        allow read: if isSignedIn(); // Only agents can see visitor lists
+        allow read: if request.auth != null; // Only agents can see visitor lists
       }
     }
   }
