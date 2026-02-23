@@ -2,42 +2,19 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Standard reads/writes — covers all subcollections
-    // This allows Monica full access to her own data tree
     match /users/{userId}/{allPaths=**} {
       allow read, write: if request.auth != null 
         && request.auth.uid == userId;
     }
 
-    // collectionGroup queries on sms_thread subcollection
-    // Path: users/{uid}/contacts/{cid}/sms_thread/{msgId}
-    // We check both the path (for direct doc access) and data (to allow secure collectionGroup queries)
     match /{path=**}/sms_thread/{messageId} {
-      allow read: if request.auth != null && (
-        path[1] == request.auth.uid ||
-        resource.data.ownerId == request.auth.uid
-      );
-      allow write: if request.auth != null && path[1] == request.auth.uid;
+      allow read, write: if request.auth != null
+        && request.auth.uid == path[1];
     }
 
-    // collectionGroup queries on tasks subcollection
     match /{path=**}/tasks/{taskId} {
-      allow read: if request.auth != null && (
-        path[1] == request.auth.uid ||
-        resource.data.ownerId == request.auth.uid
-      );
-      allow write: if request.auth != null && path[1] == request.auth.uid;
-    }
-
-    // Public Open House access
-    match /openHouses/{ohId} {
-      allow read: if true;
-      allow write: if request.auth != null; 
-      
-      // Public guestbook sign-ins
-      match /signins/{signinId} {
-        allow create: if true;
-      }
+      allow read, write: if request.auth != null
+        && request.auth.uid == path[1];
     }
 
   }

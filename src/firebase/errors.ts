@@ -13,6 +13,6 @@ export class FirestorePermissionError extends Error {
     const message = `FirestorePermissionError: Missing or insufficient permissions at [${context.path}] during [${context.operation}] operation.`;
     super(message);
     this.name = 'FirestorePermissionError';
-    this.context = context;
+    this.context = context; // Assigned explicitly to ensure diagnostic data is available
   }
 }
