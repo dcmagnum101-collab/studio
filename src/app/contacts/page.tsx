@@ -1,7 +1,7 @@
 
 "use client"
 
-import React, { useState } from "react"
+import React, { useState, useRef } from "react"
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { 
@@ -58,6 +58,7 @@ import { useUser, useFirestore, addDocumentNonBlocking } from "@/firebase";
 import { collection } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { syncVulcan7Leads } from "@/app/actions/vulcan7";
+import { Progress } from "@/components/ui/progress";
 import Link from "next/link";
 
 const SOURCE_CONFIG: Record<string, { label: string; color: string }> = {
@@ -68,6 +69,7 @@ const SOURCE_CONFIG: Record<string, { label: string; color: string }> = {
   probate: { label: 'Probate', color: 'bg-purple-600' },
   url_enrichment: { label: 'Enriched', color: 'bg-blue-500' },
   social_capture: { label: 'Social', color: 'bg-pink-500' },
+  vulcan7: { label: 'Vulcan7', color: 'bg-indigo-600' },
 };
 
 export default function ContactsPage() {
@@ -86,16 +88,56 @@ export default function ContactsPage() {
   const [newEmail, setNewEmail] = useState("");
   const [newAddress, setNewAddress] = useState("");
 
+  // Import State
+  const [isImporting, setIsImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const { 
     data: contacts, 
     loading, 
     hasMore, 
-    loadMore 
+    loadMore,
+    refresh
   } = useContacts({ source: activeTab === 'all' ? undefined : activeTab, searchQuery });
 
   const handleViewDetails = (contact: any) => {
     setSelectedContact(contact);
     setSheetOpen(true);
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    setIsImporting(true);
+    setImportProgress(10);
+    
+    try {
+      const text = await file.text();
+      setImportProgress(40);
+      
+      const res = await syncVulcan7Leads(user.uid, text);
+      setImportProgress(100);
+      
+      toast({ 
+        title: "Import Complete", 
+        description: `Imported ${res.imported} new prospects. ${res.duplicates} duplicates skipped.` 
+      });
+      
+      // Force refresh the list to show new leads
+      refresh();
+    } catch (err: any) {
+      toast({ 
+        variant: "destructive", 
+        title: "Import Failed", 
+        description: err.message 
+      });
+    } finally {
+      setIsImporting(false);
+      setTimeout(() => setImportProgress(0), 1000);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   };
 
   const handleManualAdd = () => {
@@ -133,6 +175,27 @@ export default function ContactsPage() {
             <SidebarTrigger className="-ml-1" />
             <h1 className="text-lg md:text-xl font-bold font-headline text-primary truncate">Prospector</h1>
             <div className="ml-auto flex items-center gap-2">
+              {/* VULCAN7 IMPORT BUTTON */}
+              <div className="relative group">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="gap-2 h-9 text-[10px] md:text-xs font-black uppercase tracking-widest px-4 border-primary/20 text-primary shadow-sm hover:bg-slate-50 transition-colors"
+                  disabled={isImporting}
+                >
+                  {isImporting ? <RefreshCw className="h-4 w-4 animate-spin" /> : <UploadCloud className="h-4 w-4" />}
+                  <span className="hidden sm:inline">Import Vulcan7</span>
+                </Button>
+                <input 
+                  type="file" 
+                  ref={fileInputRef}
+                  accept=".csv" 
+                  className="absolute inset-0 opacity-0 cursor-pointer disabled:cursor-not-allowed z-10" 
+                  onChange={handleFileChange}
+                  disabled={isImporting}
+                />
+              </div>
+
               <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
                 <DialogTrigger asChild>
                   <Button size="sm" className="gap-2 bg-accent hover:bg-accent/90 h-9 shadow-md text-[10px] md:text-xs font-black uppercase tracking-widest px-4">
@@ -176,6 +239,24 @@ export default function ContactsPage() {
               </Dialog>
             </div>
           </header>
+
+          {/* IMPORT PROGRESS OVERLAY */}
+          {isImporting && (
+            <div className="bg-primary/5 border-b p-2 animate-in slide-in-from-top-2">
+              <div className="max-w-7xl mx-auto flex items-center gap-4 px-6 h-10">
+                <div className="flex-1">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-[9px] font-black uppercase tracking-widest text-primary flex items-center gap-2">
+                      <RefreshCw className="h-3 w-3 animate-spin" />
+                      Monica is indexing your leads...
+                    </span>
+                    <span className="text-[9px] font-black text-primary">{importProgress}%</span>
+                  </div>
+                  <Progress value={importProgress} className="h-1 bg-primary/10" />
+                </div>
+              </div>
+            </div>
+          )}
           
           <main className="p-4 md:p-8 max-w-7xl mx-auto w-full">
             {contacts.length === 0 && !loading ? (
@@ -196,14 +277,7 @@ export default function ContactsPage() {
                       type="file" 
                       accept=".csv" 
                       className="absolute inset-0 opacity-0 cursor-pointer z-10" 
-                      onChange={async (e) => {
-                        const file = e.target.files?.[0];
-                        if (file && user) {
-                          const text = await file.text();
-                          const res = await syncVulcan7Leads(user.uid, text);
-                          toast({ title: "Import Complete", description: `Added ${res.imported} leads.` });
-                        }
-                      }}
+                      onChange={handleFileChange}
                     />
                     <CardContent className="p-6 flex flex-col items-center text-center space-y-4">
                       <div className="h-12 w-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-colors">
