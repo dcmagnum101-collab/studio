@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -31,25 +31,14 @@ import {
   Mail, 
   UserCircle,
   Copy,
-  ExternalLink,
   ShieldCheck,
-  AlertTriangle,
-  History,
-  Code
+  Code,
+  Check
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebase";
-import { collection, query, onSnapshot, doc, getDocs } from "firebase/firestore";
-import { saveSettingsSection } from "@/app/actions/save-settings";
+import { useUser } from "@/firebase";
+import { saveSettingsSection, loadAllSettings } from "@/app/actions/settings";
 import { connectGmailAccount } from "@/firebase/auth/gmail-auth";
-
-const COLORS = {
-  primary: "#1E3A8A",
-  accent: "#A88A2A",
-  background: "#F9FAFB"
-};
-
-// --- Helper Components ---
 
 const StatusBadge = ({ connected, checking }: { connected?: boolean; checking?: boolean }) => {
   if (checking) return <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200 gap-1.5"><RefreshCw className="h-3 w-3 animate-spin" /> Checking...</Badge>;
@@ -81,8 +70,6 @@ const PasswordInput = ({ value, onChange, placeholder, id }: { value: string; on
   );
 };
 
-// --- Main Page ---
-
 export default function SettingsPage() {
   const { user } = useUser();
   const { toast } = useToast();
@@ -92,33 +79,19 @@ export default function SettingsPage() {
   
   // Settings State Hub
   const [settings, setSettings] = useState<Record<string, any>>({});
-  const [initialSettings, setInitialSettings] = useState<Record<string, any>>({});
   const [savingSection, setSavingSection] = useState<string | null>(null);
+  const [successSection, setSuccessSection] = useState<string | null>(null);
   const [testingService, setTestingService] = useState<string | null>(null);
 
   useEffect(() => {
     setMounted(true);
     if (user) {
-      // Real-time listener for all settings documents
-      const q = query(collection(useFirestore(), "users", user.uid, "settings"));
-      const unsub = onSnapshot(q, (snapshot) => {
-        const data: Record<string, any> = {};
-        snapshot.docs.forEach(doc => {
-          data[doc.id] = doc.data();
-        });
+      loadAllSettings(user.uid).then(data => {
         setSettings(data);
-        if (loading) {
-          setInitialSettings(JSON.parse(JSON.stringify(data)));
-          setLoading(false);
-        }
+        setLoading(false);
       });
-      return () => unsub();
     }
   }, [user]);
-
-  const hasUnsavedChanges = useMemo(() => {
-    return JSON.stringify(settings) !== JSON.stringify(initialSettings);
-  }, [settings, initialSettings]);
 
   const handleUpdate = (section: string, field: string, value: any) => {
     setSettings(prev => ({
@@ -134,16 +107,14 @@ export default function SettingsPage() {
     if (!user) return;
     setSavingSection(section);
     try {
-      await saveSettingsSection({
-        uid: user.uid,
-        section,
-        data: settings[section] || {}
-      });
-      setInitialSettings(prev => ({
-        ...prev,
-        [section]: JSON.parse(JSON.stringify(settings[section]))
-      }));
-      toast({ title: "Settings Saved", description: `${section.toUpperCase()} configuration updated.` });
+      await saveSettingsSection(user.uid, section, settings[section] || {});
+      setSuccessSection(section);
+      toast({ title: "Settings Saved", description: `${section.toUpperCase()} updated successfully.` });
+      
+      // Reset success checkmark after 3 seconds
+      setTimeout(() => {
+        setSuccessSection(prev => prev === section ? null : prev);
+      }, 3000);
     } catch (err: any) {
       toast({ variant: "destructive", title: "Save Failed", description: err.message });
     } finally {
@@ -153,7 +124,6 @@ export default function SettingsPage() {
 
   const handleTest = async (service: string) => {
     setTestingService(service);
-    // Simulate API ping
     setTimeout(() => {
       setTestingService(null);
       handleUpdate(service, "connected", true);
@@ -168,17 +138,9 @@ export default function SettingsPage() {
       <div className="flex min-h-screen w-full bg-[#F9FAFB]">
         <AppSidebar />
         <SidebarInset>
-          <header className="flex h-16 shrink-0 items-center gap-2 border-b px-6 bg-white shadow-sm sticky top-0 z-20">
+          <header className="flex h-16 shrink-0 items-center gap-2 border-b px-6 bg-white shadow-sm sticky top-0 z-10">
             <SidebarTrigger className="-ml-1" />
-            <div className="flex items-center gap-3">
-              <h1 className="text-xl font-bold font-headline text-primary">System Settings</h1>
-              {hasUnsavedChanges && (
-                <div className="flex items-center gap-1.5 text-[10px] font-black uppercase text-accent animate-pulse">
-                  <div className="h-2 w-2 rounded-full bg-accent" />
-                  Unsaved changes
-                </div>
-              )}
-            </div>
+            <h1 className="text-xl font-bold font-headline text-primary">System Settings</h1>
           </header>
           
           <main className="p-4 md:p-8 max-w-5xl mx-auto w-full">
@@ -203,10 +165,17 @@ export default function SettingsPage() {
                       <CardTitle className="text-lg">Business Identity</CardTitle>
                       <CardDescription>Configure Monica's primary persona and brokerage details.</CardDescription>
                     </div>
-                    <Button size="sm" onClick={() => handleSave("business")} disabled={savingSection === "business"}>
-                      {savingSection === "business" ? <RefreshCw className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
-                      Save
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      {successSection === "business" && (
+                        <Badge variant="outline" className="bg-green-50 text-green-600 border-green-200 gap-1 animate-in fade-in slide-in-from-right-2">
+                          <Check className="h-3 w-3" /> Saved
+                        </Badge>
+                      )}
+                      <Button size="sm" onClick={() => handleSave("business")} disabled={savingSection === "business"}>
+                        {savingSection === "business" ? <RefreshCw className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+                        Save Section
+                      </Button>
+                    </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -233,19 +202,6 @@ export default function SettingsPage() {
                     </div>
                   </CardContent>
                 </Card>
-
-                <Card className="border-none shadow-md">
-                  <CardHeader>
-                    <CardTitle className="text-lg">Team Members</CardTitle>
-                    <CardDescription>Manage auxiliary agents and assistants.</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="p-8 border-2 border-dashed rounded-2xl bg-slate-50 text-center space-y-4">
-                      <p className="text-xs text-muted-foreground italic">Team management features are available in the Agency Plan.</p>
-                      <Button variant="outline" className="gap-2"><UserCircle className="h-4 w-4" /> Invite Member</Button>
-                    </div>
-                  </CardContent>
-                </Card>
               </TabsContent>
 
               {/* --- TAB: AI ENGINE --- */}
@@ -259,7 +215,8 @@ export default function SettingsPage() {
                         <CardDescription>Primary intelligence for lead scoring and strategic drafting.</CardDescription>
                       </div>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex items-center gap-2">
+                      {successSection === "ai_grok" && <Badge variant="outline" className="bg-green-50 text-green-600 border-green-200 gap-1"><Check className="h-3 w-3" /> Saved</Badge>}
                       <StatusBadge connected={settings.ai_grok?.connected} checking={testingService === "ai_grok"} />
                       <Button size="sm" variant="outline" onClick={() => handleTest("ai_grok")}>Test</Button>
                       <Button size="sm" onClick={() => handleSave("ai_grok")} disabled={savingSection === "ai_grok"}><Save className="h-4 w-4 mr-2" /> Save</Button>
@@ -296,7 +253,10 @@ export default function SettingsPage() {
                       <CardTitle className="text-lg">AI Behavior Settings</CardTitle>
                       <CardDescription>Fine-tune Monica's operational logic.</CardDescription>
                     </div>
-                    <Button size="sm" onClick={() => handleSave("ai_behavior")}>Save</Button>
+                    <div className="flex items-center gap-2">
+                      {successSection === "ai_behavior" && <Badge variant="outline" className="bg-green-50 text-green-600 border-green-200 gap-1"><Check className="h-3 w-3" /> Saved</Badge>}
+                      <Button size="sm" onClick={() => handleSave("ai_behavior")}>Save</Button>
+                    </div>
                   </CardHeader>
                   <CardContent className="space-y-6">
                     <div className="flex items-center justify-between">
@@ -333,22 +293,12 @@ export default function SettingsPage() {
                         <CardDescription>Professional dialer sync via Zapier or API.</CardDescription>
                       </div>
                     </div>
-                    <Button size="sm" onClick={() => handleSave("dialer_v7")}><Save className="h-4 w-4 mr-2" /> Save</Button>
+                    <div className="flex items-center gap-2">
+                      {successSection === "dialer_v7" && <Badge variant="outline" className="bg-green-50 text-green-600 border-green-200 gap-1"><Check className="h-3 w-3" /> Saved</Badge>}
+                      <Button size="sm" onClick={() => handleSave("dialer_v7")}><Save className="h-4 w-4 mr-2" /> Save</Button>
+                    </div>
                   </CardHeader>
                   <CardContent className="space-y-6">
-                    <div className="p-4 bg-blue-50 text-blue-700 rounded-xl border border-blue-100 flex gap-3 items-start">
-                      <Zap className="h-5 w-5 mt-0.5 shrink-0" />
-                      <p className="text-xs leading-relaxed">
-                        To sync leads automatically, paste the Zapier Webhook URL below into your Vulcan7 integration settings.
-                      </p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Zapier Webhook URL (Monica Inbound)</Label>
-                      <div className="flex gap-2">
-                        <Input readOnly value={`https://monica-hub.ai/api/v7-sync/${user?.uid}`} className="bg-slate-50 font-mono text-[10px]" />
-                        <Button variant="ghost" size="icon" className="shrink-0"><Copy className="h-4 w-4" /></Button>
-                      </div>
-                    </div>
                     <div className="grid gap-4 md:grid-cols-2">
                       <div className="space-y-2">
                         <Label>V7 Username</Label>
@@ -378,7 +328,8 @@ export default function SettingsPage() {
                         <CardDescription>Direct board integration for active and expired inventory.</CardDescription>
                       </div>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex items-center gap-2">
+                      {successSection === "lvr_mls" && <Badge variant="outline" className="bg-green-50 text-green-600 border-green-200 gap-1"><Check className="h-3 w-3" /> Saved</Badge>}
                       <StatusBadge connected={settings.lvr_mls?.connected} checking={testingService === "lvr_mls"} />
                       <Button size="sm" variant="outline" onClick={() => handleTest("lvr_mls")}>Test</Button>
                       <Button size="sm" onClick={() => handleSave("lvr_mls")}><Save className="h-4 w-4 mr-2" /> Save</Button>
@@ -411,7 +362,10 @@ export default function SettingsPage() {
                         <CardDescription>Manage Trulia, Realtor.com, and Zillow data streams.</CardDescription>
                       </div>
                     </div>
-                    <Button size="sm" onClick={() => handleSave("rapidapi")}>Save</Button>
+                    <div className="flex items-center gap-2">
+                      {successSection === "rapidapi" && <Badge variant="outline" className="bg-green-50 text-green-600 border-green-200 gap-1"><Check className="h-3 w-3" /> Saved</Badge>}
+                      <Button size="sm" onClick={() => handleSave("rapidapi")}>Save</Button>
+                    </div>
                   </CardHeader>
                   <CardContent className="space-y-6">
                     <div className="space-y-2">
@@ -441,7 +395,10 @@ export default function SettingsPage() {
                         <CardDescription>Power maps, place lookups, and video monitoring.</CardDescription>
                       </div>
                     </div>
-                    <Button size="sm" onClick={() => handleSave("google_apis")}>Save</Button>
+                    <div className="flex items-center gap-2">
+                      {successSection === "google_apis" && <Badge variant="outline" className="bg-green-50 text-green-600 border-green-200 gap-1"><Check className="h-3 w-3" /> Saved</Badge>}
+                      <Button size="sm" onClick={() => handleSave("google_apis")}>Save</Button>
+                    </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="space-y-2">
@@ -452,20 +409,6 @@ export default function SettingsPage() {
                       <Label>YouTube Data API Key</Label>
                       <PasswordInput value={settings.google_apis?.ytKey || ""} onChange={(v) => handleUpdate("google_apis", "ytKey", v)} />
                     </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="border-none shadow-md">
-                  <CardHeader>
-                    <CardTitle className="text-lg">Lead Signal Keywords</CardTitle>
-                    <CardDescription>Phrases Monica should flag as moving intent during AI analysis.</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <Input 
-                      value={settings.social?.keywords || ""} 
-                      onChange={(e) => handleUpdate("social", "keywords", e.target.value)}
-                      placeholder="e.g. moving soon, downsizing, estate sale, new job relocaton" 
-                    />
                   </CardContent>
                 </Card>
               </TabsContent>
@@ -481,7 +424,10 @@ export default function SettingsPage() {
                         <CardDescription>Handle follow-ups through your business account.</CardDescription>
                       </div>
                     </div>
-                    <Button size="sm" onClick={() => handleSave("outreach_gmail")}>Save</Button>
+                    <div className="flex items-center gap-2">
+                      {successSection === "outreach_gmail" && <Badge variant="outline" className="bg-green-50 text-green-600 border-green-200 gap-1"><Check className="h-3 w-3" /> Saved</Badge>}
+                      <Button size="sm" onClick={() => handleSave("outreach_gmail")}>Save</Button>
+                    </div>
                   </CardHeader>
                   <CardContent className="space-y-6">
                     <div className="p-6 bg-slate-50 border-2 border-dashed rounded-2xl text-center space-y-4">
@@ -489,7 +435,7 @@ export default function SettingsPage() {
                         <StatusBadge connected={settings.outreach_gmail?.connected} />
                         <span className="text-sm font-bold">{settings.outreach_gmail?.email || "No account linked"}</span>
                       </div>
-                      <Button onClick={() => connectGmailAccount(user.uid)} className="bg-primary px-8">
+                      <Button onClick={() => user && connectGmailAccount(user.uid)} className="bg-primary px-8">
                         {settings.outreach_gmail?.connected ? "Reconnect Account" : "Connect Business Gmail"}
                       </Button>
                     </div>
@@ -516,18 +462,6 @@ export default function SettingsPage() {
                       </div>
                     </div>
                     <Button variant="outline">Manage Billing</Button>
-                  </CardContent>
-                </Card>
-
-                <Card className="border-none shadow-md bg-red-50/30 border border-red-100">
-                  <CardHeader>
-                    <CardTitle className="text-lg text-red-900">Data & Privacy</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex gap-3">
-                      <Button variant="outline" className="flex-1 bg-white border-red-200 text-red-700 hover:bg-red-50">Delete All Leads</Button>
-                      <Button variant="destructive" className="flex-1">Close Account</Button>
-                    </div>
                   </CardContent>
                 </Card>
               </TabsContent>
