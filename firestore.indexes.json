@@ -12,6 +12,14 @@
       "collectionGroup": "contacts",
       "queryScope": "COLLECTION",
       "fields": [
+        { "fieldPath": "archagent_source", "order": "ASCENDING" },
+        { "fieldPath": "created_at", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "contacts",
+      "queryScope": "COLLECTION",
+      "fields": [
         { "fieldPath": "icpScore", "order": "DESCENDING" },
         { "fieldPath": "name", "order": "ASCENDING" }
       ]

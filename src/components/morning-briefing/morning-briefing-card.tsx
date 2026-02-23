@@ -1,110 +1,131 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useMemo } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Sparkles, PhoneCall, ArrowRight, RefreshCw, Calendar, Flame } from "lucide-react"
-import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebase"
-import { collection, query, orderBy, limit } from "firebase/firestore"
-import Link from "next/link"
+import { Sparkles, RefreshCw, Calendar, Flame, Target, CheckCircle, Clock } from "lucide-react"
+import { useUser, useDoc, useMemoFirebase } from "@/firebase"
+import { generateMorningBriefing } from "@/app/actions/morning-briefing"
+import { format } from "date-fns"
+import { useToast } from "@/hooks/use-toast"
+import { Skeleton } from "@/components/ui/skeleton"
 
+/**
+ * Monica's Morning Briefing Card.
+ * Displays real-time intelligence synced with pipeline stats.
+ */
 export function MorningBriefingCard() {
   const { user } = useUser();
-  const firestore = useFirestore();
-  const [mounted, setMounted] = useState(false);
+  const { toast } = useToast();
+  const [generating, setGenerating] = useState(false);
+
+  const today = format(new Date(), 'yyyy-MM-dd');
+  const briefingPath = useMemoFirebase(() => {
+    if (!user) return null;
+    return `users/${user.uid}/morningBriefings/${today}`;
+  }, [user, today]);
+
+  const { data: briefing, isLoading } = useDoc(briefingPath);
 
   useEffect(() => {
-    setMounted(true);
-  }, []);
+    // Auto-generate on first load if cache is missing
+    if (user && !briefing && !isLoading && !generating) {
+      handleRefresh();
+    }
+  }, [user, briefing, isLoading]);
 
-  const briefingQuery = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
-    return query(collection(firestore, 'users', user.uid, 'morningBriefings'), orderBy('date', 'desc'), limit(1));
-  }, [firestore, user]);
+  const handleRefresh = async () => {
+    if (!user) return;
+    setGenerating(true);
+    try {
+      await generateMorningBriefing(user.uid, today);
+      toast({ 
+        title: "Intelligence Synced", 
+        description: "Monica has analyzed your pipeline for today's session." 
+      });
+    } catch (err: any) {
+      toast({ 
+        variant: "destructive", 
+        title: "Synthesis Error", 
+        description: err.message 
+      });
+    } finally {
+      setGenerating(false);
+    }
+  };
 
-  const { data: briefings, isLoading } = useCollection(briefingQuery);
-  const currentBriefing = briefings?.[0] as any;
+  const renderBriefingText = (text: string) => {
+    return text.split('\n').filter(p => p.trim()).map((p, i) => (
+      <p key={i} className={`text-sm leading-relaxed text-blue-50 ${i > 0 ? "mt-4" : ""}`}>
+        {p}
+      </p>
+    ));
+  };
 
-  const topPriorityQuery = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
-    return query(collection(firestore, 'users', user.uid, 'contacts'), orderBy('icpScore', 'desc'), limit(1));
-  }, [firestore, user]);
-
-  const { data: topContacts } = useCollection(topPriorityQuery);
-  const topPriority = topContacts?.[0] as any;
-
-  if (!mounted) return null;
+  if (!user) return null;
 
   return (
-    <Card className="border-none shadow-lg bg-gradient-to-br from-primary via-primary to-primary/90 text-white overflow-hidden">
-      <CardHeader className="pb-2">
+    <Card className="border-none shadow-xl bg-gradient-to-br from-primary via-primary to-primary/90 text-white overflow-hidden relative group">
+      <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none group-hover:scale-110 transition-transform duration-700">
+        <Sparkles className="h-32 w-32" />
+      </div>
+      
+      <CardHeader className="pb-4 relative z-10">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 bg-accent rounded-lg">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-accent rounded-xl shadow-lg ring-1 ring-white/20">
               <Sparkles className="h-5 w-5 text-white" />
             </div>
             <div>
-              <CardTitle className="text-xl font-headline">Good Morning, Monica</CardTitle>
-              <CardDescription className="text-primary-foreground/70 flex items-center gap-1">
-                <Calendar className="h-3 w-3" /> Today's Briefing • {new Date().toLocaleDateString()}
+              <CardTitle className="text-xl font-black font-headline">Morning Intelligence</CardTitle>
+              <CardDescription className="text-primary-foreground/60 font-bold uppercase tracking-widest text-[10px] flex items-center gap-1.5 mt-0.5">
+                <Calendar className="h-3 w-3" /> {format(new Date(), 'EEEE, MMMM do')}
               </CardDescription>
             </div>
           </div>
-          <Button variant="ghost" size="icon" className="text-white hover:bg-white/10">
-            <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={handleRefresh} 
+            disabled={generating}
+            className="text-white hover:bg-white/10 rounded-full h-10 w-10 transition-all hover:rotate-180"
+          >
+            <RefreshCw className={`h-4 w-4 ${generating ? 'animate-spin' : ''}`} />
           </Button>
         </div>
       </CardHeader>
-      <CardContent className="space-y-6">
-        <div className="bg-white/10 rounded-xl p-4 backdrop-blur-sm border border-white/10">
-          <p className="text-sm leading-relaxed text-blue-50">
-            {currentBriefing?.briefing_text || "Monica, your pipeline is hot today! You have fresh activity in your target zip codes. Review your top priority lead below to start your power hour."}
-          </p>
+
+      <CardContent className="space-y-6 relative z-10">
+        <div className="bg-white/10 rounded-2xl p-5 backdrop-blur-md border border-white/10 shadow-inner min-h-[120px] flex flex-col justify-center">
+          {isLoading || generating ? (
+            <div className="space-y-3 py-2">
+              <Skeleton className="h-4 w-full bg-white/10" />
+              <Skeleton className="h-4 w-5/6 bg-white/10" />
+              <Skeleton className="h-4 w-4/5 bg-white/10" />
+            </div>
+          ) : briefing?.briefing_text ? (
+            renderBriefingText(briefing.briefing_text)
+          ) : (
+            <p className="text-sm text-blue-100 italic opacity-60">"Good morning Monica. Use the sync button to prepare your daily strategy."</p>
+          )}
         </div>
 
-        <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
+        <div className="grid grid-cols-3 gap-3">
           {[
-            { label: 'Expired', count: currentBriefing?.fresh_expireds || 0, color: 'bg-red-500' },
-            { label: 'FSBO', count: currentBriefing?.fresh_fsbos || 0, color: 'bg-orange-500' },
-            { label: 'Pre-Fore', count: currentBriefing?.preforeclosure || 0, color: 'bg-yellow-500' },
-            { label: 'FRBO', count: currentBriefing?.frbo || 0, color: 'bg-blue-500' },
-            { label: 'Rec', count: currentBriefing?.recommended || 0, color: 'bg-purple-500' },
-            { label: 'Circle', count: currentBriefing?.circle || 0, color: 'bg-green-500' },
-          ].map((stat) => (
-            <div key={stat.label} className="bg-white/5 rounded-lg p-2 text-center border border-white/5">
-              <div className="text-lg font-bold">{stat.count}</div>
-              <div className="text-[10px] uppercase tracking-wider text-white/60">{stat.label}</div>
+            { label: 'Due Today', val: briefing?.stats?.due_followups ?? '...', icon: Clock, color: 'text-blue-400' },
+            { label: 'Hot Expired', val: briefing?.stats?.hot_expired ?? '...', icon: Flame, color: 'text-red-400' },
+            { label: 'Tasks', val: briefing?.stats?.tasks_due ?? '...', icon: CheckCircle, color: 'text-green-400' },
+          ].map((s, i) => (
+            <div key={i} className="bg-white/5 rounded-xl p-3 border border-white/5 text-center group hover:bg-white/10 transition-colors">
+              <div className="flex items-center justify-center mb-1">
+                <s.icon className={`h-3 w-3 opacity-60 mr-1.5 ${s.color}`} />
+                <span className="text-[9px] font-black uppercase tracking-wider text-white/60">{s.label}</span>
+              </div>
+              <div className="text-xl font-black">{s.val}</div>
             </div>
           ))}
         </div>
-
-        {topPriority && (
-          <div className="bg-accent/20 rounded-xl p-4 border border-accent/30 flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="h-12 w-12 rounded-full bg-accent flex items-center justify-center ring-4 ring-accent/20">
-                <Flame className="h-6 w-6 text-white" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="font-bold">{topPriority.name}</span>
-                  <Badge className="bg-accent text-[10px] h-4">{topPriority.icpScore}/99 Score</Badge>
-                </div>
-                <p className="text-xs text-white/70">{topPriority.propertyAddress}</p>
-              </div>
-            </div>
-            <div className="flex gap-2 w-full md:w-auto">
-              <Link href={`/contacts/${topPriority.id}`}>
-                <Button size="sm" className="flex-1 bg-white text-primary hover:bg-white/90 gap-2 font-bold">
-                  <PhoneCall className="h-4 w-4" /> Open Profile
-                </Button>
-              </Link>
-              <Button size="sm" variant="ghost" className="text-white hover:bg-white/10 px-2">
-                <ArrowRight className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        )}
       </CardContent>
     </Card>
   )
