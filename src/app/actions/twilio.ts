@@ -43,7 +43,8 @@ export async function sendSMSAction(payload: {
       to,
       sid: message.sid,
       timestamp: new Date().toISOString(),
-      status: 'sent'
+      status: 'sent',
+      ownerId: userId // Ensure ownership for collection group queries
     });
 
     await adminDb.collection('users').doc(userId).collection('contacts').doc(contactId).update({

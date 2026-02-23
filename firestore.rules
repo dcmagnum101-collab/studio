@@ -41,10 +41,7 @@ service cloud.firestore {
     }
 
     match /{path=**}/sms_thread/{msgId} {
-      allow read: if isSignedIn() && (
-        // For existing messages, verify ownership via the user path
-        path.size() >= 3 && path[1] == request.auth.uid
-      );
+      allow read: if isSignedIn() && resource.data.ownerId == request.auth.uid;
     }
 
     // Public Open House Collection

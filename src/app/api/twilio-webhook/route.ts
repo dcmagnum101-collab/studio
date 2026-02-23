@@ -40,7 +40,6 @@ export async function POST(req: NextRequest) {
     const contactMatch = await contactsRef.where('phone', '==', normalizedFrom).limit(1).get();
 
     let contactId: string;
-    let contactName: string;
 
     if (contactMatch.empty) {
       // Create a new lead from scratch
@@ -56,10 +55,8 @@ export async function POST(req: NextRequest) {
         updated_at: admin.firestore.FieldValue.serverTimestamp()
       });
       contactId = newContact.id;
-      contactName = normalizedFrom;
     } else {
       contactId = contactMatch.docs[0].id;
-      contactName = contactMatch.docs[0].data().name;
     }
 
     // 3. Persist to Message Thread
@@ -70,7 +67,8 @@ export async function POST(req: NextRequest) {
       from,
       to,
       timestamp,
-      status: 'received'
+      status: 'received',
+      ownerId: userId // Ensure ownership for collection group queries
     });
 
     // 4. Update Contact Status
