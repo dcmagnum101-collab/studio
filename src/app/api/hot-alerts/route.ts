@@ -3,6 +3,8 @@ import { adminDb } from '@/lib/firebase-admin';
 import * as admin from 'firebase-admin';
 import { sendNurtureEmail } from '@/app/actions/gmail';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * @fileOverview Hot Alerts Cron Endpoint.
  * Scans for high-urgency deals and triggers multi-channel notifications.

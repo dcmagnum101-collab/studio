@@ -3,6 +3,8 @@ import { adminDb } from '@/lib/firebase-admin';
 import * as admin from 'firebase-admin';
 import { FOLLOW_UP_CADENCES, getNextFollowUpDate, type LeadStatus } from '@/lib/lead-types';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * Automation endpoint to process daily follow-up cadences.
  * Protected by Authorization header.

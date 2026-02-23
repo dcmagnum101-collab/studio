@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateDailyRecap } from '@/app/actions/goals';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * Triggered at 6 PM daily to audit agent performance.
  */
