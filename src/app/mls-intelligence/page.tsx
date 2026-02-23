@@ -1,4 +1,3 @@
-
 "use client"
 
 import React, { useState, useEffect } from "react"
@@ -29,13 +28,15 @@ import {
   Home,
   ShieldCheck,
   ArrowRight,
-  Search
+  Search,
+  Lock
 } from "lucide-react"
 import { useUser, useFirestore, addDocumentNonBlocking, useDoc, useMemoFirebase } from "@/firebase"
 import { syncLVRListings, fetchNeighborhoodStats, getExpiringLeadsAction } from "@/app/actions/lvr-mls"
 import { unifiedMLSSync } from "@/services/mls-sync-orchestrator"
 import { useToast } from "@/hooks/use-toast"
-import { collection } from "firebase/firestore"
+import { FEATURES } from "@/lib/feature-flags"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 const VEGAS_ZIPS = [
   { zip: "89144", area: "Summerlin" },
@@ -54,9 +55,6 @@ export default function MLSIntelligencePage() {
   const [results, setResults] = useState<any[]>([]);
   const [vitals, setVitals] = useState<any[]>([]);
 
-  const rapidApiRef = useMemoFirebase(() => user ? `users/${user.uid}/settings/rapidapi` : null, [user]);
-  const { data: rapidSettings } = useDoc(rapidApiRef);
-
   useEffect(() => {
     if (user) {
       handleLoadVitals();
@@ -74,12 +72,12 @@ export default function MLSIntelligencePage() {
   };
 
   const handleSyncNow = async () => {
-    if (!user) return;
+    if (!user || !FEATURES.mlsData) return;
     setLoading('global');
     try {
       const res = await unifiedMLSSync(user.uid, 'las_vegas', 'all');
       setResults(res.data);
-      toast({ title: "Sync Complete", description: `Pulled ${res.data.length} listings via ${res.source.toUpperCase()}.` });
+      toast({ title: "Sync Complete", description: `Pulled ${res.data.length} listings.` });
     } catch (err: any) {
       toast({ variant: "destructive", title: "Sync Failed", description: err.message });
     } finally {
@@ -88,30 +86,16 @@ export default function MLSIntelligencePage() {
   };
 
   const handleSync = async (type: 'active' | 'expired' | 'pending' | 'sold') => {
-    if (!user) return;
+    if (!user || !FEATURES.mlsData) return;
     setLoading(type);
     try {
       const res = await syncLVRListings({ type, zipCodes: selectedZips, userId: user.uid });
       toast({
         title: `Sync Complete: ${type.toUpperCase()}`,
-        description: `Imported ${res.imported} new prospects. ${res.duplicates} duplicates skipped.`,
+        description: `Imported ${res.imported} new prospects.`,
       });
     } catch (err: any) {
       toast({ variant: "destructive", title: "Sync Failed", description: err.message });
-    } finally {
-      setLoading(null);
-    }
-  };
-
-  const handleFindExpiring = async () => {
-    if (!user) return;
-    setLoading('expiring');
-    try {
-      const leads = await getExpiringLeadsAction(user.uid, selectedZips);
-      setResults(leads);
-      toast({ title: "Pre-Expiry Scan Complete", description: `Found ${leads.length} listings expiring within 7 days.` });
-    } catch (err: any) {
-      toast({ variant: "destructive", title: "Scan Failed", description: err.message });
     } finally {
       setLoading(null);
     }
@@ -132,23 +116,47 @@ export default function MLSIntelligencePage() {
             <SidebarTrigger className="-ml-1" />
             <div className="flex items-center gap-3">
               <h1 className="text-xl font-bold font-headline text-primary">LVR MLS Intelligence</h1>
-              <Badge className="bg-green-500 gap-1.5 h-6 px-2 text-[10px] uppercase font-black tracking-widest">
-                <ShieldCheck className="h-3 w-3" /> Connection: Active
+              <Badge className={`${FEATURES.mlsData ? 'bg-green-500' : 'bg-amber-500'} gap-1.5 h-6 px-2 text-[10px] uppercase font-black tracking-widest text-white`}>
+                <ShieldCheck className="h-3 w-3" /> Connection: {FEATURES.mlsData ? 'Active' : 'Offline'}
               </Badge>
             </div>
-            <Button className="ml-auto bg-accent hover:bg-accent/90 text-primary font-bold shadow-md h-9 gap-2">
-              <RefreshCw className="h-4 w-4" /> Sync All Data
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    className="ml-auto bg-accent hover:bg-accent/90 text-primary font-bold shadow-md h-9 gap-2"
+                    disabled={!FEATURES.mlsData || !!loading}
+                    onClick={handleSyncNow}
+                  >
+                    {!FEATURES.mlsData && <Lock className="h-3.5 w-3.5" />}
+                    <RefreshCw className={`h-4 w-4 ${loading === 'global' ? 'animate-spin' : ''}`} /> Sync All Data
+                  </Button>
+                </TooltipTrigger>
+                {!FEATURES.mlsData && (
+                  <TooltipContent>Connect RapidAPI in Settings to enable live data</TooltipContent>
+                )}
+              </Tooltip>
+            </TooltipProvider>
           </header>
           
           <main className="p-8 max-w-7xl mx-auto w-full space-y-8">
+            {!FEATURES.mlsData && (
+              <Card className="border-amber-200 bg-amber-50 shadow-sm">
+                <CardContent className="p-4 flex items-center gap-4">
+                  <AlertCircle className="h-5 w-5 text-amber-600" />
+                  <p className="text-sm font-medium text-amber-800">
+                    MLS live data integration is disabled. <strong>Connect RapidAPI in Settings</strong> to unlock real-time expired and active listings.
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+
             <section className="space-y-4">
               <div className="flex items-center justify-between">
                 <h2 className="text-sm font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
                   <MapPin className="h-4 w-4 text-accent" />
                   Target Zip Codes
                 </h2>
-                <span className="text-[10px] text-muted-foreground italic">Monica is monitoring {selectedZips.length} neighborhoods</span>
               </div>
               <div className="flex flex-wrap gap-2">
                 {VEGAS_ZIPS.map(item => (
@@ -165,77 +173,27 @@ export default function MLSIntelligencePage() {
             </section>
 
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-              <Card className="border-none shadow-md hover:shadow-xl transition-all cursor-pointer group" onClick={() => handleSync('active')}>
-                <CardContent className="p-6 space-y-4">
-                  <div className="flex justify-between items-start">
-                    <div className="p-2 bg-blue-50 text-blue-600 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                      <Home className="h-5 w-5" />
+              {[
+                { type: 'active', label: 'Active Listings', icon: Home, color: 'text-blue-600', bg: 'bg-blue-50' },
+                { type: 'expired', label: 'Expired Sync', icon: Clock, color: 'text-red-600', bg: 'bg-red-50' },
+                { type: 'pending', label: 'Pending Sales', icon: TrendingUp, color: 'text-amber-600', bg: 'bg-amber-50' },
+                { type: 'sold', label: 'Recent Solds', icon: CheckCircle2, color: 'text-green-600', bg: 'bg-green-50' },
+              ].map((s) => (
+                <Card key={s.type} className={`border-none shadow-md transition-all ${FEATURES.mlsData ? 'hover:shadow-xl cursor-pointer group' : 'opacity-60 cursor-not-allowed'}`} onClick={() => FEATURES.mlsData && handleSync(s.type as any)}>
+                  <CardContent className="p-6 space-y-4">
+                    <div className="flex justify-between items-start">
+                      <div className={`p-2 ${s.bg} ${s.color} rounded-lg ${FEATURES.mlsData ? 'group-hover:bg-primary group-hover:text-white' : ''} transition-colors`}>
+                        <s.icon className="h-5 w-5" />
+                      </div>
+                      {loading === s.type && <RefreshCw className={`h-4 w-4 animate-spin ${s.color}`} />}
                     </div>
-                    {loading === 'active' && <RefreshCw className="h-4 w-4 animate-spin text-blue-600" />}
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-slate-800">Active Listings</h3>
-                    <p className="text-xs text-muted-foreground">Monitor current competition</p>
-                  </div>
-                  <Button variant="ghost" size="sm" className="w-full justify-between p-0 h-auto font-black text-[10px] uppercase tracking-tighter text-blue-600">
-                    Run Sync <ChevronRight className="h-3 w-3" />
-                  </Button>
-                </CardContent>
-              </Card>
-
-              <Card className="border-none shadow-md hover:shadow-xl transition-all cursor-pointer group" onClick={() => handleSync('expired')}>
-                <CardContent className="p-6 space-y-4">
-                  <div className="flex justify-between items-start">
-                    <div className="p-2 bg-red-50 text-red-600 rounded-lg group-hover:bg-red-600 group-hover:text-white transition-colors">
-                      <Clock className="h-5 w-5" />
+                    <div>
+                      <h3 className="font-bold text-slate-800">{s.label}</h3>
+                      <p className="text-xs text-muted-foreground">{FEATURES.mlsData ? 'Run neighborhood scan' : 'RapidAPI required'}</p>
                     </div>
-                    {loading === 'expired' && <RefreshCw className="h-4 w-4 animate-spin text-red-600" />}
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-slate-800">Expired Sync</h3>
-                    <p className="text-xs text-muted-foreground">High-intent seller leads</p>
-                  </div>
-                  <Button variant="ghost" size="sm" className="w-full justify-between p-0 h-auto font-black text-[10px] uppercase tracking-tighter text-red-600">
-                    Run Sync <ChevronRight className="h-3 w-3" />
-                  </Button>
-                </CardContent>
-              </Card>
-
-              <Card className="border-none shadow-md hover:shadow-xl transition-all cursor-pointer group" onClick={handleFindExpiring}>
-                <CardContent className="p-6 space-y-4">
-                  <div className="flex justify-between items-start">
-                    <div className="p-2 bg-accent/10 text-accent rounded-lg group-hover:bg-accent group-hover:text-white transition-colors">
-                      <AlertCircle className="h-5 w-5" />
-                    </div>
-                    {loading === 'expiring' && <RefreshCw className="h-4 w-4 animate-spin text-accent" />}
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-slate-800">Pre-Expiry Alert</h3>
-                    <p className="text-xs text-muted-foreground">Approach before they expire</p>
-                  </div>
-                  <Button variant="ghost" size="sm" className="w-full justify-between p-0 h-auto font-black text-[10px] uppercase tracking-tighter text-accent">
-                    Scan LVR <ChevronRight className="h-3 w-3" />
-                  </Button>
-                </CardContent>
-              </Card>
-
-              <Card className="border-none shadow-md hover:shadow-xl transition-all cursor-pointer group" onClick={() => handleSync('sold')}>
-                <CardContent className="p-6 space-y-4">
-                  <div className="flex justify-between items-start">
-                    <div className="p-2 bg-green-50 text-green-600 rounded-lg group-hover:bg-green-600 group-hover:text-white transition-colors">
-                      <CheckCircle2 className="h-5 w-5" />
-                    </div>
-                    {loading === 'sold' && <RefreshCw className="h-4 w-4 animate-spin text-green-600" />}
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-slate-800">Recent Solds</h3>
-                    <p className="text-xs text-muted-foreground">Analyze neighbor price points</p>
-                  </div>
-                  <Button variant="ghost" size="sm" className="w-full justify-between p-0 h-auto font-black text-[10px] uppercase tracking-tighter text-green-600">
-                    Run Sync <ChevronRight className="h-3 w-3" />
-                  </Button>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
 
             <div className="grid gap-8 lg:grid-cols-3">
@@ -243,10 +201,7 @@ export default function MLSIntelligencePage() {
                 <Card className="border-none shadow-xl bg-white overflow-hidden">
                   <CardHeader className="bg-slate-50/50 border-b">
                     <div className="flex items-center justify-between">
-                      <div>
-                        <CardTitle className="text-lg">Sync Results</CardTitle>
-                        <CardDescription className="text-xs">Intelligence matches from live feeds</CardDescription>
-                      </div>
+                      <CardTitle className="text-lg">Sync Results</CardTitle>
                       <Sparkles className="h-5 w-5 text-accent animate-pulse" />
                     </div>
                   </CardHeader>
@@ -257,8 +212,7 @@ export default function MLSIntelligencePage() {
                           <TableRow>
                             <TableHead className="font-bold text-xs uppercase">Property</TableHead>
                             <TableHead className="font-bold text-xs uppercase">Price</TableHead>
-                            <TableHead className="font-bold text-xs uppercase">DOM</TableHead>
-                            <TableHead className="text-right font-bold text-xs uppercase">Action</TableHead>
+                            <TableHead className="text-right font-bold text-xs uppercase">Action</TooltipProvider>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -266,11 +220,6 @@ export default function MLSIntelligencePage() {
                             <TableRow key={item.mlsNumber || item.id} className="hover:bg-slate-50/50 transition-colors">
                               <TableCell className="py-4">
                                 <div className="flex items-center gap-3">
-                                  <div className="h-10 w-14 rounded-lg bg-slate-100 overflow-hidden shrink-0">
-                                    {item.thumbnail ? (
-                                      <img src={item.thumbnail} className="h-full w-full object-cover" />
-                                    ) : <Home className="h-full w-full p-2 text-slate-300" />}
-                                  </div>
                                   <div className="min-w-0">
                                     <p className="text-sm font-bold text-primary truncate">{item.propertyAddress || item.address}</p>
                                     <p className="text-[10px] text-muted-foreground uppercase">{item.zip} • {item.beds}bd/{item.baths}ba</p>
@@ -279,9 +228,6 @@ export default function MLSIntelligencePage() {
                               </TableCell>
                               <TableCell>
                                 <span className="text-sm font-black text-slate-700">${(item.listPrice || item.list_price)?.toLocaleString()}</span>
-                              </TableCell>
-                              <TableCell>
-                                <Badge variant="outline" className="text-[10px] font-bold border-slate-200">{item.daysOnMarket || item.days_on_market} Days</Badge>
                               </TableCell>
                               <TableCell className="text-right">
                                 <Button size="sm" variant="ghost" className="h-8 gap-2 text-xs font-bold text-primary">
@@ -300,17 +246,19 @@ export default function MLSIntelligencePage() {
                         <div className="space-y-2">
                           <h3 className="text-xl font-bold text-slate-900">No listings synced yet</h3>
                           <p className="text-xs text-slate-500 max-w-xs mx-auto">
-                            Monica will use {rapidSettings?.apiKey ? 'RapidAPI (Trulia/Realtor)' : 'LVR MLS'} to pull the latest Las Vegas market data.
+                            {FEATURES.mlsData ? 'Monica is ready to scan the Henderson and Summerlin markets.' : 'Connect your data sources in Settings to enable market intelligence scans.'}
                           </p>
                         </div>
-                        <Button 
-                          onClick={handleSyncNow} 
-                          disabled={!!loading}
-                          className="bg-primary h-12 px-8 rounded-xl font-black gap-2 shadow-lg"
-                        >
-                          {loading === 'global' ? <RefreshCw className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-                          Sync Now
-                        </Button>
+                        {FEATURES.mlsData && (
+                          <Button 
+                            onClick={handleSyncNow} 
+                            disabled={!!loading}
+                            className="bg-primary h-12 px-8 rounded-xl font-black gap-2 shadow-lg"
+                          >
+                            <RefreshCw className={`h-4 w-4 ${loading === 'global' ? 'animate-spin' : ''}`} />
+                            Sync Now
+                          </Button>
+                        )}
                       </div>
                     )}
                   </CardContent>
@@ -338,14 +286,6 @@ export default function MLSIntelligencePage() {
                       <div className="space-y-0.5">
                         <p className="text-[8px] font-black uppercase text-slate-400">Avg DOM</p>
                         <p className="text-sm font-bold text-slate-700">{stat.avg_dom} Days</p>
-                      </div>
-                      <div className="space-y-0.5">
-                        <p className="text-[8px] font-black uppercase text-slate-400">Active Listings</p>
-                        <p className="text-sm font-bold text-blue-600">{stat.active_count}</p>
-                      </div>
-                      <div className="space-y-0.5">
-                        <p className="text-[8px] font-black uppercase text-slate-400">Sold (30d)</p>
-                        <p className="text-sm font-bold text-green-600">{stat.sold_last_30_days}</p>
                       </div>
                     </CardContent>
                   </Card>

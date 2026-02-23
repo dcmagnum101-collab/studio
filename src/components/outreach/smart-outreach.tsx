@@ -5,8 +5,6 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { 
   Sparkles, 
   Mail, 
@@ -15,10 +13,8 @@ import {
   Wand2,
   RefreshCw,
   Send,
-  FileText,
-  Clock,
-  History,
-  Download
+  Lock,
+  AlertTriangle
 } from "lucide-react"
 import { 
   generatePersonalizedEmail, 
@@ -33,10 +29,8 @@ import { useToast } from "@/hooks/use-toast"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebase"
-import { collection, query, orderBy, where, limit } from "firebase/firestore"
-import { logVulcan7CallResult, pushToVulcan7DialQueue } from "@/app/actions/vulcan7"
-import { useCallLogs, useContacts } from "@/hooks/useFirestoreData"
-import { format } from "date-fns"
+import { useContacts } from "@/hooks/useFirestoreData"
+import { FEATURES } from "@/lib/feature-flags"
 import { ComplianceGuard } from "@/components/compliance/ComplianceGuard"
 
 export function SmartOutreach() {
@@ -53,6 +47,11 @@ export function SmartOutreach() {
   const { data: activeList, isLoading: listLoading } = useContacts({ minScore: 80 });
 
   const handleGenerateContent = async (contact: any, type: 'email' | 'sms') => {
+    if (!FEATURES.ai) {
+      toast({ variant: "destructive", title: "AI Disabled", description: "Add your Grok API key in Settings." });
+      return;
+    }
+    
     setLoading(true)
     try {
       if (type === 'email') {
@@ -110,12 +109,6 @@ export function SmartOutreach() {
     }
   };
 
-  const handleSendSMS = async (finalContent: string) => {
-    // Mock SMS sending logic for now
-    toast({ title: "SMS Sent", description: `Text message delivered to ${selectedContact.name}.` });
-    setGeneratedContent(prev => ({ ...prev, sms: undefined }));
-  };
-
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
       {/* List Panel */}
@@ -154,14 +147,6 @@ export function SmartOutreach() {
                       <Badge className="bg-accent text-white h-5 text-[10px]">Score: {contact.icpScore}</Badge>
                     </div>
                     <p className="text-xs text-muted-foreground truncate">{contact.propertyAddress}</p>
-                    {contact.phone && (
-                      <div className="mt-2 flex items-center gap-1.5 text-[10px] font-bold text-primary">
-                        <PhoneCall className="h-3 w-3" />
-                        <a href={`tel:${contact.phone.replace(/\D/g, '')}`} onClick={e => e.stopPropagation()}>
-                          {contact.phone}
-                        </a>
-                      </div>
-                    )}
                   </div>
                 ))
               ) : (
@@ -184,21 +169,26 @@ export function SmartOutreach() {
                 <div>
                   <CardTitle className="text-xl text-primary">{selectedContact.name}</CardTitle>
                   <CardDescription className="flex items-center gap-2 mt-1">
-                    <span className="flex items-center gap-1"><Mail className="h-3 w-3" /> {selectedContact.email || 'No email'}</span>
-                    {selectedContact.phone && (
-                      <a href={`tel:${selectedContact.phone.replace(/\D/g, '')}`} className="flex items-center gap-1 hover:underline">
-                        <PhoneCall className="h-3 w-3" /> {selectedContact.phone}
-                      </a>
-                    )}
+                    <Mail className="h-3 w-3" /> {selectedContact.email || 'No email'}
                   </CardDescription>
                 </div>
               </div>
             </CardHeader>
             <CardContent className="pt-6">
+              {!FEATURES.ai && (
+                <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-3">
+                  <AlertTriangle className="h-5 w-5 text-amber-600" />
+                  <p className="text-sm text-amber-800 font-medium">AI Generation is currently disabled. Add your Grok API key in Settings to draft outreach.</p>
+                </div>
+              )}
+
               <Tabs defaultValue="email">
                 <TabsList className="grid w-full grid-cols-2 mb-8">
                   <TabsTrigger value="email" className="gap-2"><Mail className="h-4 w-4" /> Email</TabsTrigger>
-                  <TabsTrigger value="sms" className="gap-2"><MessageSquare className="h-4 w-4" /> SMS</TabsTrigger>
+                  <TabsTrigger value="sms" className="gap-2" disabled={!FEATURES.sms}>
+                    {!FEATURES.sms && <Lock className="h-3 w-3" />}
+                    <MessageSquare className="h-4 w-4" /> SMS
+                  </TabsTrigger>
                 </TabsList>
                 
                 <TabsContent value="email" className="space-y-4">
@@ -206,8 +196,9 @@ export function SmartOutreach() {
                     <div className="flex flex-col items-center justify-center py-20 border-2 border-dashed rounded-xl bg-slate-50">
                       <Wand2 className="h-10 w-10 text-slate-300 mb-4" />
                       <p className="text-muted-foreground mb-6">Generate a personalized outreach email with Grok-4.</p>
-                      <Button onClick={() => handleGenerateContent(selectedContact, 'email')} disabled={loading} className="gap-2">
+                      <Button onClick={() => handleGenerateContent(selectedContact, 'email')} disabled={loading || !FEATURES.ai} className="gap-2">
                         {loading && <RefreshCw className="h-4 w-4 animate-spin" />}
+                        {!FEATURES.ai && <Lock className="h-4 w-4" />}
                         Generate with Grok
                       </Button>
                     </div>
@@ -237,31 +228,20 @@ export function SmartOutreach() {
                 </TabsContent>
 
                 <TabsContent value="sms" className="space-y-4">
-                  {!generatedContent.sms ? (
+                  {FEATURES.sms ? (
                     <div className="flex flex-col items-center justify-center py-20 border-2 border-dashed rounded-xl bg-slate-50">
                       <MessageSquare className="h-10 w-10 text-slate-300 mb-4" />
                       <p className="text-muted-foreground mb-6">Draft a short, human SMS with Grok-4 intelligence.</p>
-                      <Button onClick={() => handleGenerateContent(selectedContact, 'sms')} disabled={loading} className="gap-2">
+                      <Button onClick={() => handleGenerateContent(selectedContact, 'sms')} disabled={loading || !FEATURES.ai} className="gap-2">
                         {loading && <RefreshCw className="h-4 w-4 animate-spin" />}
                         Draft with Grok
                       </Button>
                     </div>
                   ) : (
-                    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
-                      <div className="max-w-[80%] p-4 rounded-2xl bg-primary text-primary-foreground shadow-md rounded-bl-none ml-2">
-                        <p className="text-sm leading-relaxed">{generatedContent.sms.smsMessage}</p>
-                      </div>
-                      <div className="flex justify-end gap-3">
-                        <Button variant="outline" size="sm" onClick={() => setGeneratedContent(prev => ({...prev, sms: undefined}))}>Regenerate</Button>
-                        <ComplianceGuard 
-                          content={generatedContent.sms.smsMessage} 
-                          type="sms" 
-                          contactName={selectedContact.name} 
-                          onApproved={handleSendSMS}
-                        >
-                          <Button size="sm" className="gap-2 bg-accent"><Send className="h-4 w-4" /> Send SMS</Button>
-                        </ComplianceGuard>
-                      </div>
+                    <div className="flex flex-col items-center justify-center py-20 border-2 border-dashed rounded-xl bg-slate-50 text-center px-6">
+                      <Lock className="h-10 w-10 text-slate-300 mb-4" />
+                      <h4 className="font-bold text-slate-900 mb-2">SMS Integration Required</h4>
+                      <p className="text-sm text-slate-500">Connect Twilio in Settings to enable automated text message outreach.</p>
                     </div>
                   )}
                 </TabsContent>

@@ -29,6 +29,8 @@ import { GoogleMap, useJsApiLoader, DrawingManager, InfoWindow } from "@react-go
 import { searchProperties, fetchParcelAtPoint, pullZoneParcels, calculateICPScore, ClarkParcel } from "@/lib/clark-county"
 import { useUser, useFirestore, addDocumentNonBlocking } from "@/firebase"
 import { collection } from "firebase/firestore"
+import { FEATURES } from "@/lib/feature-flags"
+import Link from "next/link"
 
 const center = {
   lat: 36.1699,
@@ -57,7 +59,7 @@ export default function FarmZonePage() {
 
   const { isLoaded, loadError } = useJsApiLoader({
     id: 'google-map-script',
-    googleMapsApiKey: "AIzaSyAKHt2xQfi9XvjwpVu9_nC-yiTXYMqmefE",
+    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY || "",
     libraries: ['drawing', 'geometry', 'places']
   });
 
@@ -172,6 +174,29 @@ export default function FarmZonePage() {
   };
 
   if (!mounted) return null;
+
+  // Handle Missing Maps Key
+  if (!FEATURES.maps) {
+    return (
+      <SidebarProvider>
+        <div className="flex min-h-screen w-full">
+          <AppSidebar />
+          <SidebarInset>
+            <div className="flex flex-col items-center justify-center h-full p-8 text-center bg-slate-50 space-y-6">
+              <div className="h-20 w-20 bg-amber-50 rounded-full flex items-center justify-center mx-auto">
+                <MapPin className="h-10 w-10 text-amber-500" />
+              </div>
+              <h2 className="text-2xl font-black text-primary">Farm Zone Map Disabled</h2>
+              <p className="text-sm text-slate-600 max-w-md">Add Google Maps key in Settings to enable the neighborhood parcel visualization feature.</p>
+              <Link href="/settings">
+                <Button className="bg-primary px-8 h-12 rounded-xl font-bold">Go to Settings</Button>
+              </Link>
+            </div>
+          </SidebarInset>
+        </div>
+      </SidebarProvider>
+    );
+  }
 
   if (loadError) {
     return (

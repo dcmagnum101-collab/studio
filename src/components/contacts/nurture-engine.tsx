@@ -4,23 +4,21 @@ import React, { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
 import { 
   Sparkles, 
   BrainCircuit, 
-  CheckCircle2, 
-  AlertCircle, 
-  Send, 
   RefreshCw,
   ArrowRight,
-  ShieldCheck,
-  MailX
+  Send,
+  Lock,
+  AlertTriangle
 } from "lucide-react"
 import { generateNurturePlan, NurtureAnalysis } from "@/services/nurture-engine-service"
 import { useUser } from "@/firebase"
 import { useToast } from "@/hooks/use-toast"
 import { sendNurtureEmail } from "@/app/actions/gmail"
 import { ComplianceGuard } from "@/components/compliance/ComplianceGuard"
+import { FEATURES } from "@/lib/feature-flags"
 
 interface NurtureEngineProps {
   contactId: string;
@@ -35,7 +33,7 @@ export function LeadNurtureEngine({ contactId, contactName }: NurtureEngineProps
   const [analysis, setAnalysis] = useState<NurtureAnalysis | null>(null);
 
   const handleRefresh = async () => {
-    if (!user) return;
+    if (!user || !FEATURES.ai) return;
     setLoading(true);
     try {
       const result = await generateNurturePlan(user.uid, contactId);
@@ -55,7 +53,7 @@ export function LeadNurtureEngine({ contactId, contactName }: NurtureEngineProps
       await sendNurtureEmail({
         userId: user.uid,
         contactId,
-        to: "recipient@example.com", // This would be the contact's real email
+        to: "recipient@example.com",
         subject: analysis.draftedMessage.subject || "Strategic Real Estate Update",
         body: finalContent,
         isAiGenerated: true
@@ -86,29 +84,42 @@ export function LeadNurtureEngine({ contactId, contactName }: NurtureEngineProps
             variant="ghost" 
             size="sm" 
             onClick={handleRefresh} 
-            disabled={loading}
+            disabled={loading || !FEATURES.ai}
             className="text-white hover:bg-white/10 border border-white/10"
           >
-            {loading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4 mr-2" />}
+            {loading ? <RefreshCw className="h-4 w-4 animate-spin" /> : (
+              !FEATURES.ai ? <Lock className="h-4 w-4 mr-2" /> : <Sparkles className="h-4 w-4 mr-2" />
+            )}
             {analysis ? 'Refresh Intel' : 'Run Analysis'}
           </Button>
         </div>
       </CardHeader>
 
       <CardContent className="p-6 space-y-8">
-        {!analysis && !loading ? (
+        {!FEATURES.ai && (
+          <div className="py-8 text-center space-y-4 bg-white/5 rounded-2xl border border-white/10">
+            <AlertTriangle className="h-8 w-8 text-amber-500 mx-auto" />
+            <p className="text-xs text-slate-400 max-w-xs mx-auto italic">Monica's strategic analysis is offline. <strong>Connect Grok AI in Settings</strong> to unlock deterministic deal steps and outbound drafting.</p>
+          </div>
+        )}
+
+        {FEATURES.ai && !analysis && !loading && (
           <div className="py-12 text-center space-y-4">
             <div className="h-16 w-16 bg-white/5 rounded-full flex items-center justify-center mx-auto border border-white/10">
               <Sparkles className="h-8 w-8 text-slate-500" />
             </div>
             <p className="text-sm text-slate-400 max-w-xs mx-auto italic">Monica is waiting to analyze recent activity and calculate the next best action.</p>
           </div>
-        ) : loading ? (
+        )}
+
+        {FEATURES.ai && loading && (
           <div className="py-12 flex flex-col items-center gap-4">
             <RefreshCw className="h-10 w-10 text-accent animate-spin" />
             <p className="text-xs text-accent font-bold uppercase tracking-widest animate-pulse">Processing Deal Intelligence...</p>
           </div>
-        ) : (
+        )}
+
+        {FEATURES.ai && analysis && !loading && (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2">
             {/* Next Actions */}
             <section className="space-y-4">
@@ -136,7 +147,7 @@ export function LeadNurtureEngine({ contactId, contactName }: NurtureEngineProps
                 </Badge>
               </div>
 
-              {analysis.draftedMessage ? (
+              {analysis.draftedMessage && (
                 <div className="space-y-4">
                   <div className="p-4 bg-white rounded-2xl text-slate-900 space-y-2 shadow-2xl">
                     {analysis.draftedMessage.subject && (
@@ -144,12 +155,7 @@ export function LeadNurtureEngine({ contactId, contactName }: NurtureEngineProps
                     )}
                     <p className="text-sm leading-relaxed whitespace-pre-wrap">{analysis.draftedMessage.body}</p>
                   </div>
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex gap-2">
-                      <ShieldCheck className={`h-4 w-4 ${analysis.compliance.isEligible ? 'text-green-500' : 'text-slate-600'}`} />
-                      <span className="text-[10px] text-slate-500 font-bold uppercase">Compliance Pass</span>
-                    </div>
-                    
+                  <div className="flex justify-end">
                     <ComplianceGuard 
                       content={analysis.draftedMessage.body} 
                       type={analysis.draftedMessage.type} 
@@ -165,11 +171,6 @@ export function LeadNurtureEngine({ contactId, contactName }: NurtureEngineProps
                       </Button>
                     </ComplianceGuard>
                   </div>
-                </div>
-              ) : (
-                <div className="p-6 border-2 border-dashed border-white/10 rounded-2xl text-center bg-white/5">
-                  <AlertCircle className="h-8 w-8 text-slate-600 mx-auto mb-2" />
-                  <p className="text-xs text-slate-500">{analysis.compliance.reason || "No outbound message drafted."}</p>
                 </div>
               )}
             </section>

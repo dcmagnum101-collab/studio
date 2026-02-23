@@ -2,6 +2,8 @@ import type {Metadata} from 'next';
 import './globals.css';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
 import { Toaster } from '@/components/ui/toaster';
+import { FEATURES } from '@/lib/feature-flags';
+import { AlertTriangle } from 'lucide-react';
 
 export const metadata: Metadata = {
   title: 'Monica AI Hub | Intelligent Seller Outreach',
@@ -24,6 +26,13 @@ export default function RootLayout({
       </head>
       <body className="font-body antialiased selection:bg-accent/20 selection:text-accent">
         <FirebaseClientProvider>
+          {/* Global AI Feature Warning */}
+          {!FEATURES.ai && (
+            <div className="bg-amber-500 text-white text-[10px] font-black uppercase tracking-widest py-2 px-4 text-center sticky top-0 z-[100] flex items-center justify-center gap-2 shadow-md">
+              <AlertTriangle className="h-3 w-3" />
+              AI features disabled — add your Grok API key in Settings
+            </div>
+          )}
           {children}
           <Toaster />
         </FirebaseClientProvider>
