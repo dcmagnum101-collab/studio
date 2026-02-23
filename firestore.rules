@@ -25,19 +25,19 @@ service cloud.firestore {
       }
     }
 
-    // Collection Group Rules for Unified Intelligence
-    // path[1] matches the userId in the expected path /users/{userId}/...
+    // Collection Group Rules - Scoped by Path Segment UID
+    // path[1] matches the userId in /users/{userId}/contacts/...
     
     match /{path=**}/sms_thread/{msgId} {
-      allow read: if isSignedIn() && path[1] == request.auth.uid;
+      allow read, write: if isSignedIn() && path[1] == request.auth.uid;
     }
 
     match /{path=**}/activityLogs/{logId} {
-      allow read: if isSignedIn() && path[1] == request.auth.uid;
+      allow read, write: if isSignedIn() && path[1] == request.auth.uid;
     }
 
     match /{path=**}/tasks/{taskId} {
-      allow read: if isSignedIn() && path[1] == request.auth.uid;
+      allow read, write: if isSignedIn() && path[1] == request.auth.uid;
     }
 
     // Public Open House Collection
