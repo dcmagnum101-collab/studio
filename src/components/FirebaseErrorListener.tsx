@@ -10,17 +10,18 @@ export function FirebaseErrorListener() {
 
   useEffect(() => {
     const handleError = (error: FirestorePermissionError) => {
-      // Safely extract context — may be undefined at runtime
-      const path = error?.context?.path ?? error?.message ?? 'unknown path';
-      const operation = error?.context?.operation ?? 'unknown operation';
+      // Safely extract context — may be undefined at runtime if not initialized correctly
+      const path = error?.context?.path || error?.message || 'unknown path';
+      const operation = error?.context?.operation || 'unknown operation';
       
-      console.error('Firestore permission error:', { path, operation, error });
+      // Log with explicit string to avoid {} being shown in some console environments
+      console.error(`[Firestore Error] Permission denied at [${path}] during [${operation}]`, error);
 
       toast({
         variant: 'destructive',
-        title: 'Permission Error',
-        description: `Could not load data (${path}). Please refresh or sign in again.`,
-        duration: 5000,
+        title: 'Security Restriction',
+        description: `Could not access ${path}. Please ensure you are signed in correctly.`,
+        duration: 6000,
       });
     };
 

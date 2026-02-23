@@ -3,6 +3,7 @@
 export interface SecurityRuleContext {
   path: string;
   operation: string;
+  requestResourceData?: any;
 }
 
 export class FirestorePermissionError extends Error {
