@@ -31,14 +31,14 @@ import {
 } from "@/components/ui/sidebar"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { useAuth, useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebase"
+import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebase"
 import { signOut } from 'firebase/auth'
-import { collection, query, where, getCountFromServer } from "firebase/firestore"
+import { initializeFirebase } from '@/firebase/init'
+import { collection, query, where } from "firebase/firestore"
 
 export function AppSidebar() {
   const pathname = usePathname()
   const router = useRouter()
-  const auth = useAuth()
   const { user } = useUser()
   const firestore = useFirestore()
   
@@ -70,8 +70,9 @@ export function AppSidebar() {
 
   const handleSignOut = async () => {
     try {
+      const { auth } = initializeFirebase();
       await signOut(auth);
-      document.cookie = "monica-session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+      // The FirebaseProvider automatically clears the cookie on auth state change
       router.push('/login');
     } catch (error) {
       console.error('Error signing out:', error);
