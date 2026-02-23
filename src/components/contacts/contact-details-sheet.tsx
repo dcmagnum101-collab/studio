@@ -41,45 +41,33 @@ import {
   X,
   Zap,
   Globe,
-  Facebook,
-  Linkedin,
-  Instagram,
-  Youtube,
-  Search,
   Scale,
   Camera,
   Printer,
-  FileBadge
+  FileBadge,
+  Wand2
 } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Progress } from "@/components/ui/progress"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { Skeleton } from "@/components/ui/skeleton"
 import { 
   useUser, 
   useFirestore, 
   useDoc, 
-  updateDocumentNonBlocking, 
-  addDocumentNonBlocking 
+  updateDocumentNonBlocking 
 } from "@/firebase"
-import { useConversationHistory, useTasks, useAppointments } from "@/hooks/useFirestoreData"
-import { generateNurtureEmail, generateConversationCoaching } from "@/app/actions/nurture-ai"
-import { sendNurtureEmail } from "@/app/actions/gmail"
-import { logVulcan7CallResult } from "@/app/actions/vulcan7"
+import { useConversationHistory, useAppointments } from "@/hooks/useFirestoreData"
+import { sendNurtureEmail, getGmailConnectionStatus } from "@/app/actions/gmail"
 import { refreshListingDetailAction } from "@/app/actions/lvr-mls"
 import { generateAppointmentBrief, type AppointmentBrief } from "@/app/actions/appointment-brief"
-import { format } from "date-fns"
+import { emailTemplates } from "@/services/email-templates"
 import { useToast } from "@/hooks/use-toast"
-import { collection, doc } from "firebase/firestore"
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
-import { ComplianceGuard } from "@/components/compliance/ComplianceGuard"
+import { doc } from "firebase/firestore"
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
-import { normalizePhone } from "@/lib/utils"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
+import { connectGmailAccount } from "@/firebase/auth/gmail-auth"
 
 interface ContactDetailsSheetProps {
   contact: any | null;
@@ -92,9 +80,14 @@ export function ContactDetailsSheet({ contact: initialContact, open, onOpenChang
   const firestore = useFirestore();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("overview");
-  const [isEditing, setIsEditing] = useState(false);
   const [isRefreshingMLS, setIsRefreshingMLS] = useState(false);
   
+  // Compose Email State
+  const [isComposeOpen, setIsComposeOpen] = useState(false);
+  const [emailSubject, setEmailSubject] = useState("");
+  const [emailBody, setEmailBody] = useState("");
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
+
   // Briefing state
   const [brief, setBrief] = useState<AppointmentBrief | null>(null);
   const [briefingOpen, setBriefingOpen] = useState(false);
@@ -103,16 +96,67 @@ export function ContactDetailsSheet({ contact: initialContact, open, onOpenChang
   const contactId = initialContact?.id;
   const contactPath = useMemo(() => user && contactId ? `users/${user.uid}/contacts/${contactId}` : null, [user, contactId]);
   const { data: contact, isLoading: contactLoading } = useDoc(contactPath);
-  const { data: history, isLoading: historyLoading } = useConversationHistory(contactId || "");
+  const { data: history } = useConversationHistory(contactId || "");
   const { data: appointments } = useAppointments();
 
-  const hasAppointment = useMemo(() => {
-    return appointments?.some(a => a.contactId === contactId);
-  }, [appointments, contactId]);
+  const handleOpenCompose = async () => {
+    if (!user || !contact) return;
 
-  const canGenerateBrief = useMemo(() => {
-    return contact?.pipeline_stage === 'appointment_set' || contact?.pipeline_stage === 'active' || hasAppointment;
-  }, [contact, hasAppointment]);
+    const isConnected = await getGmailConnectionStatus(user.uid);
+    if (!isConnected) {
+      toast({
+        title: "Gmail Not Connected",
+        description: "Connect your Google account to send emails from Monica.",
+        action: (
+          <Button size="sm" onClick={() => connectGmailAccount(user.uid)}>Connect Now</Button>
+        )
+      });
+      return;
+    }
+
+    // Determine Template
+    let template = "";
+    let subject = "Quick question regarding your property";
+    
+    const status = contact.archagent_source || 'expired';
+    if (status.includes('expired')) {
+      template = emailTemplates.expired(contact, { active_listings: 12, avg_dom: 45 });
+      subject = `Strategic Update: ${contact.propertyAddress}`;
+    } else if (status.includes('fsbo')) {
+      template = emailTemplates.fsbo(contact);
+      subject = `Question about your listing at ${contact.propertyAddress}`;
+    } else if (status.includes('preforeclosure')) {
+      template = emailTemplates.preforeclosure(contact);
+      subject = `Private: Confidential Options for ${contact.propertyAddress}`;
+    } else {
+      template = `<p>Hi ${contact.name.split(' ')[0]},</p><p>I'm reaching out to share a quick update on recent activity near ${contact.propertyAddress}.</p>`;
+    }
+
+    setEmailSubject(subject);
+    setEmailBody(template);
+    setIsComposeOpen(true);
+  };
+
+  const handleSendEmail = async () => {
+    if (!user || !contactId || !contact?.email) return;
+    
+    setIsSendingEmail(true);
+    try {
+      await sendNurtureEmail({
+        userId: user.uid,
+        contactId,
+        to: contact.email,
+        subject: emailSubject,
+        body: emailBody
+      });
+      toast({ title: "Email Sent", description: `Delivered to ${contact.name}.` });
+      setIsComposeOpen(false);
+    } catch (err: any) {
+      toast({ variant: "destructive", title: "Send Failed", description: err.message });
+    } finally {
+      setIsSendingEmail(false);
+    }
+  };
 
   const handleRefreshMLS = async () => {
     if (!user || !contact?.mlsNumber) return;
@@ -139,16 +183,11 @@ export function ContactDetailsSheet({ contact: initialContact, open, onOpenChang
       const result = await generateAppointmentBrief(user.uid, contactId);
       setBrief(result);
       setBriefingOpen(true);
-      toast({ title: "Brief Ready", description: "Listing strategy synthesized." });
     } catch (err: any) {
       toast({ variant: "destructive", title: "Briefing Failed", description: err.message });
     } finally {
       setBriefingLoading(false);
     }
-  };
-
-  const handlePrint = () => {
-    window.print();
   };
 
   if (!contactId || contactLoading) return null;
@@ -204,24 +243,28 @@ export function ContactDetailsSheet({ contact: initialContact, open, onOpenChang
                 
                 <TabsContent value="overview" className="m-0 space-y-6">
                   <section className="grid grid-cols-1 gap-4">
-                    {canGenerateBrief && (
-                      <Button 
-                        onClick={handleGenerateBrief} 
-                        disabled={generatingBrief}
-                        className="w-full h-12 bg-accent hover:bg-accent/90 text-primary font-black uppercase tracking-widest shadow-lg gap-2 rounded-xl"
-                      >
-                        {generatingBrief ? <RefreshCw className="h-5 w-5 animate-spin" /> : <FileBadge className="h-5 w-5" />}
-                        Listing Brief
-                      </Button>
-                    )}
+                    <Button 
+                      onClick={handleGenerateBrief} 
+                      disabled={generatingBrief}
+                      className="w-full h-12 bg-accent hover:bg-accent/90 text-primary font-black uppercase tracking-widest shadow-lg gap-2 rounded-xl"
+                    >
+                      {generatingBrief ? <RefreshCw className="h-5 w-5 animate-spin" /> : <FileBadge className="h-5 w-5" />}
+                      Strategic Listing Brief
+                    </Button>
                     
                     <div className="grid grid-cols-2 gap-4">
                       {contact.phone && (
                         <a href={`tel:${contact.phone.replace(/\D/g, '')}`} className="w-full">
-                          <Button variant="outline" className="w-full h-12 rounded-xl font-bold gap-2"><Phone className="h-4 w-4" /> Call</Button>
+                          <Button variant="outline" className="w-full h-12 rounded-xl font-bold gap-2"><Phone className="h-4 w-4" /> Call Lead</Button>
                         </a>
                       )}
-                      <Button variant="outline" className="h-12 rounded-xl font-bold gap-2"><Mail className="h-4 w-4" /> Email</Button>
+                      <Button 
+                        variant="outline" 
+                        className="h-12 rounded-xl font-bold gap-2"
+                        onClick={handleOpenCompose}
+                      >
+                        <Mail className="h-4 w-4" /> Send Email
+                      </Button>
                     </div>
                   </section>
 
@@ -254,7 +297,7 @@ export function ContactDetailsSheet({ contact: initialContact, open, onOpenChang
                   {contact.photos?.length > 0 && (
                     <div className="space-y-4">
                       <h4 className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
-                        <Camera className="h-3 w-3 text-accent" /> Media
+                        <Camera className="h-3 w-3 text-accent" /> Property Media
                       </h4>
                       <div className="w-full overflow-hidden rounded-2xl">
                         <Carousel className="w-full">
@@ -280,7 +323,7 @@ export function ContactDetailsSheet({ contact: initialContact, open, onOpenChang
                       <p className="text-lg font-black text-primary">${contact.listPrice?.toLocaleString() || 'N/A'}</p>
                     </Card>
                     <Card className="border-none shadow-sm bg-white p-4 space-y-1 rounded-2xl">
-                      <p className="text-[8px] font-black uppercase text-slate-400">DOM</p>
+                      <p className="text-[8px] font-black uppercase text-slate-400">Days on Market</p>
                       <p className="text-lg font-black text-slate-700">{contact.daysOnMarket || '0'} Days</p>
                     </Card>
                   </div>
@@ -297,24 +340,19 @@ export function ContactDetailsSheet({ contact: initialContact, open, onOpenChang
                           disabled={isRefreshingMLS}
                         >
                           {isRefreshingMLS ? <RefreshCw className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
-                          Refresh
+                          Refresh from LVR
                         </Button>
                       )}
                     </div>
                     <div className="bg-white rounded-2xl border border-slate-100 divide-y overflow-hidden shadow-sm">
                       <div className="p-4 flex justify-between">
-                        <span className="text-xs text-slate-500">Agent</span>
+                        <span className="text-xs text-slate-500">Listing Agent</span>
                         <span className="text-xs font-bold text-slate-700">{contact.listingAgent || 'Unknown'}</span>
                       </div>
                       <div className="p-4 flex justify-between">
-                        <span className="text-xs text-slate-500">Status</span>
+                        <span className="text-xs text-slate-500">Current Status</span>
                         <Badge variant="outline" className="text-[10px] font-bold uppercase">{contact.listing_status || 'Offline'}</Badge>
                       </div>
-                      {contact.remarks && (
-                        <div className="p-4 space-y-2">
-                          <p className="text-xs leading-relaxed text-slate-600 italic">"{contact.remarks}"</p>
-                        </div>
-                      )}
                     </div>
                   </div>
                 </TabsContent>
@@ -324,76 +362,90 @@ export function ContactDetailsSheet({ contact: initialContact, open, onOpenChang
         </SheetContent>
       </Sheet>
 
-      {/* Appointment Briefing Modal */}
-      <Dialog open={briefingOpen} onOpenChange={setBriefingOpen}>
-        <DialogContent className="max-w-4xl max-h-[95vh] overflow-y-auto p-0 border-none shadow-2xl rounded-t-3xl sm:rounded-2xl">
-          <div className="print:block" id="appointment-brief">
-            <header className="bg-primary text-white p-6 sm:p-8 space-y-2 relative overflow-hidden">
-              <div className="absolute top-0 right-0 p-8 opacity-10">
-                <FileBadge className="h-24 w-24" />
-              </div>
-              <div className="flex items-center gap-3">
-                <Badge className="bg-accent text-primary font-black px-2 text-[10px]">CONFIDENTIAL</Badge>
-              </div>
-              <DialogTitle className="text-2xl sm:text-3xl font-black font-headline">Strategy: {contact.name}</DialogTitle>
-              <DialogDescription className="text-primary-foreground/70 flex items-center gap-2 text-xs">
-                <MapPin className="h-4 w-4 shrink-0" /> {contact.propertyAddress}
-              </DialogDescription>
-            </header>
-
-            <div className="p-6 sm:p-8 space-y-8 bg-white">
-              {brief ? (
-                <div className="grid gap-8">
-                  <section className="grid md:grid-cols-2 gap-8">
-                    <div className="space-y-4">
-                      <h3 className="text-xs font-black text-primary uppercase tracking-widest flex items-center gap-2 border-b pb-2">
-                        <Home className="h-4 w-4" /> Pricing
-                      </h3>
-                      <p className="text-sm text-slate-700 leading-relaxed font-medium">{brief.property_summary}</p>
-                    </div>
-                    <div className="space-y-4">
-                      <h3 className="text-xs font-black text-primary uppercase tracking-widest flex items-center gap-2 border-b pb-2">
-                        <Zap className="h-4 w-4 text-accent" /> Motivation
-                      </h3>
-                      <p className="text-sm text-slate-700 leading-relaxed">{brief.seller_motivation}</p>
-                    </div>
-                  </section>
-
-                  <section className="bg-primary/5 p-4 sm:p-6 rounded-2xl border border-primary/10 space-y-4">
-                    <h3 className="text-xs font-black text-primary uppercase tracking-widest flex items-center gap-2">
-                      <ShieldCheck className="h-4 w-4" /> Rebuttals
-                    </h3>
-                    <div className="grid gap-4">
-                      {brief.likely_objections.slice(0, 3).map((obj, i) => (
-                        <div key={i} className="p-3 bg-white rounded-xl border border-slate-100 shadow-sm">
-                          <p className="text-[10px] font-black text-red-400 uppercase mb-1">Objection</p>
-                          <p className="text-xs font-bold text-red-900 mb-2">"{obj}"</p>
-                          <p className="text-[10px] font-black text-green-400 uppercase mb-1">Response</p>
-                          <p className="text-xs font-medium text-green-900">{brief.objection_responses[i]}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </section>
-
-                  <section className="p-4 bg-slate-900 text-white rounded-2xl space-y-2">
-                    <div className="flex items-center gap-2 text-[10px] font-black text-accent uppercase tracking-widest">
-                      <Landmark className="h-3 w-3" /> NV Intelligence
-                    </div>
-                    <p className="text-xs text-slate-300 leading-relaxed">{brief.nevada_specific_notes}</p>
-                  </section>
-                </div>
-              ) : (
-                <div className="py-20 text-center animate-pulse text-slate-400 italic">Synthesizing...</div>
-              )}
+      {/* Gmail Compose Dialog */}
+      <Dialog open={isComposeOpen} onOpenChange={setIsComposeOpen}>
+        <DialogContent className="sm:max-w-[600px] p-0 overflow-hidden border-none shadow-2xl rounded-2xl">
+          <DialogHeader className="bg-primary text-white p-6 pb-8">
+            <div className="flex items-center gap-2 mb-2">
+              <Mail className="h-5 w-5 text-accent" />
+              <DialogTitle className="text-xl font-black">Compose Nurture Email</DialogTitle>
             </div>
-
-            <footer className="p-6 bg-slate-50 border-t flex flex-col sm:flex-row justify-end gap-3 print:hidden">
-              <Button variant="outline" className="h-12 rounded-xl" onClick={() => setBriefingOpen(false)}>Close</Button>
-              <Button onClick={handlePrint} className="h-12 rounded-xl gap-2 bg-primary">
-                <Printer className="h-4 w-4" /> Print Brief
-              </Button>
-            </footer>
+            <DialogDescription className="text-primary-foreground/70">
+              Sending to: <span className="text-white font-bold">{contact?.email}</span>
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="p-6 space-y-4 bg-white">
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase text-slate-400">Subject Line</Label>
+              <Input 
+                value={emailSubject} 
+                onChange={(e) => setEmailSubject(e.target.value)}
+                className="font-bold border-slate-200 focus:ring-primary"
+              />
+            </div>
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <Label className="text-[10px] font-black uppercase text-slate-400">Email Body (HTML Supported)</Label>
+                <Badge variant="outline" className="text-[8px] font-black text-primary border-primary/20 bg-primary/5">
+                  <Sparkles className="h-2 w-2 mr-1" /> Branded Template
+                </Badge>
+              </div>
+              <Textarea 
+                value={emailBody} 
+                onChange={(e) => setEmailBody(e.target.value)}
+                className="min-h-[300px] font-mono text-xs leading-relaxed border-slate-200 focus:ring-primary"
+              />
+            </div>
           </div>
+
+          <DialogFooter className="bg-slate-50 p-4 border-t gap-3">
+            <Button variant="ghost" onClick={() => setIsComposeOpen(false)} className="font-bold">Cancel</Button>
+            <Button 
+              onClick={handleSendEmail} 
+              disabled={isSendingEmail}
+              className="bg-primary text-white font-black px-8 h-11 gap-2 shadow-lg"
+            >
+              {isSendingEmail ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              Send via Gmail
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Appointment Briefing Modal (Existing) */}
+      <Dialog open={briefingOpen} onOpenChange={setBriefingOpen}>
+        <DialogContent className="max-w-4xl max-h-[95vh] overflow-y-auto p-0 border-none shadow-2xl rounded-2xl">
+          <header className="bg-primary text-white p-8 relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-8 opacity-10"><FileBadge className="h-24 w-24" /></div>
+            <DialogTitle className="text-3xl font-black font-headline">Strategy Brief: {contact.name}</DialogTitle>
+            <DialogDescription className="text-primary-foreground/70 flex items-center gap-2 mt-2">
+              <MapPin className="h-4 w-4" /> {contact.propertyAddress}
+            </DialogDescription>
+          </header>
+          <div className="p-8 bg-white space-y-8">
+            {brief ? (
+              <div className="grid gap-8">
+                <div className="grid md:grid-cols-2 gap-8">
+                  <div className="space-y-4">
+                    <h3 className="text-xs font-black text-primary uppercase tracking-widest border-b pb-2">Market Analysis</h3>
+                    <p className="text-sm text-slate-700 leading-relaxed">{brief.property_summary}</p>
+                  </div>
+                  <div className="space-y-4">
+                    <h3 className="text-xs font-black text-primary uppercase tracking-widest border-b pb-2">Seller Context</h3>
+                    <p className="text-sm text-slate-700 leading-relaxed">{brief.seller_motivation}</p>
+                  </div>
+                </div>
+                <div className="p-6 bg-slate-900 text-white rounded-2xl">
+                  <p className="text-[10px] font-black text-accent uppercase tracking-widest mb-2">NV Compliance Note</p>
+                  <p className="text-xs text-slate-300 italic">"{brief.nevada_specific_notes}"</p>
+                </div>
+              </div>
+            ) : <div className="py-20 text-center italic text-slate-400">Loading brief...</div>}
+          </div>
+          <footer className="p-6 bg-slate-50 border-t flex justify-end">
+            <Button onClick={() => setBriefingOpen(false)} className="bg-primary">Close Briefing</Button>
+          </footer>
         </DialogContent>
       </Dialog>
     </>
