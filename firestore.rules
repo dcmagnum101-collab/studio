@@ -1,20 +1,41 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Main user data - covers all subcollections including alerts, contacts, tasks
     match /users/{userId}/{allPaths=**} {
       allow read, write: if request.auth != null 
         && request.auth.uid == userId;
     }
 
+    // collectionGroup queries - sms_thread lives under contacts
     match /{path=**}/sms_thread/{messageId} {
       allow read, write: if request.auth != null
-        && request.auth.uid == path[1];
+        && path[1] == request.auth.uid;
     }
 
+    // collectionGroup queries - tasks lives under contacts
     match /{path=**}/tasks/{taskId} {
       allow read, write: if request.auth != null
-        && request.auth.uid == path[1];
+        && path[1] == request.auth.uid;
+    }
+
+    // collectionGroup queries - activityLogs lives under contacts
+    match /{path=**}/activityLogs/{logId} {
+      allow read, write: if request.auth != null
+        && path[1] == request.auth.uid;
+    }
+
+    // Public Open House configurations
+    match /openHouses/{ohId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    // Allow public sign-ins to create contact records
+    match /users/{userId}/contacts/{contactId} {
+      allow create: if request.resource.data.archagent_source == 'open_house';
     }
 
   }

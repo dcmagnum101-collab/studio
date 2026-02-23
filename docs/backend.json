@@ -15,7 +15,7 @@
         "property_type": { "type": "string", "enum": ["single_family", "condo", "multi_family", "townhouse", "other"] },
         "pipeline_stage": {
           "type": "string",
-          "enum": ["new_lead", "attempted_contact", "conversation_had", "follow_up_scheduled", "appointment_set", "listed", "under_contract", "closed", "long_term_nurture", "dnc"]
+          "enum": ["new_lead", "attempted_contact", "conversation_had", "follow_up_scheduled", "appointment_set", "under_contract", "listed", "closed", "long_term_nurture", "dnc"]
         },
         "icpScore": { "type": "number" },
         "archagent_source": { "type": "string" },
@@ -50,6 +50,18 @@
         "status": { "type": "string" },
         "signin_count": { "type": "number" }
       }
+    },
+    "Alert": {
+      "title": "Hot Alert",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "type": { "type": "string", "enum": ["sms", "icp", "task", "market"] },
+        "leadId": { "type": "string" },
+        "read": { "type": "boolean" },
+        "created_at": { "type": "string", "format": "date-time" }
+      }
     }
   },
   "auth": {
@@ -59,6 +71,10 @@
     "/users/{userId}/contacts/{contactId}": {
       "schema": { "$ref": "#/backend/entities/Contact" },
       "description": "Master contact records."
+    },
+    "/users/{userId}/alerts/{alertId}": {
+      "schema": { "$ref": "#/backend/entities/Alert" },
+      "description": "High-intensity intelligence alerts."
     },
     "/openHouses/{ohId}": {
       "schema": { "$ref": "#/backend/entities/OpenHouse" },
