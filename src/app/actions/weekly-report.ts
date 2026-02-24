@@ -8,22 +8,7 @@
 import { grokJSON } from '@/services/grok-service';
 import { adminDb } from '@/lib/firebase-admin';
 import * as admin from 'firebase-admin';
-
-export interface WeeklyReport {
-  headline: string;
-  stats: {
-    calls: number;
-    emails: number;
-    new_leads: number;
-    appointments: number;
-    warm_moves: number;
-    dead_leads: number;
-  };
-  what_worked: string[];
-  what_to_improve: string[];
-  next_week_focus: string;
-  lead_type_breakdown: Record<string, number>;
-}
+import type { WeeklyReport } from '@/lib/weekly-report-types';
 
 /**
  * Generates a performance report based on the last 7 days of activity.

@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
@@ -40,7 +39,8 @@ import {
 } from "lucide-react";
 import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from "@/firebase";
 import { collection, query } from "firebase/firestore";
-import { generateWeeklyReport, sendReportToUser, type WeeklyReport } from "@/app/actions/weekly-report";
+import { generateWeeklyReport, sendReportToUser } from "@/app/actions/weekly-report";
+import type { WeeklyReport } from "@/lib/weekly-report-types";
 import { startOfWeek, format, startOfMonth, isWithinInterval, endOfMonth } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
