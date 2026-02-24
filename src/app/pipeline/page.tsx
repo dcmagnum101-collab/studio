@@ -1,5 +1,5 @@
-
 "use client";
+export const dynamic = 'force-dynamic';
 
 import React, { useState, useEffect, useMemo } from "react";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
@@ -89,7 +89,7 @@ export default function PipelinePage() {
                 </div>
                 <div className="text-center space-y-3">
                   <h2 className="text-3xl font-black text-primary">Your pipeline is empty</h2>
-                  <p className="text-slate-500 max-w-sm mx-auto text-sm leading-relaxed">
+                  <p className="text-slate-500 max-sm mx-auto text-sm leading-relaxed">
                     Leads move through these stages automatically as you work them. Import contacts to begin visualizing your deal flow.
                   </p>
                 </div>

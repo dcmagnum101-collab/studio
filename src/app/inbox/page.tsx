@@ -1,4 +1,5 @@
 "use client"
+export const dynamic = 'force-dynamic';
 
 import React, { useState, useEffect, useRef } from "react"
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar"
@@ -235,7 +236,7 @@ export default function SMSInboxPage() {
                         disabled={!message.trim() || sending}
                         className="h-12 w-12 rounded-2xl bg-primary shadow-lg shadow-primary/20"
                       >
-                        {sending ? <RefreshCw className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
+                        {sending ? <RefreshCw className="h-5 w-5 animate-spin" /> : <Send className="h-4 w-4" />}
                       </Button>
                     </form>
                   </footer>
