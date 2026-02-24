@@ -1,106 +1,30 @@
-
 {
   "indexes": [
     {
       "collectionGroup": "contacts",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "archagent_source", "order": "ASCENDING" },
-        { "fieldPath": "name", "order": "ASCENDING" }
+        { "fieldPath": "pipeline_stage", "order": "ASCENDING" },
+        { "fieldPath": "icpScore", "order": "DESCENDING" }
       ]
     },
     {
       "collectionGroup": "contacts",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "archagent_source", "order": "ASCENDING" },
-        { "fieldPath": "created_at", "order": "DESCENDING" }
+        { "fieldPath": "nextFollowUpDate", "order": "ASCENDING" },
+        { "fieldPath": "pipeline_stage", "order": "ASCENDING" }
       ]
     },
     {
-      "collectionGroup": "contacts",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "icpScore", "order": "DESCENDING" },
-        { "fieldPath": "name", "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "alerts",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "read", "order": "ASCENDING" },
-        { "fieldPath": "created_at", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "tasks",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "status", "order": "ASCENDING" },
-        { "fieldPath": "due_date", "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "tasks",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "ownerId", "order": "ASCENDING" },
-        { "fieldPath": "status", "order": "ASCENDING" },
-        { "fieldPath": "due_date", "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "ai_usage",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "called_at", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "sms_thread",
+      "collectionGroup": "activityLogs",
       "queryScope": "COLLECTION_GROUP",
       "fields": [
         { "fieldPath": "ownerId", "order": "ASCENDING" },
-        { "fieldPath": "direction", "order": "ASCENDING" },
-        { "fieldPath": "timestamp", "order": "DESCENDING" }
+        { "fieldPath": "type", "order": "ASCENDING" },
+        { "fieldPath": "date", "order": "ASCENDING" }
       ]
     }
   ],
-  "fieldOverrides": [
-    {
-      "collectionGroup": "activityLogs",
-      "fieldPath": "date",
-      "indexes": [
-        {
-          "order": "ASCENDING",
-          "queryScope": "COLLECTION_GROUP"
-        },
-        {
-          "order": "DESCENDING",
-          "queryScope": "COLLECTION_GROUP"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "activityLogs",
-      "fieldPath": "ownerId",
-      "indexes": [
-        {
-          "order": "ASCENDING",
-          "queryScope": "COLLECTION_GROUP"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "activityLogs",
-      "fieldPath": "type",
-      "indexes": [
-        {
-          "order": "ASCENDING",
-          "queryScope": "COLLECTION_GROUP"
-        }
-      ]
-    }
-  ]
+  "fieldOverrides": []
 }
