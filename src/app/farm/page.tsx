@@ -60,6 +60,8 @@ const mapContainerStyle = {
 
 const LIBRARIES: ("drawing" | "geometry" | "places")[] = ["drawing", "geometry", "places"];
 
+const MAPS_PLACEHOLDER = 'AIzaSyAKHt2xQfi9XvjwpVu9_nC-yiTXYMqmefE';
+
 export default function FarmZonePage() {
   const { user } = useUser();
   const firestore = useFirestore();
@@ -227,6 +229,33 @@ export default function FarmZonePage() {
   };
 
   if (!mounted) return null;
+
+  if (!process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY === MAPS_PLACEHOLDER) {
+    return (
+      <SidebarProvider>
+        <div className="flex h-screen w-full">
+          <AppSidebar />
+          <SidebarInset className="flex flex-col items-center justify-center p-8 bg-slate-50">
+            <div className="max-w-md text-center space-y-6">
+              <div className="h-20 w-20 bg-amber-50 rounded-full flex items-center justify-center mx-auto border-4 border-white shadow-sm">
+                <AlertTriangle className="h-10 w-10 text-amber-500" />
+              </div>
+              <div className="space-y-2">
+                <h2 className="text-2xl font-black text-primary">Map Engine Offline</h2>
+                <p className="text-slate-500 text-sm leading-relaxed">
+                  The Google Maps API key is missing or invalid. Monica needs this key to visualize parcel intelligence and farm zones.
+                </p>
+              </div>
+              <div className="p-4 bg-white rounded-2xl border border-slate-200 text-left space-y-3">
+                <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Technical Solution</p>
+                <p className="text-xs text-slate-600">Update the <strong>NEXT_PUBLIC_GOOGLE_MAPS_KEY</strong> in your <code>apphosting.yaml</code> file or Firebase Console secrets.</p>
+              </div>
+            </div>
+          </SidebarInset>
+        </div>
+      </SidebarProvider>
+    );
+  }
 
   return (
     <SidebarProvider>

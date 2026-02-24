@@ -8,7 +8,7 @@ env:
       - RUNTIME
 
   - variable: NEXT_PUBLIC_GOOGLE_MAPS_KEY
-    value: YOUR_ACTUAL_GOOGLE_MAPS_KEY_HERE
+    value: AIzaSyAKHt2xQfi9XvjwpVu9_nC-yiTXYMqmefE
     availability:
       - BUILD
       - RUNTIME
