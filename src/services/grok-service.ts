@@ -27,7 +27,11 @@ interface GrokOptions {
  */
 export async function grokComplete(
   messages: Message[],
-  options: GrokOptions = {}
+  options: GrokOptions = {
+  if (!process.env.GROK_API_KEY) {
+    throw new Error('Grok API key not configured. Add GROK_API_KEY to App Hosting environment secrets.');
+  }
+}
 ): Promise<string> {
   if (!GROK_API_KEY) {
     throw new Error('GROK_API_KEY is not configured.');
@@ -84,6 +88,10 @@ export async function grokAsk(
   userId?: string,
   temperature = 0.7
 ): Promise<string> {
+  if (!process.env.GROK_API_KEY) {
+    throw new Error('Grok API key not configured. Add GROK_API_KEY to App Hosting environment secrets.');
+  }
+
   return grokComplete([
     { role: 'system', content: systemPrompt },
     { role: 'user', content: userPrompt },
@@ -98,8 +106,14 @@ export async function grokJSON<T = any>(
   userPrompt: string,
   userId?: string
 ): Promise<T> {
+  if (!process.env.GROK_API_KEY) {
+    throw new Error('Grok API key not configured. Add GROK_API_KEY to App Hosting environment secrets.');
+  }
+
   const result = await grokAsk(
-    systemPrompt + '\n\nRespond ONLY with valid JSON. No markdown, no backticks, no explanation.',
+    systemPrompt + '
+
+Respond ONLY with valid JSON. No markdown, no backticks, no explanation.',
     userPrompt,
     userId,
     0.2 // Low temperature for structured output
