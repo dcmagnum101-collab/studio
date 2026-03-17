@@ -74,3 +74,10 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+
+/* macOS traffic light safe zone — sidebar header must clear the window controls */
+.electron-mac .app-header,
+.electron-mac [data-sidebar="header"] {
+  padding-left: 80px;
+}
+

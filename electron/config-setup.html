@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Monica AI Hub — Setup</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', sans-serif;
+      background: #1E3A8A;
+      color: white;
+      min-height: 100vh;
+      -webkit-app-region: drag;
+      user-select: none;
+    }
+
+    .titlebar {
+      height: 52px;
+      display: flex;
+      align-items: center;
+      padding: 0 80px;
+      font-size: 14px;
+      font-weight: 600;
+      color: rgba(255,255,255,0.7);
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .container {
+      max-width: 580px;
+      margin: 0 auto;
+      padding: 32px 24px 48px;
+      -webkit-app-region: no-drag;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 36px;
+    }
+
+    .logo {
+      width: 64px;
+      height: 64px;
+      background: linear-gradient(135deg, #F59E0B, #D97706);
+      border-radius: 16px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      font-weight: 800;
+      margin-bottom: 16px;
+    }
+
+    h1 {
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .subtitle {
+      font-size: 14px;
+      color: rgba(255,255,255,0.6);
+      line-height: 1.5;
+    }
+
+    .section {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+
+    .section-title {
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #F59E0B;
+      margin-bottom: 16px;
+    }
+
+    .field {
+      margin-bottom: 12px;
+    }
+
+    label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: rgba(255,255,255,0.7);
+      margin-bottom: 6px;
+      letter-spacing: 0.03em;
+    }
+
+    input {
+      width: 100%;
+      background: rgba(0,0,0,0.25);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 13px;
+      color: white;
+      outline: none;
+      transition: border-color 0.2s;
+      font-family: inherit;
+    }
+
+    input::placeholder { color: rgba(255,255,255,0.3); }
+    input:focus { border-color: #F59E0B; background: rgba(0,0,0,0.35); }
+
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+    .help {
+      font-size: 11px;
+      color: rgba(255,255,255,0.4);
+      margin-top: 4px;
+    }
+
+    .btn-save {
+      width: 100%;
+      margin-top: 24px;
+      background: linear-gradient(135deg, #F59E0B, #D97706);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      padding: 14px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+    }
+
+    .btn-save:hover { opacity: 0.92; }
+    .btn-save:active { transform: scale(0.98); }
+    .btn-save:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .status-msg {
+      text-align: center;
+      font-size: 13px;
+      margin-top: 12px;
+      min-height: 20px;
+      color: #86EFAC;
+    }
+    .status-msg.error { color: #FCA5A5; }
+
+    a {
+      color: #F59E0B;
+      font-size: 12px;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="titlebar">Monica AI Hub — First-Time Setup</div>
+
+  <div class="container">
+    <div class="header">
+      <div class="logo">M</div>
+      <h1>Welcome to Monica AI Hub</h1>
+      <p class="subtitle">
+        Enter your Firebase and API credentials once.<br />
+        Monica AI Hub saves them securely on this Mac.
+      </p>
+    </div>
+
+    <!-- Firebase -->
+    <div class="section">
+      <div class="section-title">Firebase (Required)</div>
+      <p class="help" style="margin-bottom:14px;">
+        Get these from <a onclick="openFirebase()">Firebase Console → Project Settings → Your Apps</a>
+      </p>
+
+      <div class="row">
+        <div class="field">
+          <label>Project ID</label>
+          <input id="NEXT_PUBLIC_FIREBASE_PROJECT_ID" placeholder="my-project-id" />
+        </div>
+        <div class="field">
+          <label>API Key</label>
+          <input id="NEXT_PUBLIC_FIREBASE_API_KEY" placeholder="AIza..." />
+        </div>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label>Auth Domain</label>
+          <input id="NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN" placeholder="project.firebaseapp.com" />
+        </div>
+        <div class="field">
+          <label>Storage Bucket</label>
+          <input id="NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET" placeholder="project.appspot.com" />
+        </div>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label>Messaging Sender ID</label>
+          <input id="NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID" placeholder="123456789" />
+        </div>
+        <div class="field">
+          <label>App ID</label>
+          <input id="NEXT_PUBLIC_FIREBASE_APP_ID" placeholder="1:123:web:abc" />
+        </div>
+      </div>
+    </div>
+
+    <!-- Firebase Admin -->
+    <div class="section">
+      <div class="section-title">Firebase Admin (Required for AI features)</div>
+      <p class="help" style="margin-bottom:14px;">
+        From <a onclick="openFirebase()">Firebase Console → Project Settings → Service Accounts → Generate new private key</a>
+      </p>
+      <div class="row">
+        <div class="field">
+          <label>Admin Project ID</label>
+          <input id="FIREBASE_ADMIN_PROJECT_ID" placeholder="my-project-id" />
+        </div>
+        <div class="field">
+          <label>Admin Client Email</label>
+          <input id="FIREBASE_ADMIN_CLIENT_EMAIL" placeholder="firebase-adminsdk@..." />
+        </div>
+      </div>
+      <div class="field">
+        <label>Admin Private Key</label>
+        <input id="FIREBASE_ADMIN_PRIVATE_KEY" placeholder="-----BEGIN PRIVATE KEY-----\n..." />
+        <div class="help">Paste the entire private key including the -----BEGIN/END----- lines</div>
+      </div>
+    </div>
+
+    <!-- Grok -->
+    <div class="section">
+      <div class="section-title">Grok AI — xAI (Required for AI features)</div>
+      <div class="field">
+        <label>Grok API Key</label>
+        <input id="GROK_API_KEY" placeholder="xai-..." />
+        <div class="help"><a onclick="openGrok()">Get your key at console.x.ai</a></div>
+      </div>
+    </div>
+
+    <!-- Twilio -->
+    <div class="section">
+      <div class="section-title">Twilio SMS (Optional — for text messaging)</div>
+      <div class="row">
+        <div class="field">
+          <label>Account SID</label>
+          <input id="TWILIO_ACCOUNT_SID" placeholder="ACxxxxx" />
+        </div>
+        <div class="field">
+          <label>Auth Token</label>
+          <input id="TWILIO_AUTH_TOKEN" placeholder="your auth token" />
+        </div>
+      </div>
+      <div class="field">
+        <label>Twilio Phone Number</label>
+        <input id="TWILIO_PHONE_NUMBER" placeholder="+17025551234" />
+      </div>
+    </div>
+
+    <!-- Google Maps -->
+    <div class="section">
+      <div class="section-title">Google Maps (Optional — for property maps)</div>
+      <div class="field">
+        <label>Maps API Key</label>
+        <input id="NEXT_PUBLIC_GOOGLE_MAPS_KEY" placeholder="AIza..." />
+      </div>
+    </div>
+
+    <button class="btn-save" id="saveBtn" onclick="save()">
+      Save &amp; Launch Monica AI Hub
+    </button>
+    <div class="status-msg" id="statusMsg"></div>
+  </div>
+
+  <script>
+    const KEYS = [
+      'NEXT_PUBLIC_FIREBASE_API_KEY',
+      'NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN',
+      'NEXT_PUBLIC_FIREBASE_PROJECT_ID',
+      'NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET',
+      'NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID',
+      'NEXT_PUBLIC_FIREBASE_APP_ID',
+      'FIREBASE_ADMIN_PROJECT_ID',
+      'FIREBASE_ADMIN_CLIENT_EMAIL',
+      'FIREBASE_ADMIN_PRIVATE_KEY',
+      'GROK_API_KEY',
+      'TWILIO_ACCOUNT_SID',
+      'TWILIO_AUTH_TOKEN',
+      'TWILIO_PHONE_NUMBER',
+      'NEXT_PUBLIC_GOOGLE_MAPS_KEY',
+    ];
+
+    // Pre-fill any saved values
+    window.addEventListener('DOMContentLoaded', async () => {
+      if (!window.electronAPI) return;
+      for (const key of KEYS) {
+        const val = await window.electronAPI.getConfig(key);
+        const el = document.getElementById(key);
+        if (el && val) el.value = val;
+      }
+    });
+
+    async function save() {
+      const btn = document.getElementById('saveBtn');
+      const msg = document.getElementById('statusMsg');
+      msg.className = 'status-msg';
+
+      // Validate required fields
+      const projectId = document.getElementById('NEXT_PUBLIC_FIREBASE_PROJECT_ID').value.trim();
+      if (!projectId) {
+        msg.textContent = 'Firebase Project ID is required.';
+        msg.className = 'status-msg error';
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Saving…';
+
+      try {
+        const config = {};
+        for (const key of KEYS) {
+          const el = document.getElementById(key);
+          if (el && el.value.trim()) config[key] = el.value.trim();
+        }
+
+        if (window.electronAPI) {
+          await window.electronAPI.saveAllConfig(config);
+          msg.textContent = 'Saved! Launching Monica AI Hub…';
+          setTimeout(() => window.electronAPI.configComplete(), 800);
+        } else {
+          msg.textContent = 'Error: Electron API not available.';
+          msg.className = 'status-msg error';
+          btn.disabled = false;
+          btn.textContent = 'Save & Launch Monica AI Hub';
+        }
+      } catch (err) {
+        msg.textContent = 'Error saving: ' + err.message;
+        msg.className = 'status-msg error';
+        btn.disabled = false;
+        btn.textContent = 'Save & Launch Monica AI Hub';
+      }
+    }
+
+    function openFirebase() {
+      window.open('https://console.firebase.google.com');
+    }
+
+    function openGrok() {
+      window.open('https://console.x.ai');
+    }
+  </script>
+</body>
+</html>
