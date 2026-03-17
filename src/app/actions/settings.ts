@@ -34,15 +34,16 @@ export async function saveSettingsSection(
  */
 export async function loadAllSettings(uid: string) {
   const sections = [
-    'business', 
-    'ai_grok', 
-    'ai_behavior', 
-    'dialer_v7', 
-    'lvr_mls', 
-    'rapidapi', 
-    'google_apis', 
-    'social', 
-    'outreach_gmail'
+    'business',
+    'ai_grok',
+    'ai_behavior',
+    'dialer_v7',
+    'lvr_mls',
+    'rapidapi',
+    'google_apis',
+    'social',
+    'outreach_gmail',
+    'twilio',
   ];
   
   const results: Record<string, any> = {};

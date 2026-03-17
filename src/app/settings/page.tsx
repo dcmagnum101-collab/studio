@@ -4,64 +4,58 @@ export const dynamic = 'force-dynamic';
 import React, { useState, useEffect } from "react";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/app-sidebar";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
-import { Slider } from "@/components/ui/slider";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { 
-  RefreshCw, 
-  BrainCircuit, 
-  CheckCircle2, 
-  Eye, 
-  EyeOff, 
-  Save, 
-  Zap, 
-  PhoneCall, 
-  Building2, 
-  Globe, 
-  Database, 
-  Landmark, 
-  Search, 
-  Smartphone, 
-  Mail, 
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  RefreshCw,
+  CheckCircle2,
+  Eye,
+  EyeOff,
+  Save,
+  Mail,
+  Phone,
+  BrainCircuit,
   UserCircle,
-  Copy,
-  ShieldCheck,
-  Code,
-  Check
+  ExternalLink,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@/firebase";
 import { saveSettingsSection, loadAllSettings } from "@/app/actions/settings";
 import { connectGmailAccount } from "@/firebase/auth/gmail-auth";
 
-const StatusBadge = ({ connected, checking }: { connected?: boolean; checking?: boolean }) => {
-  if (checking) return <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200 gap-1.5"><RefreshCw className="h-3 w-3 animate-spin" /> Checking...</Badge>;
-  if (connected) return <Badge className="bg-green-500 gap-1.5"><CheckCircle2 className="h-3 w-3" /> Connected</Badge>;
-  return <Badge variant="outline" className="text-slate-400 gap-1.5"><ShieldCheck className="h-3 w-3" /> Not Connected</Badge>;
-};
+const MARKETS = [
+  { id: "las_vegas", label: "Las Vegas" },
+  { id: "henderson", label: "Henderson" },
+  { id: "north_las_vegas", label: "North Las Vegas" },
+  { id: "boulder_city", label: "Boulder City" },
+  { id: "pahrump", label: "Pahrump" },
+];
 
-const PasswordInput = ({ value, onChange, placeholder, id }: { value: string; onChange: (v: string) => void; placeholder?: string; id?: string }) => {
+const PasswordInput = ({ value, onChange, placeholder, id }: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  id?: string;
+}) => {
   const [show, setShow] = useState(false);
   return (
     <div className="relative">
-      <Input 
+      <Input
         id={id}
-        type={show ? "text" : "password"} 
-        value={value} 
-        onChange={(e) => onChange(e.target.value)} 
+        type={show ? "text" : "password"}
+        value={value}
+        onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
-        className="pr-10"
+        className="pr-10 h-11"
       />
-      <Button 
-        variant="ghost" 
-        size="icon" 
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
         className="absolute right-0 top-0 h-full px-3 text-slate-400 hover:text-primary"
         onClick={() => setShow(!show)}
       >
@@ -71,402 +65,408 @@ const PasswordInput = ({ value, onChange, placeholder, id }: { value: string; on
   );
 };
 
+const StatusBadge = ({ connected, checking }: { connected?: boolean; checking?: boolean }) => {
+  if (checking) return <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200 gap-1.5"><RefreshCw className="h-3 w-3 animate-spin" /> Checking...</Badge>;
+  if (connected) return <Badge className="bg-green-500 gap-1.5 text-white"><CheckCircle2 className="h-3 w-3" /> Connected</Badge>;
+  return <Badge variant="outline" className="text-slate-400 gap-1.5">Not Connected</Badge>;
+};
+
 export default function SettingsPage() {
   const { user } = useUser();
   const { toast } = useToast();
-  const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("business");
-  
-  // Settings State Hub
   const [settings, setSettings] = useState<Record<string, any>>({});
-  const [savingSection, setSavingSection] = useState<string | null>(null);
-  const [successSection, setSuccessSection] = useState<string | null>(null);
-  const [testingService, setTestingService] = useState<string | null>(null);
+  const [saving, setSaving] = useState<string | null>(null);
+  const [testing, setTesting] = useState<string | null>(null);
+
+  // Local form state
+  const [profile, setProfile] = useState({
+    agentName: "Monica Selvaggio",
+    license: "S.0190894",
+    brokerage: "Century21 Americana",
+    phone: "",
+    email: "",
+    markets: ["las_vegas", "henderson", "north_las_vegas", "boulder_city", "pahrump"],
+  });
+  const [grokKey, setGrokKey] = useState("");
+  const [twilioSid, setTwilioSid] = useState("");
+  const [twilioToken, setTwilioToken] = useState("");
 
   useEffect(() => {
-    setMounted(true);
     if (user) {
       loadAllSettings(user.uid).then(data => {
         setSettings(data);
+        if (data.business) {
+          setProfile(prev => ({
+            ...prev,
+            agentName: data.business.agentName || prev.agentName,
+            license: data.business.license || prev.license,
+            brokerage: data.business.brokerage || prev.brokerage,
+            phone: data.business.phone || "",
+            email: data.business.email || "",
+            markets: data.business.markets || prev.markets,
+          }));
+        }
+        if (data.ai_grok) setGrokKey(data.ai_grok.apiKey || "");
+        if (data.twilio) {
+          setTwilioSid(data.twilio.accountSid || "");
+          setTwilioToken(data.twilio.authToken || "");
+        }
         setLoading(false);
       });
     }
   }, [user]);
 
-  const handleUpdate = (section: string, field: string, value: any) => {
-    setSettings(prev => ({
-      ...prev,
-      [section]: {
-        ...(prev[section] || {}),
-        [field]: value
-      }
-    }));
-  };
-
-  const handleSave = async (section: string) => {
+  const save = async (section: string, data: any) => {
     if (!user) return;
-    setSavingSection(section);
+    setSaving(section);
     try {
-      await saveSettingsSection(user.uid, section, settings[section] || {});
-      setSuccessSection(section);
-      toast({ title: "Settings Saved", description: `${section.toUpperCase()} updated successfully.` });
-      
-      // Reset success checkmark after 3 seconds
-      setTimeout(() => {
-        setSuccessSection(prev => prev === section ? null : prev);
-      }, 3000);
+      await saveSettingsSection(user.uid, section, data);
+      toast({ title: "Saved!", description: "Your settings have been updated." });
     } catch (err: any) {
-      toast({ variant: "destructive", title: "Save Failed", description: err.message });
+      toast({ variant: "destructive", title: "Couldn't save", description: "Check your connection and try again." });
     } finally {
-      setSavingSection(null);
+      setSaving(null);
     }
   };
 
-  const handleTest = async (service: string) => {
-    setTestingService(service);
-    setTimeout(() => {
-      setTestingService(null);
-      handleUpdate(service, "connected", true);
-      toast({ title: "Connection Successful", description: `${service.toUpperCase()} is communicating correctly.` });
-    }, 1500);
+  // Real health checks
+  const testGrok = async () => {
+    if (!grokKey) {
+      toast({ variant: "destructive", title: "Enter your API key first" });
+      return;
+    }
+    setTesting("grok");
+    try {
+      const res = await fetch("https://api.x.ai/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${grokKey}` },
+        body: JSON.stringify({ model: "grok-3-mini", messages: [{ role: "user", content: "ping" }], max_tokens: 5 }),
+      });
+      if (res.ok || res.status === 400) {
+        // 400 means authenticated but bad request — key is valid
+        await save("ai_grok", { apiKey: grokKey, connected: true });
+        setSettings(prev => ({ ...prev, ai_grok: { ...prev.ai_grok, connected: true } }));
+        toast({ title: "Grok connected!", description: "AI is active and ready." });
+      } else {
+        toast({ variant: "destructive", title: "Invalid API key", description: "Check your key at console.x.ai" });
+      }
+    } catch {
+      toast({ variant: "destructive", title: "Connection failed", description: "Make sure your key is correct." });
+    } finally {
+      setTesting(null);
+    }
   };
 
-  if (!mounted || loading) return <div className="flex h-screen items-center justify-center italic text-slate-400">Loading Monica System Prefs...</div>;
+  const testTwilio = async () => {
+    if (!twilioSid || !twilioToken) {
+      toast({ variant: "destructive", title: "Enter your Account SID and Auth Token first" });
+      return;
+    }
+    setTesting("twilio");
+    try {
+      const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${twilioSid}.json`, {
+        headers: { Authorization: `Basic ${btoa(`${twilioSid}:${twilioToken}`)}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        await save("twilio", { accountSid: twilioSid, authToken: twilioToken, connected: true, friendlyName: data.friendly_name });
+        setSettings(prev => ({ ...prev, twilio: { ...prev.twilio, connected: true } }));
+        toast({ title: "Twilio connected!", description: "SMS is ready to send." });
+      } else {
+        toast({ variant: "destructive", title: "Couldn't connect to Twilio", description: "Check your Account SID and Auth Token at twilio.com/console" });
+      }
+    } catch {
+      toast({ variant: "destructive", title: "Connection failed", description: "Check your credentials." });
+    } finally {
+      setTesting(null);
+    }
+  };
+
+  if (loading) return (
+    <div className="flex h-screen items-center justify-center text-slate-400 italic">
+      Loading settings...
+    </div>
+  );
+
+  const gmailConnected = !!settings.outreach_gmail?.connected;
+  const grokConnected = !!settings.ai_grok?.connected;
+  const twilioConnected = !!settings.twilio?.connected;
 
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full bg-[#F9FAFB]">
         <AppSidebar />
         <SidebarInset>
-          <header className="flex h-16 shrink-0 items-center gap-2 border-b px-6 bg-white shadow-sm sticky top-0 z-10">
+          <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4 md:px-6 bg-white shadow-sm sticky top-0 z-10">
             <SidebarTrigger className="-ml-1" />
-            <h1 className="text-xl font-bold font-headline text-primary">System Settings</h1>
+            <h1 className="text-xl font-bold font-headline text-primary">Settings</h1>
           </header>
-          
-          <main className="p-4 md:p-8 max-w-5xl mx-auto w-full">
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8">
-              <TabsList className="bg-transparent h-auto p-0 flex gap-2 md:gap-4 overflow-x-auto no-scrollbar scrollbar-hide w-full justify-start border-b rounded-none mb-4">
-                {["Business", "AI Engine", "Dialer", "MLS & Data Sources", "Social & Web", "Outreach", "Account"].map(t => (
-                  <TabsTrigger 
-                    key={t} 
-                    value={t.toLowerCase().replace(/ & /g, '-').replace(/ /g, '-')} 
-                    className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-2 pb-3 font-bold text-[10px] md:text-xs uppercase tracking-widest transition-all"
-                  >
-                    {t}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
 
-              {/* --- TAB: BUSINESS --- */}
-              <TabsContent value="business" className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
-                <Card className="border-none shadow-md">
-                  <CardHeader className="flex flex-row items-center justify-between">
+          <main className="p-4 md:p-8 max-w-2xl mx-auto w-full space-y-6">
+
+            {/* ── MY PROFILE ── */}
+            <Card className="border-none shadow-md bg-white">
+              <CardHeader>
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-primary/10 rounded-xl">
+                    <UserCircle className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <CardTitle>My Profile</CardTitle>
+                    <CardDescription>Your name, license, and markets you serve.</CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="col-span-2 space-y-2">
+                    <Label>Full Name</Label>
+                    <Input
+                      value={profile.agentName}
+                      onChange={e => setProfile(p => ({ ...p, agentName: e.target.value }))}
+                      className="h-11"
+                      placeholder="Monica Selvaggio"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>License #</Label>
+                    <Input
+                      value={profile.license}
+                      onChange={e => setProfile(p => ({ ...p, license: e.target.value }))}
+                      className="h-11"
+                      placeholder="S.0190894"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Brokerage</Label>
+                    <Input
+                      value={profile.brokerage}
+                      onChange={e => setProfile(p => ({ ...p, brokerage: e.target.value }))}
+                      className="h-11"
+                      placeholder="Century21 Americana"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Phone</Label>
+                    <Input
+                      value={profile.phone}
+                      onChange={e => setProfile(p => ({ ...p, phone: e.target.value }))}
+                      className="h-11"
+                      placeholder="(702) 555-0100"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Email</Label>
+                    <Input
+                      type="email"
+                      value={profile.email}
+                      onChange={e => setProfile(p => ({ ...p, email: e.target.value }))}
+                      className="h-11"
+                      placeholder="monica@c21americana.com"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <Label>Markets I serve</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {MARKETS.map(m => (
+                      <label key={m.id} className="flex items-center gap-2.5 cursor-pointer">
+                        <Checkbox
+                          checked={profile.markets.includes(m.id)}
+                          onCheckedChange={v => {
+                            if (v) setProfile(p => ({ ...p, markets: [...p.markets, m.id] }));
+                            else setProfile(p => ({ ...p, markets: p.markets.filter(x => x !== m.id) }));
+                          }}
+                        />
+                        <span className="text-sm text-slate-700">{m.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <Button
+                  onClick={() => save("business", profile)}
+                  disabled={saving === "business"}
+                  className="w-full h-11 bg-primary text-white font-bold gap-2"
+                >
+                  {saving === "business" ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                  Save Profile
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* ── MY EMAIL (GMAIL) ── */}
+            <Card className="border-none shadow-md bg-white">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-red-100 rounded-xl">
+                      <Mail className="h-5 w-5 text-red-600" />
+                    </div>
                     <div>
-                      <CardTitle className="text-lg">Business Identity</CardTitle>
-                      <CardDescription>Configure Monica's primary persona and brokerage details.</CardDescription>
+                      <CardTitle>My Email (Gmail)</CardTitle>
+                      <CardDescription>For sending AI-written outreach emails.</CardDescription>
                     </div>
-                    <div className="flex items-center gap-2">
-                      {successSection === "business" && (
-                        <Badge variant="outline" className="bg-green-50 text-green-600 border-green-200 gap-1 animate-in fade-in slide-in-from-right-2">
-                          <Check className="h-3 w-3" /> Saved
-                        </Badge>
-                      )}
-                      <Button size="sm" onClick={() => handleSave("business")} disabled={savingSection === "business"}>
-                        {savingSection === "business" ? <RefreshCw className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
-                        Save Section
-                      </Button>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>Agent Full Name</Label>
-                        <Input value={settings.business?.agentName || ""} onChange={(e) => handleUpdate("business", "agentName", e.target.value)} placeholder="Monica Selvaggio" />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Brokerage Name</Label>
-                        <Input value={settings.business?.brokerage || ""} onChange={(e) => handleUpdate("business", "brokerage", e.target.value)} placeholder="Selvaggio Global Real Estate" />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>License Number</Label>
-                        <Input value={settings.business?.license || ""} onChange={(e) => handleUpdate("business", "license", e.target.value)} placeholder="S.0123456" />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Phone Number</Label>
-                        <Input value={settings.business?.phone || ""} onChange={(e) => handleUpdate("business", "phone", e.target.value)} placeholder="(702) 555-0199" />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Value Proposition</Label>
-                      <Textarea value={settings.business?.tagline || ""} onChange={(e) => handleUpdate("business", "tagline", e.target.value)} placeholder="Las Vegas's premier luxury listing specialist..." />
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
+                  </div>
+                  <StatusBadge connected={gmailConnected} />
+                </div>
+              </CardHeader>
+              <CardContent>
+                {gmailConnected ? (
+                  <div className="space-y-3">
+                    <p className="text-sm text-slate-600">
+                      Connected as: <span className="font-bold text-primary">{settings.outreach_gmail?.email || "Your Gmail account"}</span>
+                    </p>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-red-500 hover:text-red-600 hover:bg-red-50 h-8 text-xs"
+                      onClick={() => {
+                        save("outreach_gmail", { connected: false, email: null });
+                        setSettings(prev => ({ ...prev, outreach_gmail: { connected: false } }));
+                      }}
+                    >
+                      Disconnect
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <Button
+                      onClick={() => user && connectGmailAccount(user.uid)}
+                      className="w-full h-12 bg-white border-2 border-slate-200 hover:border-primary text-primary font-bold text-base rounded-xl gap-3 shadow-sm hover:shadow-md transition-all"
+                      variant="outline"
+                    >
+                      <Mail className="h-5 w-5 text-red-500" />
+                      Connect Gmail Account
+                    </Button>
+                    <p className="text-xs text-slate-400 text-center">
+                      We only send emails YOU approve. We never read your inbox.
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
-              {/* --- TAB: AI ENGINE --- */}
-              <TabsContent value="ai-engine" className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
-                <Card className="border-none shadow-md">
-                  <CardHeader className="flex flex-row items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-primary text-white rounded-lg"><BrainCircuit className="h-5 w-5" /></div>
-                      <div>
-                        <CardTitle className="text-lg">Grok (xAI) Configuration</CardTitle>
-                        <CardDescription>Primary intelligence for lead scoring and strategic drafting.</CardDescription>
-                      </div>
+            {/* ── MY PHONE (TWILIO SMS) ── */}
+            <Card className="border-none shadow-md bg-white">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-blue-100 rounded-xl">
+                      <Phone className="h-5 w-5 text-blue-600" />
                     </div>
-                    <div className="flex items-center gap-2">
-                      {successSection === "ai_grok" && <Badge variant="outline" className="bg-green-50 text-green-600 border-green-200 gap-1"><Check className="h-3 w-3" /> Saved</Badge>}
-                      <StatusBadge connected={settings.ai_grok?.connected} checking={testingService === "ai_grok"} />
-                      <Button size="sm" variant="outline" onClick={() => handleTest("ai_grok")}>Test</Button>
-                      <Button size="sm" onClick={() => handleSave("ai_grok")} disabled={savingSection === "ai_grok"}><Save className="h-4 w-4 mr-2" /> Save</Button>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <Label>Grok API Key</Label>
-                      <PasswordInput value={settings.ai_grok?.apiKey || ""} onChange={(v) => handleUpdate("ai_grok", "apiKey", v)} />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>Base URL</Label>
-                        <Input value={settings.ai_grok?.baseUrl || "https://api.x.ai/v1"} onChange={(e) => handleUpdate("ai_grok", "baseUrl", e.target.value)} />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Model</Label>
-                        <Select value={settings.ai_grok?.model || "grok-4-latest"} onValueChange={(v) => handleUpdate("ai_grok", "model", v)}>
-                          <SelectTrigger><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="grok-4-latest">grok-4-latest</SelectItem>
-                            <SelectItem value="grok-3">grok-3</SelectItem>
-                            <SelectItem value="grok-3-mini">grok-3-mini</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="border-none shadow-md">
-                  <CardHeader className="flex flex-row items-center justify-between">
                     <div>
-                      <CardTitle className="text-lg">AI Behavior Settings</CardTitle>
-                      <CardDescription>Fine-tune Monica's operational logic.</CardDescription>
+                      <CardTitle>My Phone (Twilio SMS)</CardTitle>
+                      <CardDescription>For sending text messages to leads.</CardDescription>
                     </div>
-                    <div className="flex items-center gap-2">
-                      {successSection === "ai_behavior" && <Badge variant="outline" className="bg-green-50 text-green-600 border-green-200 gap-1"><Check className="h-3 w-3" /> Saved</Badge>}
-                      <Button size="sm" onClick={() => handleSave("ai_behavior")}>Save</Button>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div className="flex items-center justify-between">
-                      <Label className="flex-1">Auto-generate nurture emails</Label>
-                      <Switch checked={settings.ai_behavior?.autoGenerate || false} onCheckedChange={(v) => handleUpdate("ai_behavior", "autoGenerate", v)} />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <Label className="flex-1">AI compliance check before every send</Label>
-                      <Switch checked={settings.ai_behavior?.complianceCheck ?? true} onCheckedChange={(v) => handleUpdate("ai_behavior", "complianceCheck", v)} />
-                    </div>
-                    <div className="space-y-4">
-                      <div className="flex justify-between items-center">
-                        <Label>AI Creativity (Temperature)</Label>
-                        <Badge variant="secondary">{settings.ai_behavior?.temperature || 0.7}</Badge>
-                      </div>
-                      <Slider 
-                        min={0.1} max={1.0} step={0.1} 
-                        value={[settings.ai_behavior?.temperature || 0.7]} 
-                        onValueChange={(v) => handleUpdate("ai_behavior", "temperature", v[0])} 
+                  </div>
+                  <StatusBadge connected={twilioConnected} checking={testing === "twilio"} />
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {twilioConnected ? (
+                  <div className="space-y-3">
+                    <p className="text-sm text-green-700 font-medium">SMS is active and ready to send.</p>
+                    <p className="text-xs text-slate-500">Connected number: {settings.twilio?.phone || "Twilio number"}</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="twilio-sid">Account SID</Label>
+                      <Input
+                        id="twilio-sid"
+                        value={twilioSid}
+                        onChange={e => setTwilioSid(e.target.value)}
+                        placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                        className="h-11 font-mono text-sm"
                       />
                     </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              {/* --- TAB: DIALER --- */}
-              <TabsContent value="dialer" className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
-                <Card className="border-none shadow-md">
-                  <CardHeader className="flex flex-row items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-primary text-white rounded-lg"><PhoneCall className="h-5 w-5" /></div>
-                      <div>
-                        <CardTitle className="text-lg">Vulcan7 Integration</CardTitle>
-                        <CardDescription>Professional dialer sync via Zapier or API.</CardDescription>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {successSection === "dialer_v7" && <Badge variant="outline" className="bg-green-50 text-green-600 border-green-200 gap-1"><Check className="h-3 w-3" /> Saved</Badge>}
-                      <Button size="sm" onClick={() => handleSave("dialer_v7")}><Save className="h-4 w-4 mr-2" /> Save</Button>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label>V7 Username</Label>
-                        <Input value={settings.dialer_v7?.username || ""} onChange={(e) => handleUpdate("dialer_v7", "username", e.target.value)} />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>V7 Password</Label>
-                        <PasswordInput value={settings.dialer_v7?.password || ""} onChange={(v) => handleUpdate("dialer_v7", "password", v)} />
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <Label>Automatically flag DNC numbers</Label>
-                      <Switch checked={settings.dialer_v7?.flagDnc ?? true} onCheckedChange={(v) => handleUpdate("dialer_v7", "flagDnc", v)} />
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              {/* --- TAB: MLS & DATA SOURCES --- */}
-              <TabsContent value="mls-data-sources" className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
-                <Card className="border-none shadow-md">
-                  <CardHeader className="flex flex-row items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-primary text-white rounded-lg"><Building2 className="h-5 w-5" /></div>
-                      <div>
-                        <CardTitle className="text-lg">LVR MLS (Las Vegas Realtors)</CardTitle>
-                        <CardDescription>Direct board integration for active and expired inventory.</CardDescription>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {successSection === "lvr_mls" && <Badge variant="outline" className="bg-green-50 text-green-600 border-green-200 gap-1"><Check className="h-3 w-3" /> Saved</Badge>}
-                      <StatusBadge connected={settings.lvr_mls?.connected} checking={testingService === "lvr_mls"} />
-                      <Button size="sm" variant="outline" onClick={() => handleTest("lvr_mls")}>Test</Button>
-                      <Button size="sm" onClick={() => handleSave("lvr_mls")}><Save className="h-4 w-4 mr-2" /> Save</Button>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>RETS/RESO Username</Label>
-                        <Input value={settings.lvr_mls?.username || ""} onChange={(e) => handleUpdate("lvr_mls", "username", e.target.value)} />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>RETS/RESO Password</Label>
-                        <PasswordInput value={settings.lvr_mls?.password || ""} onChange={(v) => handleUpdate("lvr_mls", "password", v)} />
-                      </div>
-                    </div>
                     <div className="space-y-2">
-                      <Label>Target Zip Codes (Comma-separated)</Label>
-                      <Input value={settings.lvr_mls?.zips || ""} onChange={(e) => handleUpdate("lvr_mls", "zips", e.target.value)} placeholder="89144, 89135, 89052..." />
+                      <Label htmlFor="twilio-token">Auth Token</Label>
+                      <PasswordInput
+                        id="twilio-token"
+                        value={twilioToken}
+                        onChange={setTwilioToken}
+                        placeholder="Your Twilio Auth Token"
+                      />
                     </div>
-                  </CardContent>
-                </Card>
+                    <a
+                      href="https://console.twilio.com"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 text-xs text-primary hover:underline"
+                    >
+                      Get these at twilio.com/console <ExternalLink className="h-3 w-3" />
+                    </a>
+                    <Button
+                      onClick={testTwilio}
+                      disabled={testing === "twilio"}
+                      className="w-full h-11 bg-primary text-white font-bold gap-2"
+                    >
+                      {testing === "twilio" ? <RefreshCw className="h-4 w-4 animate-spin" /> : null}
+                      Connect Twilio SMS
+                    </Button>
+                  </>
+                )}
+              </CardContent>
+            </Card>
 
-                <Card className="border-none shadow-md">
-                  <CardHeader className="flex flex-row items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-primary text-white rounded-lg"><Globe className="h-5 w-5" /></div>
-                      <div>
-                        <CardTitle className="text-lg">RapidAPI Hub</CardTitle>
-                        <CardDescription>Manage Trulia, Realtor.com, and Zillow data streams.</CardDescription>
-                      </div>
+            {/* ── AI ENGINE (GROK) ── */}
+            <Card className="border-none shadow-md bg-white">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-primary/10 rounded-xl">
+                      <BrainCircuit className="h-5 w-5 text-primary" />
                     </div>
-                    <div className="flex items-center gap-2">
-                      {successSection === "rapidapi" && <Badge variant="outline" className="bg-green-50 text-green-600 border-green-200 gap-1"><Check className="h-3 w-3" /> Saved</Badge>}
-                      <Button size="sm" onClick={() => handleSave("rapidapi")}>Save</Button>
+                    <div>
+                      <CardTitle>AI Engine (Grok)</CardTitle>
+                      <CardDescription>Powers email drafting, lead scoring, and briefings.</CardDescription>
                     </div>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
+                  </div>
+                  <StatusBadge connected={grokConnected} checking={testing === "grok"} />
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {grokConnected ? (
+                  <div className="p-4 bg-green-50 rounded-xl border border-green-200">
+                    <p className="font-bold text-green-800 flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4" /> AI is active
+                    </p>
+                    <p className="text-xs text-green-700 mt-1">Using model: grok-4-latest</p>
+                  </div>
+                ) : (
+                  <>
                     <div className="space-y-2">
-                      <Label>RapidAPI Key</Label>
-                      <PasswordInput value={settings.rapidapi?.apiKey || ""} onChange={(v) => handleUpdate("rapidapi", "apiKey", v)} />
+                      <Label htmlFor="grok-key">API Key</Label>
+                      <PasswordInput
+                        id="grok-key"
+                        value={grokKey}
+                        onChange={setGrokKey}
+                        placeholder="xai-xxxxxxxxxxxxxxxxxxxx"
+                      />
                     </div>
-                    <div className="grid gap-4 md:grid-cols-3">
-                      {['trulia', 'realtor', 'homes'].map(s => (
-                        <div key={s} className="p-4 bg-slate-50 rounded-xl border flex flex-col items-center gap-3">
-                          <span className="text-xs font-black uppercase tracking-widest">{s}</span>
-                          <Switch checked={settings.rapidapi?.[s] ?? true} onCheckedChange={(v) => handleUpdate("rapidapi", s, v)} />
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
+                    <a
+                      href="https://console.x.ai"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 text-xs text-primary hover:underline"
+                    >
+                      Get your key at console.x.ai <ExternalLink className="h-3 w-3" />
+                    </a>
+                    <Button
+                      onClick={testGrok}
+                      disabled={testing === "grok"}
+                      className="w-full h-11 bg-primary text-white font-bold gap-2"
+                    >
+                      {testing === "grok" ? <RefreshCw className="h-4 w-4 animate-spin" /> : null}
+                      Connect AI
+                    </Button>
+                  </>
+                )}
+              </CardContent>
+            </Card>
 
-              {/* --- TAB: SOCIAL & WEB --- */}
-              <TabsContent value="social-web" className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
-                <Card className="border-none shadow-md">
-                  <CardHeader className="flex flex-row items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-primary text-white rounded-lg"><Code className="h-5 w-5" /></div>
-                      <div>
-                        <CardTitle className="text-lg">Google & Web APIs</CardTitle>
-                        <CardDescription>Power maps, place lookups, and video monitoring.</CardDescription>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {successSection === "google_apis" && <Badge variant="outline" className="bg-green-50 text-green-600 border-green-200 gap-1"><Check className="h-3 w-3" /> Saved</Badge>}
-                      <Button size="sm" onClick={() => handleSave("google_apis")}>Save</Button>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <Label>Google Cloud API Key (Maps & Places)</Label>
-                      <PasswordInput value={settings.google_apis?.mapKey || ""} onChange={(v) => handleUpdate("google_apis", "mapKey", v)} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>YouTube Data API Key</Label>
-                      <PasswordInput value={settings.google_apis?.ytKey || ""} onChange={(v) => handleUpdate("google_apis", "ytKey", v)} />
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              {/* --- TAB: OUTREACH --- */}
-              <TabsContent value="outreach" className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
-                <Card className="border-none shadow-md">
-                  <CardHeader className="flex flex-row items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-primary text-white rounded-lg"><Mail className="h-5 w-5" /></div>
-                      <div>
-                        <CardTitle className="text-lg">Gmail Integration</CardTitle>
-                        <CardDescription>Handle follow-ups through your business account.</CardDescription>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {successSection === "outreach_gmail" && <Badge variant="outline" className="bg-green-50 text-green-600 border-green-200 gap-1"><Check className="h-3 w-3" /> Saved</Badge>}
-                      <Button size="sm" onClick={() => handleSave("outreach_gmail")}>Save</Button>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div className="p-6 bg-slate-50 border-2 border-dashed rounded-2xl text-center space-y-4">
-                      <div className="flex justify-center gap-2 items-center">
-                        <StatusBadge connected={settings.outreach_gmail?.connected} />
-                        <span className="text-sm font-bold">{settings.outreach_gmail?.email || "No account linked"}</span>
-                      </div>
-                      <Button onClick={() => user && connectGmailAccount(user.uid)} className="bg-primary px-8">
-                        {settings.outreach_gmail?.connected ? "Reconnect Account" : "Connect Business Gmail"}
-                      </Button>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <Label>Artificial send delay (2-5 min random)</Label>
-                      <Switch checked={settings.outreach_gmail?.delay ?? true} onCheckedChange={(v) => handleUpdate("outreach_gmail", "delay", v)} />
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              {/* --- TAB: ACCOUNT --- */}
-              <TabsContent value="account" className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
-                <Card className="border-none shadow-md overflow-hidden">
-                  <CardHeader className="bg-slate-50">
-                    <CardTitle className="text-lg">Plan & Subscription</CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-8 flex items-center justify-between">
-                    <div className="flex items-center gap-6">
-                      <div className="h-16 w-16 bg-accent rounded-full flex items-center justify-center text-white text-2xl font-black">PRO</div>
-                      <div>
-                        <h3 className="text-xl font-black">Monica Agency Plan</h3>
-                        <p className="text-sm text-muted-foreground">Unlimited leads, MLS monitoring, and real-time sync.</p>
-                      </div>
-                    </div>
-                    <Button variant="outline">Manage Billing</Button>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            </Tabs>
           </main>
         </SidebarInset>
       </div>

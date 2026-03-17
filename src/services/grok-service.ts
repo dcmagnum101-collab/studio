@@ -27,14 +27,10 @@ interface GrokOptions {
  */
 export async function grokComplete(
   messages: Message[],
-  options: GrokOptions = {
+  options: GrokOptions = {}
+): Promise<string> {
   if (!process.env.GROK_API_KEY) {
     throw new Error('Grok API key not configured. Add GROK_API_KEY to App Hosting environment secrets.');
-  }
-}
-): Promise<string> {
-  if (!GROK_API_KEY) {
-    throw new Error('GROK_API_KEY is not configured.');
   }
 
   const response = await fetch(`${GROK_BASE_URL}/chat/completions`, {
@@ -111,9 +107,7 @@ export async function grokJSON<T = any>(
   }
 
   const result = await grokAsk(
-    systemPrompt + '
-
-Respond ONLY with valid JSON. No markdown, no backticks, no explanation.',
+    systemPrompt + '\n\nRespond ONLY with valid JSON. No markdown, no backticks, no explanation.',
     userPrompt,
     userId,
     0.2 // Low temperature for structured output

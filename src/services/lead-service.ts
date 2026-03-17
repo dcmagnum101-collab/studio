@@ -3,14 +3,15 @@
  * @fileOverview Comprehensive lead management service.
  * Handles all Firestore operations for leads including CRUD,
  * follow-up scheduling, status updates, and batch imports.
+ * All operations scoped to users/{userId}/contacts for data isolation.
  */
 
 import { db } from '@/firebase/init';
 import {
   collection, doc, getDoc, getDocs, setDoc, updateDoc,
   deleteDoc, query, where, orderBy, limit, Timestamp,
-  writeBatch, serverTimestamp, onSnapshot, addDoc,
-  QueryConstraint, startAfter, DocumentSnapshot,
+  writeBatch, serverTimestamp, addDoc,
+  QueryConstraint, DocumentSnapshot,
 } from 'firebase/firestore';
 import type {
   Lead, LeadStatus, LeadPriority, LeadSource
@@ -20,10 +21,16 @@ import {
   getNextFollowUpDate, getNextFollowUpMethod,
 } from '@/lib/lead-types';
 
-const LEADS_COLLECTION = 'leads';
-const CONTACTS_COLLECTION = 'contacts';
-const TASKS_COLLECTION = 'tasks';
-const ACTIVITIES_COLLECTION = 'activities';
+// Path helpers — all data lives under users/{userId}/contacts
+function contactsPath(userId: string) {
+  return collection(db, 'users', userId, 'contacts');
+}
+function contactDocPath(userId: string, id: string) {
+  return doc(db, 'users', userId, 'contacts', id);
+}
+function activitiesPath(userId: string, contactId: string) {
+  return collection(db, 'users', userId, 'contacts', contactId, 'activityLogs');
+}
 
 // ─── Type Helpers ────────────────────────────────────────────────────────────
 
@@ -35,9 +42,9 @@ function toFirestoreDate(date: Date | string | undefined): Timestamp | null {
 
 function fromFirestore(data: Record<string, unknown>): Lead {
   const result: Record<string, unknown> = { ...data };
-  // Convert Timestamps to ISO strings
   for (const key of ['createdAt', 'updatedAt', 'lastContactDate', 'nextFollowUpDate',
-    'listingExpiredDate', 'foreclosureFilingDate', 'auctionDate', 'lastSaleDate']) {
+    'listingExpiredDate', 'foreclosureFilingDate', 'auctionDate', 'lastSaleDate',
+    'created_at', 'updated_at']) {
     if (result[key] instanceof Timestamp) {
       result[key] = (result[key] as Timestamp).toDate().toISOString();
     }
@@ -47,69 +54,74 @@ function fromFirestore(data: Record<string, unknown>): Lead {
 
 // ─── Create Lead ─────────────────────────────────────────────────────────────
 
-export async function createLead(leadData: Omit<Lead, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
+export async function createLead(
+  userId: string,
+  leadData: Omit<Lead, 'id' | 'createdAt' | 'updatedAt'>
+): Promise<string> {
   const priority = calculateLeadPriority(leadData);
   const aiScore = calculateAIScore(leadData);
   const followUpStage = 0;
   const nextFollowUpDate = getNextFollowUpDate(leadData.status, followUpStage);
   const nextFollowUpMethod = getNextFollowUpMethod(leadData.status, followUpStage);
 
-  const docRef = await addDoc(collection(db, LEADS_COLLECTION), {
+  const docRef = await addDoc(contactsPath(userId), {
     ...leadData,
+    ownerId: userId,
     priority,
     aiScore,
+    icpScore: aiScore,
+    pipeline_stage: leadData.pipeline_stage || 'new_lead',
     followUpStage,
     followUpCount: 0,
     touchCount: 0,
     nextFollowUpDate: Timestamp.fromDate(nextFollowUpDate),
     nextFollowUpMethod,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
+    created_at: serverTimestamp(),
+    updated_at: serverTimestamp(),
   });
   return docRef.id;
 }
 
 // ─── Get Lead ────────────────────────────────────────────────────────────────
 
-export async function getLead(id: string): Promise<Lead | null> {
-  const snap = await getDoc(doc(db, LEADS_COLLECTION, id));
+export async function getLead(userId: string, id: string): Promise<Lead | null> {
+  const snap = await getDoc(contactDocPath(userId, id));
   if (!snap.exists()) return null;
   return fromFirestore({ id: snap.id, ...snap.data() });
 }
 
 // ─── Update Lead ─────────────────────────────────────────────────────────────
 
-export async function updateLead(id: string, updates: Partial<Lead>): Promise<void> {
-  const ref = doc(db, LEADS_COLLECTION, id);
-  
-  // Recalculate derived fields if status changes
+export async function updateLead(userId: string, id: string, updates: Partial<Lead>): Promise<void> {
+  const ref = contactDocPath(userId, id);
   if (updates.status) {
-    const current = await getLead(id);
+    const current = await getLead(userId, id);
     const merged = { ...current, ...updates } as Lead;
     updates.priority = calculateLeadPriority(merged);
     updates.aiScore = calculateAIScore(merged);
+    updates.icpScore = updates.aiScore;
   }
-  
   await updateDoc(ref, {
     ...updates,
-    updatedAt: serverTimestamp(),
+    updated_at: serverTimestamp(),
   });
 }
 
 // ─── Delete Lead ─────────────────────────────────────────────────────────────
 
-export async function deleteLead(id: string): Promise<void> {
-  await deleteDoc(doc(db, LEADS_COLLECTION, id));
+export async function deleteLead(userId: string, id: string): Promise<void> {
+  await deleteDoc(contactDocPath(userId, id));
 }
 
 // ─── Get Leads by Status ─────────────────────────────────────────────────────
 
 export async function getLeadsByStatus(
+  userId: string,
   status: LeadStatus,
   maxResults = 100
 ): Promise<Lead[]> {
   const q = query(
-    collection(db, LEADS_COLLECTION),
+    contactsPath(userId),
     where('status', '==', status),
     orderBy('aiScore', 'desc'),
     limit(maxResults)
@@ -120,10 +132,10 @@ export async function getLeadsByStatus(
 
 // ─── Get All Leads ───────────────────────────────────────────────────────────
 
-export async function getAllLeads(maxResults = 500): Promise<Lead[]> {
+export async function getAllLeads(userId: string, maxResults = 500): Promise<Lead[]> {
   const q = query(
-    collection(db, LEADS_COLLECTION),
-    orderBy('aiScore', 'desc'),
+    contactsPath(userId),
+    orderBy('icpScore', 'desc'),
     limit(maxResults)
   );
   const snap = await getDocs(q);
@@ -132,44 +144,27 @@ export async function getAllLeads(maxResults = 500): Promise<Lead[]> {
 
 // ─── Get Hot Leads (Due for Follow-Up) ──────────────────────────────────────
 
-export async function getLeadsDueForFollowUp(maxResults = 50): Promise<Lead[]> {
+export async function getLeadsDueForFollowUp(userId: string, maxResults = 50): Promise<Lead[]> {
   const now = Timestamp.now();
   const q = query(
-    collection(db, LEADS_COLLECTION),
+    contactsPath(userId),
     where('nextFollowUpDate', '<=', now),
-    where('status', 'not-in', ['closed', 'dead']),
+    where('pipeline_stage', 'not-in', ['closed', 'dnc']),
     orderBy('nextFollowUpDate', 'asc'),
-    orderBy('aiScore', 'desc'),
     limit(maxResults)
   );
   const snap = await getDocs(q);
   return snap.docs.map(d => fromFirestore({ id: d.id, ...d.data() }));
 }
 
-// ─── Get Leads by Source ─────────────────────────────────────────────────────
+// ─── Get Hot Leads ───────────────────────────────────────────────────────────
 
-export async function getLeadsBySource(
-  source: LeadSource,
-  maxResults = 100
-): Promise<Lead[]> {
+export async function getHotLeads(userId: string, maxResults = 50): Promise<Lead[]> {
   const q = query(
-    collection(db, LEADS_COLLECTION),
-    where('source', '==', source),
-    orderBy('createdAt', 'desc'),
-    limit(maxResults)
-  );
-  const snap = await getDocs(q);
-  return snap.docs.map(d => fromFirestore({ id: d.id, ...d.data() }));
-}
-
-// ─── Get Leads by Priority ───────────────────────────────────────────────────
-
-export async function getHotLeads(maxResults = 50): Promise<Lead[]> {
-  const q = query(
-    collection(db, LEADS_COLLECTION),
-    where('priority', '==', 'hot'),
-    where('status', 'not-in', ['closed', 'dead']),
-    orderBy('aiScore', 'desc'),
+    contactsPath(userId),
+    where('icpScore', '>=', 80),
+    where('pipeline_stage', 'not-in', ['closed', 'dnc']),
+    orderBy('icpScore', 'desc'),
     limit(maxResults)
   );
   const snap = await getDocs(q);
@@ -178,79 +173,54 @@ export async function getHotLeads(maxResults = 50): Promise<Lead[]> {
 
 // ─── Pipeline Summary ─────────────────────────────────────────────────────────
 
-export async function getPipelineSummary(): Promise<Record<LeadStatus, number>> {
-  const snap = await getDocs(collection(db, LEADS_COLLECTION));
+export async function getPipelineSummary(userId: string): Promise<Record<string, number>> {
+  const snap = await getDocs(contactsPath(userId));
   const counts: Record<string, number> = {};
   snap.docs.forEach(d => {
-    const status = d.data().status as LeadStatus;
-    counts[status] = (counts[status] || 0) + 1;
+    const stage = d.data().pipeline_stage as string || 'new_lead';
+    counts[stage] = (counts[stage] || 0) + 1;
   });
-  return counts as Record<LeadStatus, number>;
+  return counts;
 }
 
-// ─── Log Activity / Contact ───────────────────────────────────────────────────
+// ─── Log Activity ─────────────────────────────────────────────────────────────
 
 export interface LeadActivity {
-  leadId: string;
+  contactId: string;
   type: 'call' | 'sms' | 'email' | 'note' | 'door-knock' | 'meeting' | 'status-change';
   notes: string;
-  outcome?: 'connected' | 'voicemail' | 'no-answer' | 'callback-requested' | 'not-interested' | 'interested';
-  duration?: number; // seconds (for calls)
+  outcome?: 'connected' | 'voicemail' | 'no-answer' | 'callback-requested' | 'not-interested' | 'interested' | 'appointment-set';
+  duration?: number;
   agentId?: string;
   createdAt?: string;
 }
 
-export async function logLeadActivity(activity: Omit<LeadActivity, 'createdAt'>): Promise<string> {
-  const ref = await addDoc(collection(db, ACTIVITIES_COLLECTION), {
+export async function logLeadActivity(
+  userId: string,
+  activity: Omit<LeadActivity, 'createdAt'>
+): Promise<string> {
+  const ref = await addDoc(activitiesPath(userId, activity.contactId), {
     ...activity,
-    createdAt: serverTimestamp(),
+    ownerId: userId,
+    date: new Date().toISOString(),
+    created_at: serverTimestamp(),
   });
-  
-  // Update lead's last contact date and increment touch count
-  await updateDoc(doc(db, LEADS_COLLECTION, activity.leadId), {
+
+  await updateDoc(contactDocPath(userId, activity.contactId), {
     lastContactDate: serverTimestamp(),
-    touchCount: await _getAndIncrement(activity.leadId, 'touchCount'),
-    updatedAt: serverTimestamp(),
+    updated_at: serverTimestamp(),
   });
-  
+
   return ref.id;
-}
-
-async function _getAndIncrement(leadId: string, field: string): Promise<number> {
-  const snap = await getDoc(doc(db, LEADS_COLLECTION, leadId));
-  return ((snap.data()?.[field] as number) || 0) + 1;
-}
-
-// ─── Advance Follow-Up Stage ─────────────────────────────────────────────────
-
-export async function advanceFollowUpStage(leadId: string): Promise<void> {
-  const lead = await getLead(leadId);
-  if (!lead) return;
-  
-  const currentStage = lead.followUpStage || 0;
-  const newStage = currentStage + 1;
-  const nextDate = getNextFollowUpDate(lead.status, newStage);
-  const nextMethod = getNextFollowUpMethod(lead.status, newStage);
-  
-  await updateDoc(doc(db, LEADS_COLLECTION, leadId), {
-    followUpStage: newStage,
-    followUpCount: (lead.followUpCount || 0) + 1,
-    lastContactDate: serverTimestamp(),
-    nextFollowUpDate: Timestamp.fromDate(nextDate),
-    nextFollowUpMethod: nextMethod,
-    updatedAt: serverTimestamp(),
-  });
 }
 
 // ─── Search Leads ─────────────────────────────────────────────────────────────
 
-export async function searchLeads(searchQuery: string, maxResults = 50): Promise<Lead[]> {
-  // Firestore doesn't support full-text search natively
-  // We do a simple prefix search on fullName
+export async function searchLeads(userId: string, searchQuery: string, maxResults = 50): Promise<Lead[]> {
   const q = query(
-    collection(db, LEADS_COLLECTION),
-    where('fullName', '>=', searchQuery),
-    where('fullName', '<=', searchQuery + '\uf8ff'),
+    contactsPath(userId),
+    where('name', '>=', searchQuery),
+    where('name', '<=', searchQuery + '\uf8ff'),
     limit(maxResults)
   );
   const snap = await getDocs(q);
@@ -259,147 +229,130 @@ export async function searchLeads(searchQuery: string, maxResults = 50): Promise
 
 // ─── Batch Import Leads ───────────────────────────────────────────────────────
 
-export async function batchImportLeads(leads: Omit<Lead, 'id' | 'createdAt' | 'updatedAt'>[]): Promise<number> {
-  const batch = writeBatch(db);
+export async function batchImportLeads(
+  userId: string,
+  leads: Omit<Lead, 'id' | 'createdAt' | 'updatedAt'>[]
+): Promise<number> {
+  let batch = writeBatch(db);
   let count = 0;
-  
+  let batchCount = 0;
+
   for (const leadData of leads) {
     const priority = calculateLeadPriority(leadData);
     const aiScore = calculateAIScore(leadData);
     const followUpStage = 0;
     const nextFollowUpDate = getNextFollowUpDate(leadData.status, followUpStage);
     const nextFollowUpMethod = getNextFollowUpMethod(leadData.status, followUpStage);
-    
-    const ref = doc(collection(db, LEADS_COLLECTION));
+
+    const ref = doc(contactsPath(userId));
     batch.set(ref, {
       ...leadData,
+      ownerId: userId,
       priority,
       aiScore,
+      icpScore: aiScore,
+      pipeline_stage: leadData.pipeline_stage || 'new_lead',
       followUpStage,
       followUpCount: 0,
       touchCount: 0,
       nextFollowUpDate: Timestamp.fromDate(nextFollowUpDate),
       nextFollowUpMethod,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
+      created_at: serverTimestamp(),
+      updated_at: serverTimestamp(),
     });
     count++;
-    
-    // Firestore batch limit is 500
-    if (count % 450 === 0) {
+    batchCount++;
+
+    if (batchCount >= 499) {
       await batch.commit();
+      batch = writeBatch(db);
+      batchCount = 0;
     }
   }
-  
-  await batch.commit();
+
+  if (batchCount > 0) {
+    await batch.commit();
+  }
   return count;
 }
 
-// ─── Upsert Lead (for sync operations) ───────────────────────────────────────
+// ─── Find Lead by Field ───────────────────────────────────────────────────────
 
-export async function upsertLead(
-  lead: Omit<Lead, 'id' | 'createdAt' | 'updatedAt'>,
-  dedupeKey: 'address' | 'mlsNumber' | 'phone' = 'address'
-): Promise<{ id: string; created: boolean }> {
-  // Check if lead already exists
-  const existing = await findLeadByField(dedupeKey, lead[dedupeKey] as string);
-  
-  if (existing) {
-    // Update existing lead with fresh data but preserve manual overrides
-    await updateDoc(doc(db, LEADS_COLLECTION, existing.id!), {
-      ...lead,
-      // Preserve manual data
-      notes: existing.notes,
-      tags: existing.tags,
-      assignedTo: existing.assignedTo,
-      followUpStage: existing.followUpStage,
-      followUpCount: existing.followUpCount,
-      touchCount: existing.touchCount,
-      priority: existing.priority,
-      aiScore: calculateAIScore({ ...existing, ...lead }),
-      updatedAt: serverTimestamp(),
-    });
-    return { id: existing.id!, created: false };
-  }
-  
-  const id = await createLead(lead);
-  return { id, created: true };
-}
-
-export async function findLeadByField(field: string, value: string): Promise<Lead | null> {
+export async function findLeadByField(
+  userId: string,
+  field: string,
+  value: string
+): Promise<Lead | null> {
   if (!value) return null;
-  const q = query(
-    collection(db, LEADS_COLLECTION),
-    where(field, '==', value),
-    limit(1)
-  );
+  const q = query(contactsPath(userId), where(field, '==', value), limit(1));
   const snap = await getDocs(q);
   if (snap.empty) return null;
   const d = snap.docs[0];
   return fromFirestore({ id: d.id, ...d.data() });
 }
 
-// ─── Get Leads for Map ────────────────────────────────────────────────────────
+// ─── Upsert Lead ──────────────────────────────────────────────────────────────
 
-export async function getLeadsForMap(statusFilter?: LeadStatus[]): Promise<Lead[]> {
-  const constraints: QueryConstraint[] = [
-    where('lat', '!=', null),
-  ];
-  
-  if (statusFilter && statusFilter.length > 0) {
-    constraints.push(where('status', 'in', statusFilter));
+export async function upsertLead(
+  userId: string,
+  lead: Omit<Lead, 'id' | 'createdAt' | 'updatedAt'>,
+  dedupeKey: 'address' | 'phone' = 'phone'
+): Promise<{ id: string; created: boolean }> {
+  const value = lead[dedupeKey] as string;
+  const existing = value ? await findLeadByField(userId, dedupeKey, value) : null;
+
+  if (existing) {
+    await updateDoc(contactDocPath(userId, existing.id!), {
+      ...lead,
+      notes: existing.notes,
+      aiScore: calculateAIScore({ ...existing, ...lead }),
+      icpScore: calculateAIScore({ ...existing, ...lead }),
+      updated_at: serverTimestamp(),
+    });
+    return { id: existing.id!, created: false };
   }
-  
-  constraints.push(orderBy('lat'), orderBy('aiScore', 'desc'), limit(500));
-  
-  const q = query(collection(db, LEADS_COLLECTION), ...constraints);
-  const snap = await getDocs(q);
-  return snap.docs.map(d => fromFirestore({ id: d.id, ...d.data() }));
+
+  const id = await createLead(userId, lead);
+  return { id, created: true };
 }
 
-// ─── Stats Helpers ────────────────────────────────────────────────────────────
+// ─── Get Lead Stats ────────────────────────────────────────────────────────────
 
-export async function getLeadStats(): Promise<{
+export async function getLeadStats(userId: string): Promise<{
   total: number;
   hot: number;
   dueToday: number;
-  byStatus: Record<string, number>;
-  bySource: Record<string, number>;
+  byStage: Record<string, number>;
   recentlyAdded: number;
 }> {
-  const snap = await getDocs(collection(db, LEADS_COLLECTION));
+  const snap = await getDocs(contactsPath(userId));
   const now = new Date();
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
   const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-  
+
   const stats = {
     total: 0,
     hot: 0,
     dueToday: 0,
-    byStatus: {} as Record<string, number>,
-    bySource: {} as Record<string, number>,
+    byStage: {} as Record<string, number>,
     recentlyAdded: 0,
   };
-  
+
   snap.docs.forEach(d => {
     const data = d.data();
     stats.total++;
-    
-    if (data.priority === 'hot') stats.hot++;
-    
+    if ((data.icpScore || data.aiScore || 0) >= 80) stats.hot++;
     if (data.nextFollowUpDate) {
       const followUpDate = (data.nextFollowUpDate as Timestamp).toDate();
-      if (followUpDate <= now) stats.dueToday++;
+      if (followUpDate <= todayEnd) stats.dueToday++;
     }
-    
-    stats.byStatus[data.status] = (stats.byStatus[data.status] || 0) + 1;
-    stats.bySource[data.source] = (stats.bySource[data.source] || 0) + 1;
-    
-    if (data.createdAt) {
-      const createdDate = (data.createdAt as Timestamp).toDate();
+    const stage = data.pipeline_stage || 'new_lead';
+    stats.byStage[stage] = (stats.byStage[stage] || 0) + 1;
+    if (data.created_at) {
+      const createdDate = (data.created_at as Timestamp).toDate();
       if (createdDate >= weekAgo) stats.recentlyAdded++;
     }
   });
-  
+
   return stats;
 }

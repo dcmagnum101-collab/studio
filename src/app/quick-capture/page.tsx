@@ -1,124 +1,275 @@
-
 "use client"
 
-import React, { useState, useEffect, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import React, { useState, Suspense } from "react";
+import { useRouter } from "next/navigation";
+import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
+import { AppSidebar } from "@/components/layout/app-sidebar";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Sparkles, Send, RefreshCw, X } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Sparkles, UserPlus, ArrowRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useUser, useFirestore } from "@/firebase";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { calculateAIScore } from "@/lib/lead-types";
 
 function QuickCaptureContent() {
-  const searchParams = useSearchParams();
+  const router = useRouter();
   const { toast } = useToast();
-  const [loading, setLoading] = useState(false);
-  const [analysis, setAnalysis] = useState<any>(null);
+  const { user } = useUser();
+  const firestore = useFirestore();
+  const [saving, setSaving] = useState(false);
 
-  const capturedUrl = searchParams.get("url") || "";
-  const capturedText = searchParams.get("text") || "";
+  const [form, setForm] = useState({
+    firstName: "",
+    lastName: "",
+    phone: "",
+    email: "",
+    propertyAddress: "",
+    city: "",
+    state: "NV",
+    zip: "",
+    source: "manual",
+    leadType: "expired",
+    notes: "",
+  });
 
-  useEffect(() => {
-    if (capturedText) {
-      handleAnalyze();
+  const set = (field: string, value: string) =>
+    setForm(prev => ({ ...prev, [field]: value }));
+
+  const handleSave = async () => {
+    if (!user || !firestore) return;
+    if (!form.firstName && !form.lastName) {
+      toast({ variant: "destructive", title: "Name required", description: "Enter at least a first or last name." });
+      return;
     }
-  }, []);
+    setSaving(true);
+    try {
+      const name = `${form.firstName} ${form.lastName}`.trim();
+      const leadData = {
+        firstName: form.firstName,
+        lastName: form.lastName,
+        name,
+        phone: form.phone,
+        email: form.email,
+        propertyAddress: form.propertyAddress,
+        city: form.city,
+        state: form.state,
+        zip: form.zip,
+        archagent_source: form.source,
+        archagent_tags: [form.leadType],
+        notes: form.notes,
+        pipeline_stage: "new_lead",
+        ownerId: user.uid,
+        icpScore: calculateAIScore({
+          status: form.leadType as any,
+          phone: form.phone,
+          email: form.email,
+        } as any),
+        nextFollowUpDate: new Date().toISOString(),
+        created_at: serverTimestamp(),
+        updated_at: serverTimestamp(),
+      };
 
-  const handleAnalyze = () => {
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      setAnalysis({
-        name: "Potential Lead",
-        motivation: "Major life transition detected in post content.",
-        urgency: "High",
-        suggestedOpener: "Hi! I saw your post regarding the move. I specialize in helping families in your neighborhood navigate these transitions. Would a quick market pulse update be helpful?"
-      });
-    }, 1200);
-  };
+      const contactsRef = collection(firestore, "users", user.uid, "contacts");
+      const docRef = await addDoc(contactsRef, leadData);
 
-  const handleSave = () => {
-    toast({
-      title: "Lead Created",
-      description: "Contact has been added to your Prospecting Hub."
-    });
-    setTimeout(() => window.close(), 1000);
+      toast({ title: "Lead added!", description: `${name} is in your pipeline.` });
+      router.push(`/contacts/${docRef.id}`);
+    } catch (err: any) {
+      toast({ variant: "destructive", title: "Save failed", description: "Try again or check your connection." });
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
-    <div className="p-4 bg-slate-50 min-h-screen">
-      <Card className="border-none shadow-xl overflow-hidden max-w-md mx-auto">
-        <CardHeader className="bg-primary text-white pb-6">
-          <div className="flex justify-between items-center mb-2">
-            <CardTitle className="text-lg font-bold flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-accent" />
-              Monica Quick Capture
-            </CardTitle>
-            <Button variant="ghost" size="icon" className="text-white hover:bg-white/10 h-8 w-8" onClick={() => window.close()}>
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-          <CardDescription className="text-primary-foreground/70 text-xs">AI-powered social lead extraction</CardDescription>
-        </CardHeader>
-        <CardContent className="p-6 space-y-6 bg-white">
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label className="text-[10px] font-bold uppercase text-muted-foreground">Source URL</Label>
-              <Input value={capturedUrl} readOnly className="bg-slate-50 text-xs truncate" />
-            </div>
-            <div className="space-y-2">
-              <Label className="text-[10px] font-bold uppercase text-muted-foreground">Captured Text</Label>
-              <Textarea value={capturedText} className="min-h-[100px] text-xs leading-relaxed" />
-            </div>
-            
-            {!analysis && !loading && (
-              <Button onClick={handleAnalyze} className="w-full gap-2">
-                <Sparkles className="h-4 w-4" /> Analyze Post
-              </Button>
-            )}
+    <SidebarProvider>
+      <div className="flex min-h-screen w-full bg-[#F9FAFB]">
+        <AppSidebar />
+        <SidebarInset>
+          <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4 md:px-6 bg-white shadow-sm sticky top-0 z-10">
+            <SidebarTrigger className="-ml-1" />
+            <h1 className="text-xl font-bold font-headline text-primary">Add a Lead</h1>
+          </header>
 
-            {loading && (
-              <div className="flex flex-col items-center justify-center py-8 space-y-4">
-                <RefreshCw className="h-8 w-8 text-accent animate-spin" />
-                <p className="text-xs text-muted-foreground italic">Monica is extracting lead intelligence...</p>
-              </div>
-            )}
-
-            {analysis && (
-              <div className="space-y-4 pt-4 border-t animate-in fade-in slide-in-from-top-2">
-                <div className="p-4 bg-accent/5 rounded-xl border border-accent/10 space-y-3">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h4 className="text-sm font-bold text-primary">{analysis.name}</h4>
-                      <p className="text-[10px] text-muted-foreground uppercase font-black">Motivation: {analysis.motivation}</p>
-                    </div>
-                    <Badge className="bg-accent h-4 text-[8px] font-bold uppercase">{analysis.urgency}</Badge>
+          <main className="p-4 md:p-8 max-w-2xl mx-auto w-full">
+            <Card className="border-none shadow-xl bg-white">
+              <CardHeader className="pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="bg-primary/10 rounded-xl p-3">
+                    <UserPlus className="h-6 w-6 text-primary" />
                   </div>
-                  <div className="h-px bg-slate-100" />
-                  <div className="space-y-2">
-                    <p className="text-[10px] font-black text-muted-foreground uppercase">AI Suggested Opener</p>
-                    <p className="text-xs text-slate-700 italic bg-white p-3 rounded-lg border leading-relaxed leading-relaxed">"{analysis.suggestedOpener}"</p>
-                    <div className="flex gap-2 justify-end pt-2">
-                      <Button size="sm" className="gap-2 bg-primary" onClick={handleSave}>
-                        <Send className="h-3 w-3" /> Approve & Save
-                      </Button>
-                    </div>
+                  <div>
+                    <CardTitle className="text-xl font-bold text-primary">Quick Add Lead</CardTitle>
+                    <p className="text-sm text-slate-500 mt-1">Fill in what you know — you can add more later.</p>
                   </div>
                 </div>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Name */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="firstName">First Name</Label>
+                    <Input
+                      id="firstName"
+                      placeholder="e.g. John"
+                      value={form.firstName}
+                      onChange={e => set("firstName", e.target.value)}
+                      className="h-11"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="lastName">Last Name</Label>
+                    <Input
+                      id="lastName"
+                      placeholder="e.g. Smith"
+                      value={form.lastName}
+                      onChange={e => set("lastName", e.target.value)}
+                      className="h-11"
+                    />
+                  </div>
+                </div>
+
+                {/* Contact */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="phone">Phone Number</Label>
+                    <Input
+                      id="phone"
+                      placeholder="(702) 555-1234"
+                      value={form.phone}
+                      onChange={e => set("phone", e.target.value)}
+                      className="h-11"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email (optional)</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="john@example.com"
+                      value={form.email}
+                      onChange={e => set("email", e.target.value)}
+                      className="h-11"
+                    />
+                  </div>
+                </div>
+
+                {/* Address */}
+                <div className="space-y-2">
+                  <Label htmlFor="address">Property Address</Label>
+                  <Input
+                    id="address"
+                    placeholder="e.g. 1234 Desert Rose Dr"
+                    value={form.propertyAddress}
+                    onChange={e => set("propertyAddress", e.target.value)}
+                    className="h-11"
+                  />
+                </div>
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="space-y-2 col-span-1">
+                    <Label htmlFor="city">City</Label>
+                    <Input
+                      id="city"
+                      placeholder="Las Vegas"
+                      value={form.city}
+                      onChange={e => set("city", e.target.value)}
+                      className="h-11"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="state">State</Label>
+                    <Input
+                      id="state"
+                      placeholder="NV"
+                      value={form.state}
+                      onChange={e => set("state", e.target.value)}
+                      className="h-11"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="zip">Zip</Label>
+                    <Input
+                      id="zip"
+                      placeholder="89101"
+                      value={form.zip}
+                      onChange={e => set("zip", e.target.value)}
+                      className="h-11"
+                    />
+                  </div>
+                </div>
+
+                {/* Source + Type */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Lead Source</Label>
+                    <Select value={form.source} onValueChange={v => set("source", v)}>
+                      <SelectTrigger className="h-11">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="manual">Manual Entry</SelectItem>
+                        <SelectItem value="vulcan7">Vulcan7</SelectItem>
+                        <SelectItem value="archagent">ArchAgent</SelectItem>
+                        <SelectItem value="redx">RedX</SelectItem>
+                        <SelectItem value="referral">Referral</SelectItem>
+                        <SelectItem value="open_house">Open House</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Lead Type</Label>
+                    <Select value={form.leadType} onValueChange={v => set("leadType", v)}>
+                      <SelectTrigger className="h-11">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="expired">Expired Listing</SelectItem>
+                        <SelectItem value="fsbo">FSBO</SelectItem>
+                        <SelectItem value="pre-foreclosure">Pre-Foreclosure</SelectItem>
+                        <SelectItem value="geo">Geo / Circle</SelectItem>
+                        <SelectItem value="past_client">Past Client</SelectItem>
+                        <SelectItem value="sphere">Sphere of Influence</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {/* Notes */}
+                <div className="space-y-2">
+                  <Label htmlFor="notes">Notes (optional)</Label>
+                  <Textarea
+                    id="notes"
+                    placeholder="e.g. Met at open house on Oak Ave. Very motivated — needs to sell before school starts."
+                    value={form.notes}
+                    onChange={e => set("notes", e.target.value)}
+                    rows={3}
+                  />
+                </div>
+
+                <Button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="w-full h-12 bg-primary hover:bg-primary/90 text-white font-bold text-base rounded-xl shadow-lg gap-2"
+                >
+                  {saving ? "Saving..." : <>Add to My Leads <ArrowRight className="h-5 w-5" /></>}
+                </Button>
+              </CardContent>
+            </Card>
+          </main>
+        </SidebarInset>
+      </div>
+    </SidebarProvider>
   );
 }
 
 export default function QuickCapturePage() {
   return (
-    <Suspense fallback={<div className="p-8 text-center text-xs text-muted-foreground italic">Opening Quick Capture...</div>}>
+    <Suspense fallback={<div className="p-8 text-center text-xs text-muted-foreground">Loading...</div>}>
       <QuickCaptureContent />
     </Suspense>
   );
