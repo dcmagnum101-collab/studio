@@ -1,79 +1,35 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Monica AI Hub — Error</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', sans-serif;
-      background: #1E3A8A;
-      color: white;
-      height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      padding: 40px;
-      -webkit-app-region: drag;
-      user-select: none;
-    }
-
-    .icon {
-      font-size: 64px;
-      margin-bottom: 24px;
-    }
-
-    h1 {
-      font-size: 24px;
-      font-weight: 700;
-      margin-bottom: 12px;
-    }
-
-    p {
-      font-size: 14px;
-      color: rgba(255,255,255,0.65);
-      line-height: 1.6;
-      max-width: 420px;
-      margin-bottom: 32px;
-    }
-
-    .btn {
-      -webkit-app-region: no-drag;
-      background: linear-gradient(135deg, #F59E0B, #D97706);
-      color: white;
-      border: none;
-      border-radius: 10px;
-      padding: 12px 28px;
-      font-size: 14px;
-      font-weight: 700;
-      cursor: pointer;
-      transition: opacity 0.2s;
-    }
-
-    .btn:hover { opacity: 0.9; }
-
-    .details {
-      margin-top: 24px;
-      font-size: 12px;
-      color: rgba(255,255,255,0.35);
-      max-width: 480px;
-    }
-  </style>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #1E3A8A; color: white; height: 100vh;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    font-family: -apple-system, sans-serif;
+    text-align: center; padding: 40px;
+    -webkit-app-region: drag;
+  }
+  .icon { font-size: 48px; margin-bottom: 20px; }
+  h1 { font-size: 22px; margin-bottom: 10px; }
+  p { font-size: 13px; opacity: 0.6; line-height: 1.6; max-width: 400px; }
+  .action {
+    margin-top: 32px;
+    background: #A88A2A; color: white;
+    border: none; padding: 12px 28px;
+    border-radius: 8px; font-size: 14px;
+    font-weight: 700; cursor: pointer;
+    -webkit-app-region: no-drag;
+  }
+  .action:hover { opacity: 0.9; }
+</style>
 </head>
 <body>
   <div class="icon">⚠️</div>
   <h1>Monica AI Hub couldn't start</h1>
-  <p>
-    The app server failed to start. This usually means a configuration issue.<br />
-    Please quit and reopen the app — if the problem persists, check your Firebase settings.
-  </p>
-  <button class="btn" onclick="window.location.reload()">Try Again</button>
-  <div class="details">
-    If this keeps happening, quit Monica AI Hub and contact support.
-  </div>
+  <p>The app ran into a problem starting up. Please quit and reopen the app. If this keeps happening, contact Derek.</p>
+  <button class="action" onclick="window.location.reload()">Try Again</button>
 </body>
 </html>

@@ -1,37 +1,31 @@
 'use strict';
 
-const { app, BrowserWindow, shell, Menu, ipcMain, Notification } = require('electron');
+const { app, BrowserWindow, shell, Menu, Notification, ipcMain } = require('electron');
 const path = require('path');
 const { exec } = require('child_process');
-const { promisify } = require('util');
-const waitOn = require('wait-on');
 const fs = require('fs');
+const waitOn = require('wait-on');
 
-const isDev = process.env.NODE_ENV === 'development';
-const PORT = 9002;
-
-let mainWindow = null;
-let configWindow = null;
-let nextProcess = null;
-
-// ─── electron-store setup ────────────────────────────────────────────────────
+// ─── electron-store ───────────────────────────────────────────────────────────
 let Store;
 try {
   Store = require('electron-store');
-} catch (e) {
-  // Fallback if electron-store is not available
+} catch (_) {
+  // Minimal in-memory fallback (packaged app should always have electron-store)
   Store = class {
-    constructor() { this.data = {}; }
-    get(key, def) { return this.data[key] !== undefined ? this.data[key] : def; }
-    set(key, val) { this.data[key] = val; }
-    get store() { return this.data; }
-    has(key) { return this.data[key] !== undefined && this.data[key] !== ''; }
+    constructor() { this._d = {}; }
+    get(k, def) { return this._d[k] !== undefined ? this._d[k] : (def !== undefined ? def : ''); }
+    set(k, v) { this._d[k] = v; }
+    get store() { return { ...this._d }; }
   };
 }
-const store = new Store({ name: 'monica-ai-hub-config' });
+const store = new Store({ name: 'monica-ai-hub' });
 
-// ─── Env file writer ─────────────────────────────────────────────────────────
+const PORT = 9002;
+let mainWindow;
+let nextProcess;
 
+// ─── Credential keys ──────────────────────────────────────────────────────────
 const ENV_KEYS = [
   'NEXT_PUBLIC_FIREBASE_API_KEY',
   'NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN',
@@ -47,67 +41,124 @@ const ENV_KEYS = [
   'TWILIO_AUTH_TOKEN',
   'TWILIO_PHONE_NUMBER',
   'NEXT_PUBLIC_GOOGLE_MAPS_KEY',
-  'SPARK_API_KEY',
 ];
 
-function writeEnvFile() {
-  const envPath = path.join(__dirname, '../.env.local');
-  const lines = ENV_KEYS
-    .map(key => {
-      const val = store.get(key, process.env[key] || '');
-      return val ? `${key}=${val}` : null;
-    })
-    .filter(Boolean);
+// ─── Seed bundled credentials into store (first launch only) ─────────────────
+function seedBundledCredentials() {
+  // bundled-credentials.js is written by scripts/embed-credentials.js at build time
+  const credPath = path.join(__dirname, 'bundled-credentials.js');
+  if (!fs.existsSync(credPath)) return;
   try {
-    fs.writeFileSync(envPath, lines.join('\n') + '\n', 'utf-8');
-    console.log('[Monica] .env.local written with', lines.length, 'keys');
+    const bundled = require(credPath);
+    for (const key of ENV_KEYS) {
+      // Only seed if store doesn't already have a real value
+      if (!store.get(key) && bundled[key]) {
+        store.set(key, bundled[key]);
+      }
+    }
   } catch (err) {
-    console.error('[Monica] Failed to write .env.local:', err.message);
+    console.warn('[main] Could not load bundled-credentials.js:', err.message);
   }
 }
 
-// ─── IPC handlers ────────────────────────────────────────────────────────────
+// ─── Write .env.local so Next.js picks up credentials at runtime ──────────────
+function writeEnvFile() {
+  const envPath = path.join(app.getPath('userData'), '.env.local');
+  const lines = ENV_KEYS.map(k => {
+    const v = store.get(k) || process.env[k] || '';
+    return v ? `${k}=${v}` : null;
+  }).filter(Boolean);
+  fs.writeFileSync(envPath, lines.join('\n') + '\n', 'utf-8');
+  return envPath;
+}
 
-ipcMain.handle('get-config', (_event, key) => store.get(key, ''));
-ipcMain.handle('set-config', (_event, key, value) => {
-  store.set(key, value);
-  writeEnvFile();
-  return true;
-});
-ipcMain.handle('get-all-config', () => store.store);
-ipcMain.handle('save-all-config', (_event, config) => {
-  Object.entries(config).forEach(([k, v]) => store.set(k, v));
-  writeEnvFile();
-  return true;
-});
-ipcMain.handle('is-configured', () => {
-  // App is configured if Firebase project ID is set
-  const projectId = store.get('NEXT_PUBLIC_FIREBASE_PROJECT_ID', '');
-  return !!projectId;
-});
-ipcMain.handle('config-complete', () => {
-  // Called from config-setup.html when user saves
-  if (configWindow) {
-    configWindow.close();
-    configWindow = null;
-  }
-  createMainWindow();
-});
-ipcMain.handle('update-dock-badge', (_event, count) => {
-  if (app.dock) app.dock.setBadge(count > 0 ? String(count) : '');
-});
+// ─── Start Next.js production server ─────────────────────────────────────────
+function startNextServer(envPath) {
+  return new Promise((resolve, reject) => {
+    // In packaged app, Next.js lives in extraResources/app
+    const appDir = app.isPackaged
+      ? path.join(process.resourcesPath, 'app')
+      : path.join(__dirname, '..');
 
-// ─── Menu builder ────────────────────────────────────────────────────────────
+    const nextBin = path.join(appDir, 'node_modules', '.bin', 'next');
 
+    const env = {
+      ...process.env,
+      NODE_ENV: 'production',
+      DOTENV_CONFIG_PATH: envPath,
+    };
+
+    // Inject env vars directly into the server process environment
+    for (const k of ENV_KEYS) {
+      const v = store.get(k) || process.env[k] || '';
+      if (v) env[k] = v;
+    }
+
+    console.log('[main] Starting Next.js server at', appDir);
+    nextProcess = exec(`"${nextBin}" start -p ${PORT}`, { cwd: appDir, env });
+    nextProcess.stdout.on('data', d => console.log('[Next]', d.trim()));
+    nextProcess.stderr.on('data', d => console.error('[Next]', d.trim()));
+    nextProcess.on('error', reject);
+
+    waitOn({ resources: [`http://localhost:${PORT}`], timeout: 90000 })
+      .then(resolve)
+      .catch(reject);
+  });
+}
+
+// ─── Create main window ───────────────────────────────────────────────────────
+function createWindow() {
+  mainWindow = new BrowserWindow({
+    width: 1440,
+    height: 900,
+    minWidth: 1024,
+    minHeight: 700,
+    titleBarStyle: 'hiddenInset',
+    trafficLightPosition: { x: 20, y: 20 },
+    backgroundColor: '#1E3A8A',
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js'),
+    },
+    show: false,
+  });
+
+  // Show branded loading screen immediately while Next.js boots
+  mainWindow.loadFile(path.join(__dirname, 'loading.html'));
+  mainWindow.once('ready-to-show', () => mainWindow.show());
+
+  // Open external links in system browser
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    shell.openExternal(url);
+    return { action: 'deny' };
+  });
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    if (!url.startsWith(`http://localhost:${PORT}`) && !url.startsWith('file://')) {
+      event.preventDefault();
+      shell.openExternal(url);
+    }
+  });
+
+  return mainWindow;
+}
+
+// ─── Native Mac menu ──────────────────────────────────────────────────────────
 function buildMenu() {
+  const go = (route) => () => {
+    if (mainWindow) mainWindow.loadURL(`http://localhost:${PORT}${route}`);
+  };
+
   const template = [
     {
       label: 'Monica AI Hub',
       submenu: [
         { label: 'About Monica AI Hub', role: 'about' },
         { type: 'separator' },
+        { label: 'Settings', accelerator: 'Cmd+,', click: go('/settings') },
+        { type: 'separator' },
         { label: 'Hide Monica AI Hub', accelerator: 'Cmd+H', role: 'hide' },
-        { label: 'Hide Others', accelerator: 'Option+Cmd+H', role: 'hideOthers' },
+        { label: 'Hide Others', accelerator: 'Cmd+Alt+H', role: 'hideOthers' },
         { type: 'separator' },
         { label: 'Quit Monica AI Hub', accelerator: 'Cmd+Q', role: 'quit' },
       ],
@@ -115,28 +166,19 @@ function buildMenu() {
     {
       label: 'Edit',
       submenu: [
-        { role: 'undo' },
-        { role: 'redo' },
-        { type: 'separator' },
-        { role: 'cut' },
-        { role: 'copy' },
-        { role: 'paste' },
-        { role: 'pasteAndMatchStyle' },
-        { role: 'delete' },
+        { role: 'undo' }, { role: 'redo' }, { type: 'separator' },
+        { role: 'cut' }, { role: 'copy' }, { role: 'paste' },
         { role: 'selectAll' },
       ],
     },
     {
       label: 'View',
       submenu: [
+        { label: 'Home', accelerator: 'Cmd+1', click: go('/') },
+        { label: 'My Leads', accelerator: 'Cmd+2', click: go('/contacts') },
+        { label: 'Pipeline', accelerator: 'Cmd+3', click: go('/pipeline') },
+        { type: 'separator' },
         { role: 'reload' },
-        { role: 'forceReload' },
-        ...(isDev ? [{ role: 'toggleDevTools' }] : []),
-        { type: 'separator' },
-        { role: 'resetZoom' },
-        { role: 'zoomIn' },
-        { role: 'zoomOut' },
-        { type: 'separator' },
         { role: 'togglefullscreen' },
       ],
     },
@@ -147,217 +189,97 @@ function buildMenu() {
         { role: 'zoom' },
         { type: 'separator' },
         { role: 'front' },
-        { type: 'separator' },
-        { role: 'window' },
       ],
     },
   ];
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
-// ─── Next.js server ──────────────────────────────────────────────────────────
+// ─── IPC handlers ─────────────────────────────────────────────────────────────
+ipcMain.handle('get-config', (_, key) => store.get(key, ''));
+ipcMain.handle('set-config', (_, key, value) => { store.set(key, value); return true; });
+ipcMain.handle('get-all-config', () => store.store);
+ipcMain.handle('save-all-config', (_, config) => {
+  for (const [k, v] of Object.entries(config)) {
+    if (ENV_KEYS.includes(k)) store.set(k, v);
+  }
+  return true;
+});
+ipcMain.handle('is-configured', () => !!(store.get('NEXT_PUBLIC_FIREBASE_PROJECT_ID')));
+ipcMain.handle('config-complete', () => {
+  // Called from config-setup.html after user saves credentials on first launch
+  writeEnvFile();
+  if (mainWindow) {
+    startNextServer(path.join(app.getPath('userData'), '.env.local'))
+      .then(() => mainWindow.loadURL(`http://localhost:${PORT}`))
+      .catch(() => mainWindow.loadFile(path.join(__dirname, 'error.html')));
+  }
+  return true;
+});
+ipcMain.handle('update-dock-badge', (_, count) => {
+  if (process.platform === 'darwin') {
+    app.dock.setBadge(count > 0 ? String(count) : '');
+  }
+  return true;
+});
 
-function startNextServer() {
-  return new Promise((resolve, reject) => {
-    const nextBin = path.join(__dirname, '../node_modules/.bin/next');
-    const appDir = path.join(__dirname, '..');
-
-    console.log('[Monica] Starting Next.js server on port', PORT);
-
-    nextProcess = exec(
-      `"${nextBin}" start -p ${PORT}`,
-      {
-        cwd: appDir,
-        env: {
-          ...process.env,
-          NODE_ENV: 'production',
-          PORT: String(PORT),
-        },
-      }
-    );
-
-    nextProcess.stdout.on('data', data => process.stdout.write('[Next] ' + data));
-    nextProcess.stderr.on('data', data => process.stderr.write('[Next ERR] ' + data));
-    nextProcess.on('error', reject);
-
-    waitOn({
-      resources: [`http://localhost:${PORT}`],
-      timeout: 120000,
-      interval: 500,
-    })
-      .then(resolve)
-      .catch(reject);
-  });
-}
-
-// ─── Config window ───────────────────────────────────────────────────────────
-
-function createConfigWindow() {
-  configWindow = new BrowserWindow({
-    width: 680,
-    height: 760,
-    resizable: false,
-    titleBarStyle: 'hiddenInset',
-    trafficLightPosition: { x: 16, y: 16 },
-    backgroundColor: '#1E3A8A',
-    webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: true,
-      preload: path.join(__dirname, 'preload.js'),
-    },
-    show: false,
-  });
-
-  configWindow.loadFile(path.join(__dirname, 'config-setup.html'));
-
-  configWindow.once('ready-to-show', () => {
-    configWindow.show();
-    configWindow.focus();
-  });
-}
-
-// ─── Main window ─────────────────────────────────────────────────────────────
-
-function createMainWindow() {
-  mainWindow = new BrowserWindow({
-    width: 1440,
-    height: 900,
-    minWidth: 1024,
-    minHeight: 700,
-    titleBarStyle: 'hiddenInset',
-    trafficLightPosition: { x: 16, y: 16 },
-    backgroundColor: '#F9FAFB',
-    icon: path.join(__dirname, '../public/icon.png'),
-    webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: true,
-      preload: path.join(__dirname, 'preload.js'),
-    },
-    show: false,
-  });
-
-  // Show loading screen immediately
-  mainWindow.loadFile(path.join(__dirname, 'loading.html'));
-
-  // Open external links in system browser
-  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
-    return { action: 'deny' };
-  });
-
-  mainWindow.webContents.on('will-navigate', (event, url) => {
-    if (!url.startsWith(`http://localhost:${PORT}`) && !url.startsWith('file://')) {
-      event.preventDefault();
-      shell.openExternal(url);
-    }
-  });
-
-  // Reload shortcut in dev
-  mainWindow.webContents.on('before-input-event', (_event, input) => {
-    if (isDev && input.key === 'r' && input.meta) {
-      mainWindow.webContents.reload();
-    }
-  });
-
-  mainWindow.once('ready-to-show', () => {
-    mainWindow.show();
-    mainWindow.focus();
-  });
-
-  mainWindow.on('closed', () => {
-    mainWindow = null;
-  });
-
-  // Update dock badge when window focuses
-  mainWindow.on('focus', () => {
-    mainWindow.webContents.executeJavaScript(`
-      (function() {
-        try {
-          const contacts = JSON.parse(localStorage.getItem('overdue_count') || '0');
-          window.electronAPI && window.electronAPI.updateDockBadge(Number(contacts));
-        } catch(e) {}
-      })()
-    `).catch(() => {});
-  });
-
-  return mainWindow;
-}
-
-// ─── Morning notification ─────────────────────────────────────────────────────
-
+// ─── 8 AM morning notification ────────────────────────────────────────────────
 function scheduleMorningNotification() {
+  if (!Notification.isSupported()) return;
   const now = new Date();
-  const target = new Date();
+  const target = new Date(now);
   target.setHours(8, 0, 0, 0);
-  if (now >= target) target.setDate(target.getDate() + 1);
-
-  const delay = target.getTime() - now.getTime();
+  if (target <= now) target.setDate(target.getDate() + 1);
   setTimeout(() => {
-    if (Notification.isSupported()) {
+    new Notification({
+      title: 'Good morning, Monica!',
+      body: 'Your daily call list is ready. Open Monica AI Hub to start your day.',
+    }).show();
+    setInterval(() => {
       new Notification({
         title: 'Good morning, Monica!',
-        body: "Open Monica AI Hub to see who to call today.",
-        silent: false,
+        body: 'Your daily call list is ready.',
       }).show();
-    }
-    // Reschedule for tomorrow
-    scheduleMorningNotification();
-  }, delay);
+    }, 24 * 60 * 60 * 1000);
+  }, target.getTime() - now.getTime());
 }
 
 // ─── App lifecycle ────────────────────────────────────────────────────────────
-
 app.whenReady().then(async () => {
   buildMenu();
+  seedBundledCredentials();
 
-  const isConfigured = !!(store.get('NEXT_PUBLIC_FIREBASE_PROJECT_ID', ''));
+  const isConfigured = !!(store.get('NEXT_PUBLIC_FIREBASE_PROJECT_ID'));
+  createWindow();
 
   if (!isConfigured) {
-    // First launch — show config screen
-    createConfigWindow();
+    // First launch with no credentials — show setup screen
+    mainWindow.once('ready-to-show', () => {
+      mainWindow.loadFile(path.join(__dirname, 'config-setup.html'));
+    });
     return;
   }
 
-  // Write env file before starting Next.js
-  writeEnvFile();
-
-  if (isDev) {
-    // Dev mode: Next.js is already running
-    createMainWindow();
-    mainWindow.loadURL(`http://localhost:${PORT}`);
-    return;
-  }
-
-  // Production: start Next.js server, then swap to app
-  const win = createMainWindow();
   try {
-    await startNextServer();
-    win.loadURL(`http://localhost:${PORT}`);
+    const envPath = writeEnvFile();
+    await startNextServer(envPath);
+    mainWindow.loadURL(`http://localhost:${PORT}`);
     scheduleMorningNotification();
   } catch (err) {
-    console.error('[Monica] Server failed to start:', err);
-    win.loadFile(path.join(__dirname, 'error.html'));
+    console.error('[main] Startup failed:', err);
+    mainWindow.loadFile(path.join(__dirname, 'error.html'));
   }
 });
 
 app.on('window-all-closed', () => {
-  if (nextProcess) {
-    nextProcess.kill('SIGTERM');
-    nextProcess = null;
-  }
-  app.quit();
+  if (nextProcess) nextProcess.kill();
+  if (process.platform !== 'darwin') app.quit();
 });
 
 app.on('before-quit', () => {
-  if (nextProcess) {
-    nextProcess.kill('SIGTERM');
-    nextProcess = null;
-  }
+  if (nextProcess) nextProcess.kill();
 });
 
 app.on('activate', () => {
-  if (BrowserWindow.getAllWindows().length === 0) {
-    const isConfigured = !!(store.get('NEXT_PUBLIC_FIREBASE_PROJECT_ID', ''));
-    if (isConfigured) createMainWindow();
-  }
+  if (BrowserWindow.getAllWindows().length === 0) createWindow();
 });
