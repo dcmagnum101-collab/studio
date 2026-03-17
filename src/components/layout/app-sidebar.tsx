@@ -13,18 +13,18 @@ import {
   Trello,
   CheckSquare,
   CalendarDays,
-  Home,
   Database,
   Building2,
-  Wrench,
   MessageSquare,
   FileBarChart,
   BrainCircuit,
   Bell,
   RefreshCw,
   X,
-  Target,
-  ArrowRight
+  ArrowRight,
+  Upload,
+  Home,
+  Mail,
 } from "lucide-react"
 
 import {
@@ -53,8 +53,8 @@ export function AppSidebar() {
   const router = useRouter()
   const { user } = useUser()
   const firestore = useFirestore()
-  
-  // Real-time unread count
+
+  // Real-time unread SMS count
   const unreadQuery = useMemoFirebase(() => {
     if (!user || !firestore) return null
     return query(collection(firestore, "users", user.uid, "contacts"), where("unreadSMSCount", ">", 0))
@@ -77,23 +77,22 @@ export function AppSidebar() {
   const { data: hotAlerts, isLoading: alertsLoading } = useCollection(alertsQuery)
   const unreadAlertsCount = hotAlerts?.length || 0
 
+  // Navigation — most used at top, plain English labels
   const navigation = [
-    { name: "Dashboard", href: "/", icon: LayoutDashboard },
-    { name: "Goals", href: "/goals", icon: Target },
-    { name: "Setup Guide", href: "/setup-guide", icon: Wrench },
-    { name: "Inbox", href: "/inbox", icon: MessageSquare, badge: unreadSMSCount },
-    { name: "Objection Coach", href: "/objection-coach", icon: BrainCircuit },
-    { name: "Prospector", href: "/contacts", icon: Users },
-    { name: "MLS Intel", href: "/mls-intelligence", icon: Building2 },
-    { name: "Market Reports", href: "/market-report", icon: FileBarChart },
-    { name: "Sources Hub", href: "/sources", icon: Database },
+    { name: "Home", href: "/", icon: LayoutDashboard },
+    { name: "My Leads", href: "/contacts", icon: Users },
+    { name: "Import Leads", href: "/sources", icon: Upload },
     { name: "Pipeline", href: "/pipeline", icon: Trello },
     { name: "Tasks", href: "/tasks", icon: CheckSquare },
     { name: "Calendar", href: "/calendar", icon: CalendarDays },
-    { name: "Farm Zones", href: "/farm", icon: Map },
-    { name: "Open House", href: "/open-house", icon: Home },
-    { name: "Outreach Builder", href: "/outreach", icon: Sparkles },
-    { name: "Analytics", href: "/analytics", icon: PieChart },
+    { name: "Write Outreach", href: "/outreach", icon: Sparkles },
+    { name: "Inbox", href: "/inbox", icon: MessageSquare, badge: unreadSMSCount },
+    { name: "Practice Scripts", href: "/objection-coach", icon: BrainCircuit },
+    { name: "My Farm", href: "/farm", icon: Map },
+    { name: "Open Houses", href: "/open-house", icon: Home },
+    { name: "Market Activity", href: "/mls-intelligence", icon: Building2 },
+    { name: "Neighborhood Reports", href: "/market-report", icon: FileBarChart },
+    { name: "My Stats", href: "/analytics", icon: PieChart },
     { name: "Settings", href: "/settings", icon: Settings },
   ]
 
@@ -141,7 +140,7 @@ export function AppSidebar() {
               <header className="bg-primary text-white p-4 flex justify-between items-center">
                 <div className="flex items-center gap-2">
                   <Bell className="h-4 w-4 text-accent" />
-                  <h3 className="font-black text-xs uppercase tracking-widest">Tactical Alerts</h3>
+                  <h3 className="font-black text-xs uppercase tracking-widest">Hot Alerts</h3>
                 </div>
                 {alertsLoading && <RefreshCw className="h-3 w-3 animate-spin opacity-50" />}
               </header>
@@ -154,9 +153,9 @@ export function AppSidebar() {
                           <div className={`h-1.5 w-1.5 rounded-full ${alert.type === 'icp' ? 'bg-orange-500' : alert.type === 'sms' ? 'bg-blue-500' : 'bg-red-500'}`} />
                           {alert.title}
                         </span>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
+                        <Button
+                          variant="ghost"
+                          size="icon"
                           className="h-5 w-5 opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-500 transition-all"
                           onClick={() => handleMarkRead(alert.id)}
                         >
@@ -170,7 +169,7 @@ export function AppSidebar() {
                         </span>
                         <Link href={`/contacts/${alert.leadId}`}>
                           <Button variant="link" className="h-auto p-0 text-[10px] font-black text-primary uppercase gap-1">
-                            Action <ArrowRight className="h-2.5 w-2.5" />
+                            View <ArrowRight className="h-2.5 w-2.5" />
                           </Button>
                         </Link>
                       </div>
@@ -187,6 +186,7 @@ export function AppSidebar() {
           </Popover>
         </div>
       </SidebarHeader>
+
       <SidebarContent>
         <SidebarMenu className="px-2">
           {navigation.map((item) => (
@@ -213,11 +213,12 @@ export function AppSidebar() {
           ))}
         </SidebarMenu>
       </SidebarContent>
+
       <SidebarFooter className="p-4">
         <SidebarSeparator className="mb-4 opacity-20" />
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton 
+            <SidebarMenuButton
               className="text-red-600 hover:text-red-700 hover:bg-red-50"
               onClick={handleSignOut}
             >

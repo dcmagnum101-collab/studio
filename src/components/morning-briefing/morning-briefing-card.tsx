@@ -58,8 +58,7 @@ export function MorningBriefingCard() {
   };
 
   const renderBriefingText = (text: string) => {
-    return text.split('
-').filter(p => p.trim()).map((p, i) => (
+    return text.split('\n').filter(p => p.trim()).map((p, i) => (
       <p key={i} className={`text-sm leading-relaxed text-blue-50 ${i > 0 ? "mt-4" : ""}`}>
         {p}
       </p>
