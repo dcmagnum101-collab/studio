@@ -1,7 +1,14 @@
 {
-  "name": "nextn",
-  "version": "0.1.0",
+  "name": "monica-ai-hub",
+  "version": "1.0.0",
+  "productName": "Monica AI Hub",
+  "description": "Real Estate AI Outreach Platform for Monica Selvaggio",
+  "author": {
+    "name": "Monica Selvaggio",
+    "email": "contact@monicaaihub.com"
+  },
   "private": true,
+  "main": "electron/main.js",
   "scripts": {
     "dev": "next dev --turbopack -p 9002",
     "genkit:dev": "genkit start -- tsx src/ai/dev.ts",
@@ -10,7 +17,73 @@
     "start": "next start",
     "lint": "next lint",
     "format": "prettier --write .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "electron": "electron .",
+    "electron:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:9002 && electron .\"",
+    "electron:dist": "npm run build && electron-builder --mac --publish never",
+    "postinstall": "electron-builder install-app-deps"
+  },
+  "build": {
+    "appId": "com.monicaaihub.app",
+    "productName": "Monica AI Hub",
+    "directories": {
+      "output": "dist",
+      "buildResources": "assets"
+    },
+    "files": [
+      "**/*",
+      "!dist/**",
+      "!.next/cache/**",
+      "!node_modules/.cache/**",
+      "!**/*.md",
+      "!.env*"
+    ],
+    "asar": true,
+    "asarUnpack": [
+      "node_modules/sharp/**",
+      "node_modules/@next/**"
+    ],
+    "extraResources": [
+      {
+        "from": ".env.production",
+        "to": ".env.local"
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.business",
+      "icon": "assets/icon.icns",
+      "identity": null,
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["x64", "arm64"]
+        }
+      ],
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "assets/entitlements.mac.plist",
+      "entitlementsInherit": "assets/entitlements.mac.plist"
+    },
+    "dmg": {
+      "title": "Monica AI Hub",
+      "window": {
+        "width": 660,
+        "height": 400
+      },
+      "contents": [
+        {
+          "x": 180,
+          "y": 170,
+          "type": "file"
+        },
+        {
+          "x": 480,
+          "y": 170,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    }
   },
   "dependencies": {
     "@genkit-ai/google-genai": "^1.28.0",
@@ -40,7 +113,9 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^3.6.0",
-    "dotenv": "^16.5.0",
+    "dotenv": "^16.6.1",
+    "electron-serve": "^3.0.1",
+    "electron-store": "^11.0.2",
     "embla-carousel-react": "^8.6.0",
     "firebase": "^11.9.1",
     "firebase-admin": "^13.1.0",
@@ -51,11 +126,13 @@
     "nodemailer": "^6.10.0",
     "papaparse": "^5.4.1",
     "patch-package": "^8.0.0",
+    "png2icons": "^2.0.1",
     "react": "^19.2.1",
     "react-day-picker": "^9.11.3",
     "react-dom": "^19.2.1",
     "react-hook-form": "^7.54.2",
     "recharts": "^2.15.1",
+    "sharp": "^0.34.5",
     "tailwind-merge": "^3.0.1",
     "tailwindcss-animate": "^1.0.7",
     "twilio": "^5.4.5",
@@ -67,14 +144,18 @@
     "@types/papaparse": "^5.3.14",
     "@types/react": "^19.2.1",
     "@types/react-dom": "^19.2.1",
+    "concurrently": "^9.2.1",
+    "electron": "^41.0.3",
+    "electron-builder": "^26.8.1",
     "eslint": "^9.19.0",
     "eslint-config-next": "15.1.6",
-    "prettier": "^3.4.2",
     "eslint-config-prettier": "^10.0.1",
     "eslint-plugin-prettier": "^5.2.3",
     "genkit-cli": "^1.28.0",
     "postcss": "^8",
+    "prettier": "^3.4.2",
     "tailwindcss": "^3.4.1",
-    "typescript": "^5"
+    "typescript": "^5",
+    "wait-on": "^9.0.4"
   }
 }
