@@ -1,0 +1,1 @@
+Hi {{contact_name}}, I came across {{business_name}} in the {{industry}} space and was genuinely impressed by what you're building. I'd love to connect and share something that could be valuable for you — do you have 15 minutes this week?
