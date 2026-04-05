@@ -1,99 +1,187 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { prisma } from '@/lib/prisma'
 import { daysUntil } from '@/lib/utils'
-import type { Case, Task, AuditFlag } from '@prisma/client'
+import { STAGE_THRESHOLDS, REQUIRED_DOCS } from './constants'
+import type { AuditFlag } from '@prisma/client'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
-export interface CaseAuditData {
-  id: string
+// ─── Audit input builder ──────────────────────────────────────
+
+export interface CaseAuditInput {
   caseNumber: string
-  title: string
-  status: string
+  type: string
   stage: string
+  daysInStage: number
+  daysSinceActivity: number
+  solDate: string
+  daysUntilSOL: number
   priority: string
-  incidentDate: Date
-  statute: Date
   estimatedValue: number | null
+  settlementOffer: number | null
+  openTasks: Array<{ title: string; dueDate: Date }>
+  overdueTasks: Array<{ title: string; dueDate: Date }>
+  documents: Array<{ category: string }>
+  missingDocs: string[]
+  description: string | null
+}
+
+export interface AuditReport {
+  riskScore: number
+  riskLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
+  summary: string
+  nextBestAction: string
+  flags: Array<{
+    type: string
+    severity: string
+    title: string
+    description: string
+    recommendation: string
+    urgency: string
+  }>
+}
+
+function buildAuditInput(c: {
+  caseNumber: string
+  type: string
+  stage: string
   stageEnteredAt: Date
-  lastActivity?: Date
-  taskCount: number
-  overdueTaskCount: number
-  documentCount: number
-  noteCount: number
+  priority: string
+  estimatedValue: number | null
+  settlementOffer: number | null
+  statute: Date
+  description: string | null
+  tasks: Array<{ title: string; status: string; dueDate: Date }>
+  documents: Array<{ category: string }>
+  notes: Array<{ createdAt: Date }>
+  updatedAt: Date
+}): CaseAuditInput {
+  const daysInStage = Math.abs(daysUntil(c.stageEnteredAt))
+  const lastActivity = c.notes[0]?.createdAt ?? c.updatedAt
+  const daysSinceActivity = Math.abs(daysUntil(lastActivity))
+
+  const openTasks = c.tasks.filter(t => t.status !== 'COMPLETED' && t.status !== 'CANCELLED')
+  const overdueTasks = openTasks.filter(t => t.dueDate < new Date())
+
+  const docCategories = c.documents.map(d => d.category)
+  const required = REQUIRED_DOCS[c.type] ?? REQUIRED_DOCS.DEFAULT ?? []
+  const missingDocs = required.filter(d => !docCategories.includes(d))
+
+  return {
+    caseNumber: c.caseNumber,
+    type: c.type,
+    stage: c.stage,
+    daysInStage,
+    daysSinceActivity,
+    solDate: c.statute.toLocaleDateString(),
+    daysUntilSOL: daysUntil(c.statute),
+    priority: c.priority,
+    estimatedValue: c.estimatedValue,
+    settlementOffer: c.settlementOffer,
+    openTasks: openTasks.map(t => ({ title: t.title, dueDate: t.dueDate })),
+    overdueTasks: overdueTasks.map(t => ({ title: t.title, dueDate: t.dueDate })),
+    documents: c.documents,
+    missingDocs,
+    description: c.description,
+  }
 }
 
-export async function auditCase(caseData: CaseAuditData, userId: string) {
-  const daysInStage = daysUntil(caseData.stageEnteredAt) * -1
-  const solDays = daysUntil(caseData.statute)
-  const flags: Array<Omit<AuditFlag, 'id' | 'createdAt' | 'resolvedAt' | 'resolvedBy'>> = []
+// ─── Full Claude audit prompt ─────────────────────────────────
 
-  // SOL check
-  if (solDays <= 30 && caseData.status === 'ACTIVE') {
-    flags.push({
-      caseId: caseData.id,
-      runId: '', // filled after run creation
-      type: 'SOL_WARNING',
-      severity: solDays <= 7 ? 'CRITICAL' : solDays <= 14 ? 'HIGH' : 'MEDIUM',
-      title: `SOL expires in ${solDays} days`,
-      description: `Statute of limitations for case ${caseData.caseNumber} expires on ${caseData.statute.toLocaleDateString()}. Immediate action required.`,
-      recommendation: solDays <= 7
-        ? 'File immediately or obtain tolling agreement. Contact client ASAP.'
-        : 'Prepare demand letter and ensure all evidence is documented.',
-      urgency: solDays <= 7 ? 'IMMEDIATE' : 'THIS_WEEK',
-      isResolved: false,
-    })
-  }
+function buildAuditPrompt(input: CaseAuditInput): string {
+  return `You are a senior legal case auditor for Paul Padda Law, a plaintiff personal injury firm in Las Vegas, NV.
 
-  // Stalled case check
-  if (daysInStage > 90 && caseData.status === 'ACTIVE') {
-    flags.push({
-      caseId: caseData.id,
-      runId: '',
-      type: 'STALLED',
-      severity: daysInStage > 180 ? 'HIGH' : 'MEDIUM',
-      title: `Case stalled in ${caseData.stage} for ${daysInStage} days`,
-      description: `Case ${caseData.caseNumber} has been in ${caseData.stage} stage for ${daysInStage} days without progression.`,
-      recommendation: 'Review case status, contact client, and create action plan to advance.',
-      urgency: 'THIS_WEEK',
-      isResolved: false,
-    })
-  }
+Audit this case and return a JSON report identifying all risks, bottlenecks, and action items.
 
-  // Overdue tasks
-  if (caseData.overdueTaskCount > 0) {
-    flags.push({
-      caseId: caseData.id,
-      runId: '',
-      type: 'OVERDUE_TASK',
-      severity: caseData.overdueTaskCount >= 3 ? 'HIGH' : 'MEDIUM',
-      title: `${caseData.overdueTaskCount} overdue task${caseData.overdueTaskCount > 1 ? 's' : ''}`,
-      description: `Case ${caseData.caseNumber} has ${caseData.overdueTaskCount} overdue tasks that need attention.`,
-      recommendation: 'Review and complete or reassign overdue tasks immediately.',
-      urgency: 'IMMEDIATE',
-      isResolved: false,
-    })
-  }
+CASE DATA:
+Case Number: ${input.caseNumber}
+Case Type: ${input.type}
+Current Stage: ${input.stage}
+Days in Current Stage: ${input.daysInStage} (threshold: ${STAGE_THRESHOLDS[input.stage] ?? 30} days)
+Days Since Last Activity: ${input.daysSinceActivity}
+SOL Date: ${input.solDate}
+Days Until SOL: ${input.daysUntilSOL}
+Priority: ${input.priority}
+Estimated Value: $${input.estimatedValue?.toLocaleString() ?? 'Not set'}
+Settlement Offer: $${input.settlementOffer?.toLocaleString() ?? 'None'}
+Open Tasks: ${input.openTasks.length} (${input.overdueTasks.length} overdue)
+Overdue Tasks: ${input.overdueTasks.map(t => t.title).join(', ') || 'None'}
+Documents Present: ${input.documents.map(d => d.category).join(', ') || 'None'}
+Required Documents Missing: ${input.missingDocs.join(', ') || 'None'}
+Case Description: ${input.description ?? 'Not provided'}
 
-  // Missing documents
-  if (caseData.documentCount === 0 && caseData.stage !== 'INTAKE') {
-    flags.push({
-      caseId: caseData.id,
-      runId: '',
-      type: 'MISSING_DOC',
-      severity: 'MEDIUM',
-      title: 'No documents uploaded',
-      description: `Case ${caseData.caseNumber} in ${caseData.stage} stage has no documents uploaded.`,
-      recommendation: 'Upload police report, medical records, or other relevant documents.',
-      urgency: 'THIS_WEEK',
-      isResolved: false,
-    })
-  }
+STAGE THRESHOLDS (days before flagged as stalled):
+${JSON.stringify(STAGE_THRESHOLDS)}
 
-  return flags
+REQUIRED DOCUMENTS FOR THIS CASE TYPE:
+${JSON.stringify(REQUIRED_DOCS[input.type] ?? [])}
+
+Return ONLY valid JSON — no markdown, no explanation, just the JSON object:
+{
+  "riskScore": <number 0-100>,
+  "riskLevel": <"LOW" | "MEDIUM" | "HIGH" | "CRITICAL">,
+  "summary": "<2-3 sentence plain English case health summary>",
+  "nextBestAction": "<single most important action to take on this case right now>",
+  "flags": [
+    {
+      "type": <"BOTTLENECK" | "SOL_WARNING" | "MISSING_DOC" | "STALLED" | "UNDERVALUED" | "OVERDUE_TASK" | "NO_ACTIVITY">,
+      "severity": <"LOW" | "MEDIUM" | "HIGH" | "CRITICAL">,
+      "title": "<concise flag title>",
+      "description": "<what the problem is and why it matters>",
+      "recommendation": "<specific, actionable step to resolve this flag>",
+      "urgency": <"IMMEDIATE" | "THIS_WEEK" | "THIS_MONTH">
+    }
+  ]
+}`
 }
 
-export async function runFullAudit(userId: string, type: 'SCHEDULED' | 'MANUAL' = 'MANUAL') {
+// ─── Audit a single case via Claude ──────────────────────────
+
+export async function auditCaseWithClaude(input: CaseAuditInput): Promise<AuditReport> {
+  const msg = await anthropic.messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 1500,
+    messages: [{ role: 'user', content: buildAuditPrompt(input) }],
+  })
+
+  const text = (msg.content[0] as { text: string }).text.trim()
+
+  // Strip markdown code fences if Claude wraps in ```json
+  const jsonText = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/, '')
+
+  return JSON.parse(jsonText) as AuditReport
+}
+
+// ─── Save audit flags to DB ───────────────────────────────────
+
+async function saveAuditFlags(
+  caseId: string,
+  runId: string,
+  report: AuditReport
+): Promise<void> {
+  if (report.flags.length === 0) return
+
+  await prisma.auditFlag.createMany({
+    data: report.flags.map(f => ({
+      caseId,
+      runId,
+      type: f.type as never,
+      severity: f.severity as never,
+      urgency: f.urgency as never,
+      title: f.title,
+      description: f.description,
+      recommendation: f.recommendation,
+      isResolved: false,
+    })),
+  })
+}
+
+// ─── Run full audit (non-streaming, used by cron) ─────────────
+
+export async function runFullAudit(
+  userId: string,
+  type: 'SCHEDULED' | 'MANUAL' = 'MANUAL'
+) {
   const activeCases = await prisma.case.findMany({
     where: { status: 'ACTIVE' },
     include: {
@@ -103,103 +191,75 @@ export async function runFullAudit(userId: string, type: 'SCHEDULED' | 'MANUAL' 
     },
   })
 
-  const allFlags: Omit<AuditFlag, 'id' | 'createdAt' | 'resolvedAt' | 'resolvedBy'>[] = []
-
-  for (const c of activeCases) {
-    const overdueCount = c.tasks.filter(
-      t => t.status !== 'COMPLETED' && t.status !== 'CANCELLED' && t.dueDate < new Date()
-    ).length
-
-    const caseData: CaseAuditData = {
-      id: c.id,
-      caseNumber: c.caseNumber,
-      title: c.title,
-      status: c.status,
-      stage: c.stage,
-      priority: c.priority,
-      incidentDate: c.incidentDate,
-      statute: c.statute,
-      estimatedValue: c.estimatedValue,
-      stageEnteredAt: c.stageEnteredAt,
-      lastActivity: c.notes[0]?.createdAt,
-      taskCount: c.tasks.length,
-      overdueTaskCount: overdueCount,
-      documentCount: c.documents.length,
-      noteCount: c.notes.length,
-    }
-
-    const flags = await auditCase(caseData, userId)
-    allFlags.push(...flags)
-  }
-
-  // Create audit run record
   const run = await prisma.auditRun.create({
     data: {
       triggeredBy: userId,
       type,
       casesScanned: activeCases.length,
-      flagsFound: allFlags.length,
-      riskScore: calculateRiskScore(allFlags),
+      flagsFound: 0,
+      riskScore: 0,
+    },
+  })
+
+  let totalFlags = 0
+  let totalRisk = 0
+
+  for (const c of activeCases) {
+    try {
+      const input = buildAuditInput(c)
+      const report = await auditCaseWithClaude(input)
+      await saveAuditFlags(c.id, run.id, report)
+      totalFlags += report.flags.length
+      totalRisk += report.riskScore
+    } catch (err) {
+      console.error(`[audit] Case ${c.caseNumber} failed:`, err)
+    }
+  }
+
+  const avgRisk = activeCases.length > 0 ? totalRisk / activeCases.length : 0
+
+  await prisma.auditRun.update({
+    where: { id: run.id },
+    data: {
+      flagsFound: totalFlags,
+      riskScore: avgRisk,
       completedAt: new Date(),
     },
   })
 
-  // Create flags with run ID
-  if (allFlags.length > 0) {
-    await prisma.auditFlag.createMany({
-      data: allFlags.map(f => ({ ...f, runId: run.id })),
-    })
-  }
-
-  return { run, flagCount: allFlags.length }
+  return { run, flagCount: totalFlags }
 }
 
-function calculateRiskScore(
-  flags: Omit<AuditFlag, 'id' | 'createdAt' | 'resolvedAt' | 'resolvedBy'>[]
-): number {
-  const weights = { CRITICAL: 10, HIGH: 5, MEDIUM: 2, LOW: 1 }
-  const total = flags.reduce((sum, f) => sum + (weights[f.severity as keyof typeof weights] ?? 1), 0)
-  return Math.min(100, total)
-}
+// ─── Single case audit ────────────────────────────────────────
 
-export async function generateAuditSummary(runId: string): Promise<string> {
-  const run = await prisma.auditRun.findUnique({
-    where: { id: runId },
+export async function auditSingleCase(caseId: string, userId: string) {
+  const c = await prisma.case.findUniqueOrThrow({
+    where: { id: caseId },
     include: {
-      flags: {
-        include: { case: true },
-        orderBy: { severity: 'asc' },
-        take: 20,
-      },
+      tasks: true,
+      documents: true,
+      notes: { orderBy: { createdAt: 'desc' }, take: 1 },
     },
   })
 
-  if (!run) return 'Audit run not found'
-
-  const flagsSummary = run.flags
-    .map(f => `- [${f.severity}] ${f.case.caseNumber}: ${f.title}`)
-    .join('\n')
-
-  const msg = await anthropic.messages.create({
-    model: 'claude-sonnet-4-20250514',
-    max_tokens: 500,
-    messages: [
-      {
-        role: 'user',
-        content: `You are an AI legal analyst for Paul Padda Law in Las Vegas, NV. Summarize this audit run in 3-4 sentences for the attorney's morning briefing. Be concise and action-oriented.
-
-Audit Results:
-- Cases scanned: ${run.casesScanned}
-- Flags found: ${run.flagsFound}
-- Risk score: ${run.riskScore}/100
-
-Top flags:
-${flagsSummary}
-
-Write a brief executive summary.`,
-      },
-    ],
+  const run = await prisma.auditRun.create({
+    data: {
+      triggeredBy: userId,
+      type: 'SINGLE_CASE',
+      casesScanned: 1,
+      flagsFound: 0,
+      riskScore: 0,
+    },
   })
 
-  return (msg.content[0] as { text: string }).text
+  const input = buildAuditInput(c)
+  const report = await auditCaseWithClaude(input)
+  await saveAuditFlags(c.id, run.id, report)
+
+  await prisma.auditRun.update({
+    where: { id: run.id },
+    data: { flagsFound: report.flags.length, riskScore: report.riskScore, completedAt: new Date() },
+  })
+
+  return { run, report }
 }

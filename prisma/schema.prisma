@@ -514,3 +514,19 @@ enum CommType {
   SOL_ALERT
   TASK_REMINDER
 }
+
+// ─── ALERT THROTTLE ───────────────────────────────────────────
+// Prevents duplicate alerts within a throttle window
+
+model AlertThrottle {
+  id          String   @id @default(cuid())
+  caseId      String?
+  taskId      String?
+  alertType   String
+  channel     String   // EMAIL | SMS | VOICE
+  sentAt      DateTime @default(now())
+  expiresAt   DateTime
+
+  @@index([caseId, alertType, channel])
+  @@index([expiresAt])
+}

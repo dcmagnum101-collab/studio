@@ -86,13 +86,37 @@ export function AuditPageClient({
   const [localFlags, setLocalFlags] = useState(unresolvedFlags)
   const [activeFilter, setActiveFilter] = useState<string>('ALL')
 
+  const [streamProgress, setStreamProgress] = useState<{ processed: number; total: number; current?: string } | null>(null)
+
   async function runAudit() {
     setRunning(true)
+    setStreamProgress({ processed: 0, total: 0 })
     try {
-      const res = await fetch('/api/audit/run', { method: 'POST' })
-      if (res.ok) window.location.reload()
+      const res = await fetch('/api/audit/run-all', { method: 'POST' })
+      if (!res.body) { window.location.reload(); return }
+
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        const chunk = decoder.decode(value)
+        const lines = chunk.split('\n').filter(l => l.startsWith('data: '))
+        for (const line of lines) {
+          try {
+            const data = JSON.parse(line.slice(6))
+            if (data.type === 'progress') {
+              setStreamProgress({ processed: data.processed, total: data.total, current: data.caseNumber })
+            } else if (data.type === 'complete') {
+              window.location.reload()
+            }
+          } catch { /* ignore parse errors */ }
+        }
+      }
     } finally {
       setRunning(false)
+      setStreamProgress(null)
     }
   }
 
@@ -192,7 +216,9 @@ export function AuditPageClient({
               ) : (
                 <Play className="w-3.5 h-3.5" />
               )}
-              {running ? 'Running...' : 'Run Audit'}
+              {running && streamProgress
+                ? `${streamProgress.processed}/${streamProgress.total}${streamProgress.current ? ` · ${streamProgress.current}` : ''}`
+                : running ? 'Starting...' : 'Run Full Audit'}
             </button>
           </div>
 

@@ -17,6 +17,7 @@ import {
   ChevronRight,
   Scale,
   LogOut,
+  BarChart3,
 } from 'lucide-react'
 import { signOut } from 'next-auth/react'
 
@@ -42,6 +43,7 @@ const NAV_SECTIONS = [
     items: [
       { href: '/audit', label: 'AI Audit', icon: Brain },
       { href: '/competitors', label: 'Competitors', icon: Trophy },
+      { href: '/reports', label: 'Reports', icon: BarChart3 },
     ],
   },
   {
