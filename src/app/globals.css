@@ -1,38 +1,84 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&display=swap');
+
 @layer base {
   :root {
-    --background: 210 20% 98%;
-    --foreground: 224 71% 4%;
+    /* Light mode — surfaces are near-white, accents are gold/navy */
+    --background: 210 20% 97%;
+    --foreground: 215 25% 10%;
     --card: 0 0% 100%;
-    --card-foreground: 224 71% 4%;
+    --card-foreground: 215 25% 10%;
     --popover: 0 0% 100%;
-    --popover-foreground: 224 71% 4%;
-    --primary: 224 64% 33%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 210 20% 96%;
-    --secondary-foreground: 224 64% 33%;
-    --muted: 210 20% 90%;
+    --popover-foreground: 215 25% 10%;
+    --primary: 217 72% 11%;       /* Deep Navy #0A1628 */
+    --primary-foreground: 45 55% 54%;  /* Gold */
+    --secondary: 210 16% 93%;
+    --secondary-foreground: 217 72% 11%;
+    --muted: 210 16% 90%;
     --muted-foreground: 215 16% 47%;
-    --accent: 45 60% 41%;
-    --accent-foreground: 0 0% 100%;
+    --accent: 40 55% 54%;         /* Gold #C9A84C */
+    --accent-foreground: 217 72% 8%;
     --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 224 64% 33%;
-    --radius: 1rem;
-    --sidebar-background: 224 64% 33%;
-    --sidebar-foreground: 210 20% 98%;
-    --sidebar-primary: 45 60% 41%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 224 60% 25%;
-    --sidebar-accent-foreground: 210 20% 98%;
-    --sidebar-border: 224 60% 25%;
-    --sidebar-ring: 45 60% 41%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 214 20% 88%;
+    --input: 214 20% 88%;
+    --ring: 40 55% 54%;
+    --radius: 0.5rem;
+
+    --sidebar-background: 217 72% 11%;
+    --sidebar-foreground: 210 20% 93%;
+    --sidebar-primary: 40 55% 54%;
+    --sidebar-primary-foreground: 217 72% 8%;
+    --sidebar-accent: 217 68% 15%;
+    --sidebar-accent-foreground: 40 55% 54%;
+    --sidebar-border: 217 64% 16%;
+    --sidebar-ring: 40 55% 54%;
+
+    --chart-1: 40 55% 54%;
+    --chart-2: 217 72% 35%;
+    --chart-3: 142 71% 45%;
+    --chart-4: 0 84% 60%;
+    --chart-5: 199 89% 48%;
+  }
+
+  .dark {
+    --background: 215 30% 8%;     /* #0D1421 near-navy */
+    --foreground: 210 16% 90%;
+    --card: 215 28% 10%;          /* Surface Dark */
+    --card-foreground: 210 16% 90%;
+    --popover: 215 28% 11%;
+    --popover-foreground: 210 16% 90%;
+    --primary: 40 55% 54%;        /* Gold as primary CTA in dark */
+    --primary-foreground: 217 72% 8%;
+    --secondary: 215 25% 14%;
+    --secondary-foreground: 210 16% 75%;
+    --muted: 215 22% 16%;
+    --muted-foreground: 215 14% 55%;
+    --accent: 40 55% 54%;
+    --accent-foreground: 217 72% 8%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 215 22% 16%;
+    --input: 215 22% 16%;
+    --ring: 40 55% 54%;
+
+    --sidebar-background: 217 72% 6%;
+    --sidebar-foreground: 210 16% 85%;
+    --sidebar-primary: 40 55% 54%;
+    --sidebar-primary-foreground: 217 72% 8%;
+    --sidebar-accent: 217 65% 10%;
+    --sidebar-accent-foreground: 40 50% 70%;
+    --sidebar-border: 217 55% 13%;
+    --sidebar-ring: 40 55% 54%;
+
+    --chart-1: 40 55% 54%;
+    --chart-2: 199 89% 48%;
+    --chart-3: 142 71% 45%;
+    --chart-4: 0 72% 51%;
+    --chart-5: 280 70% 60%;
   }
 }
 
@@ -40,37 +86,56 @@
   * {
     @apply border-border;
   }
+
+  html {
+    @apply dark;
+  }
+
   body {
-    @apply bg-background text-foreground font-body;
+    @apply bg-background text-foreground font-sans antialiased;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
   }
-  h1, h2, h3, h4, h5, h6 {
-    @apply font-headline font-bold tracking-tight;
+
+  h1, h2, h3 {
+    @apply tracking-tight;
+  }
+
+  /* Scrollbar styling */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-muted rounded-full;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground/40;
   }
 }
 
-/* Hide Google Maps Terms of Use and other overlays for cleaner UI */
-.gm-style-cc { display: none !important; }
-.gm-svpc { display: none !important; }
-.gmnoprint { display: none !important; }
-
-/* Custom Scrollbar for sidebars */
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
-}
-.no-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-
-/* Smooth transitions for all cards and interactive elements */
-.card-hover {
-  @apply transition-all duration-300 hover:shadow-xl hover:-translate-y-1 hover:scale-[1.01];
-}
-
-/* Modern utility for text truncation with better line heights */
-.truncate-multiline {
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+@layer utilities {
+  .font-display {
+    font-family: 'DM Serif Display', serif;
+  }
+  .font-data {
+    font-family: 'DM Mono', monospace;
+  }
+  .text-gold {
+    color: #C9A84C;
+  }
+  .bg-gold {
+    background-color: #C9A84C;
+  }
+  .border-gold {
+    border-color: #C9A84C;
+  }
+  .text-gold-muted {
+    color: #8A6F2E;
+  }
+  .glow-gold {
+    box-shadow: 0 0 20px rgba(201, 168, 76, 0.15);
+  }
 }
