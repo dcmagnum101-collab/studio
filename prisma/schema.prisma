@@ -1,0 +1,516 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─── USERS & AUTH ─────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?
+  role          UserRole  @default(STAFF)
+  phone         String?
+  isActive      Boolean   @default(true)
+  notifyMorning Boolean   @default(true)
+  notifyNightly Boolean   @default(true)
+  notifyAlerts  Boolean   @default(true)
+  notifySMS     Boolean   @default(false)
+  accounts      Account[]
+  sessions      Session[]
+  assignedCases Case[]    @relation("AssignedCases")
+  tasks         Task[]    @relation("AssignedTasks")
+  timeEntries   TimeEntry[]
+  notes         Note[]
+  auditRuns     AuditRun[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+enum UserRole {
+  ADMIN
+  ATTORNEY
+  PARALEGAL
+  STAFF
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ─── CASES ────────────────────────────────────────────────────
+
+model Case {
+  id             String         @id @default(cuid())
+  caseNumber     String         @unique
+  title          String
+  status         CaseStatus     @default(ACTIVE)
+  type           CaseType
+  subType        String?
+  stage          PipelineStage  @default(INTAKE)
+  stageEnteredAt DateTime       @default(now())
+  priority       Priority       @default(MEDIUM)
+  dateOpened     DateTime       @default(now())
+  dateClosed     DateTime?
+  incidentDate   DateTime
+  statute        DateTime
+  description    String?        @db.Text
+  estimatedValue Float?
+  settlementOffer Float?
+  settlementFinal Float?
+  assignedToId   String
+  assignedTo     User           @relation("AssignedCases", fields: [assignedToId], references: [id])
+  clientId       String
+  client         Contact        @relation("ClientCases", fields: [clientId], references: [id])
+  contacts       CaseContact[]
+  documents      Document[]
+  tasks          Task[]
+  notes          Note[]
+  timeEntries    TimeEntry[]
+  invoices       Invoice[]
+  auditFlags     AuditFlag[]
+  stageHistory   StageHistory[]
+  integrationRefs IntegrationRef[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+}
+
+enum CaseStatus {
+  ACTIVE
+  INACTIVE
+  SETTLED
+  CLOSED
+  REFERRED
+  ARCHIVED
+}
+
+enum CaseType {
+  PERSONAL_INJURY
+  AUTO_ACCIDENT
+  SLIP_AND_FALL
+  WRONGFUL_DEATH
+  WORKERS_COMP
+  MEDICAL_MALPRACTICE
+  PRODUCT_LIABILITY
+  PREMISES_LIABILITY
+  OTHER
+}
+
+enum PipelineStage {
+  INTAKE
+  INVESTIGATION
+  DEMAND
+  NEGOTIATION
+  LITIGATION
+  TRIAL
+  SETTLEMENT
+  CLOSED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+model StageHistory {
+  id        String         @id @default(cuid())
+  caseId    String
+  case      Case           @relation(fields: [caseId], references: [id])
+  fromStage PipelineStage?
+  toStage   PipelineStage
+  movedAt   DateTime       @default(now())
+  movedBy   String
+  notes     String?
+}
+
+// ─── CONTACTS ─────────────────────────────────────────────────
+
+model Contact {
+  id           String        @id @default(cuid())
+  type         ContactType
+  firstName    String
+  lastName     String
+  email        String?
+  phone        String?
+  address      String?
+  city         String?
+  state        String?
+  zip          String?
+  company      String?
+  barNumber    String?
+  notes        String?       @db.Text
+  clientCases  Case[]        @relation("ClientCases")
+  caseContacts CaseContact[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+model CaseContact {
+  id        String  @id @default(cuid())
+  caseId    String
+  case      Case    @relation(fields: [caseId], references: [id])
+  contactId String
+  contact   Contact @relation(fields: [contactId], references: [id])
+  role      String
+
+  @@unique([caseId, contactId, role])
+}
+
+enum ContactType {
+  CLIENT
+  OPPOSING_COUNSEL
+  EXPERT
+  WITNESS
+  INSURANCE
+  MEDICAL_PROVIDER
+  ADJUSTER
+  OTHER
+}
+
+// ─── DOCUMENTS ────────────────────────────────────────────────
+
+model Document {
+  id         String      @id @default(cuid())
+  caseId     String
+  case       Case        @relation(fields: [caseId], references: [id])
+  name       String
+  category   DocCategory
+  url        String
+  size       Int
+  mimeType   String
+  uploadedBy String
+  docusignId String?
+  signedAt   DateTime?
+  createdAt  DateTime    @default(now())
+}
+
+enum DocCategory {
+  MEDICAL_RECORDS
+  MEDICAL_BILLS
+  POLICE_REPORT
+  PHOTOS
+  INSURANCE_POLICY
+  DEMAND_LETTER
+  SETTLEMENT_DOCS
+  PLEADINGS
+  DISCOVERY
+  CORRESPONDENCE
+  RETAINER
+  EXPERT_REPORT
+  WAGE_RECORDS
+  OTHER
+}
+
+// ─── TASKS ────────────────────────────────────────────────────
+
+model Task {
+  id           String       @id @default(cuid())
+  caseId       String?
+  case         Case?        @relation(fields: [caseId], references: [id])
+  title        String
+  description  String?      @db.Text
+  dueDate      DateTime
+  priority     Priority     @default(MEDIUM)
+  status       TaskStatus   @default(PENDING)
+  assignedToId String
+  assignedTo   User         @relation("AssignedTasks", fields: [assignedToId], references: [id])
+  category     TaskCategory
+  completedAt  DateTime?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  OVERDUE
+  CANCELLED
+}
+
+enum TaskCategory {
+  FILING
+  DISCOVERY
+  DEPOSITION
+  CLIENT_CONTACT
+  COURT_DATE
+  MEDICAL
+  NEGOTIATION
+  INTERNAL
+  DEADLINE
+}
+
+// ─── NOTES ────────────────────────────────────────────────────
+
+model Note {
+  id        String   @id @default(cuid())
+  caseId    String
+  case      Case     @relation(fields: [caseId], references: [id])
+  content   String   @db.Text
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─── TIME & BILLING ───────────────────────────────────────────
+
+model TimeEntry {
+  id          String   @id @default(cuid())
+  caseId      String
+  case        Case     @relation(fields: [caseId], references: [id])
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  description String
+  hours       Float
+  rate        Float    @default(350)
+  date        DateTime
+  billable    Boolean  @default(true)
+  invoiceId   String?
+  invoice     Invoice? @relation(fields: [invoiceId], references: [id])
+  qbSynced    Boolean  @default(false)
+  qbId        String?
+  createdAt   DateTime @default(now())
+}
+
+model Invoice {
+  id          String        @id @default(cuid())
+  caseId      String
+  case        Case          @relation(fields: [caseId], references: [id])
+  clientId    String
+  amount      Float
+  status      InvoiceStatus @default(DRAFT)
+  dueDate     DateTime
+  issuedAt    DateTime      @default(now())
+  paidAt      DateTime?
+  lineItems   Json
+  qbInvoiceId String?
+  timeEntries TimeEntry[]
+  createdAt   DateTime      @default(now())
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  OVERDUE
+  VOID
+}
+
+// ─── AI AUDIT ─────────────────────────────────────────────────
+
+model AuditFlag {
+  id             String    @id @default(cuid())
+  caseId         String
+  case           Case      @relation(fields: [caseId], references: [id])
+  runId          String
+  run            AuditRun  @relation(fields: [runId], references: [id])
+  type           FlagType
+  severity       Severity
+  title          String
+  description    String    @db.Text
+  recommendation String    @db.Text
+  urgency        Urgency
+  isResolved     Boolean   @default(false)
+  resolvedAt     DateTime?
+  resolvedBy     String?
+  createdAt      DateTime  @default(now())
+}
+
+model AuditRun {
+  id           String      @id @default(cuid())
+  triggeredBy  String
+  user         User        @relation(fields: [triggeredBy], references: [id])
+  type         AuditType
+  casesScanned Int
+  flagsFound   Int
+  riskScore    Float
+  summary      String?     @db.Text
+  flags        AuditFlag[]
+  completedAt  DateTime?
+  createdAt    DateTime    @default(now())
+}
+
+enum FlagType {
+  BOTTLENECK
+  SOL_WARNING
+  MISSING_DOC
+  STALLED
+  UNDERVALUED
+  OVERDUE_TASK
+  NO_ACTIVITY
+}
+
+enum Severity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum Urgency {
+  IMMEDIATE
+  THIS_WEEK
+  THIS_MONTH
+}
+
+enum AuditType {
+  SCHEDULED
+  MANUAL
+  SINGLE_CASE
+}
+
+// ─── COMPETITORS ──────────────────────────────────────────────
+
+model Competitor {
+  id              String             @id @default(cuid())
+  name            String
+  firm            String
+  barNumber       String?
+  website         String?
+  phone           String?
+  address         String?
+  practiceAreas   String[]
+  adPlatforms     String[]
+  estimatedCases  Int?
+  avgSettlement   Float?
+  winRate         Float?
+  reviewCount     Int?
+  avgRating       Float?
+  reclaimScore    Int?
+  reclaimAnalysis String?            @db.Text
+  notes           String?            @db.Text
+  tags            String[]
+  tactics         CompetitorTactic[]
+  alerts          CompetitorAlert[]
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+}
+
+model CompetitorTactic {
+  id           String         @id @default(cuid())
+  competitorId String
+  competitor   Competitor     @relation(fields: [competitorId], references: [id])
+  category     TacticCategory
+  title        String
+  description  String         @db.Text
+  source       String?
+  effectiveness Int?
+  aiAnalysis   String?        @db.Text
+  createdAt    DateTime       @default(now())
+}
+
+model CompetitorAlert {
+  id           String     @id @default(cuid())
+  competitorId String
+  competitor   Competitor @relation(fields: [competitorId], references: [id])
+  type         AlertType
+  title        String
+  description  String
+  isRead       Boolean    @default(false)
+  createdAt    DateTime   @default(now())
+}
+
+enum TacticCategory {
+  ADVERTISING
+  SETTLEMENT_STRATEGY
+  CASE_TYPE_FOCUS
+  REFERRAL_NETWORK
+  PRICING
+  INTAKE
+  LITIGATION
+}
+
+enum AlertType {
+  NEW_REVIEW
+  AD_CAMPAIGN
+  CASE_WIN
+  CASE_LOSS
+  RATING_CHANGE
+  WEBSITE_CHANGE
+}
+
+// ─── INTEGRATIONS ─────────────────────────────────────────────
+
+model IntegrationRef {
+  id          String   @id @default(cuid())
+  caseId      String
+  case        Case     @relation(fields: [caseId], references: [id])
+  system      String
+  externalId  String
+  externalUrl String?
+  metadata    Json?
+  lastSynced  DateTime @default(now())
+
+  @@unique([caseId, system])
+}
+
+model IntegrationSync {
+  id       String   @id @default(cuid())
+  system   String
+  status   String
+  message  String?
+  records  Int      @default(0)
+  syncedAt DateTime @default(now())
+}
+
+// ─── COMMUNICATION LOG ────────────────────────────────────────
+
+model CommunicationLog {
+  id        String   @id @default(cuid())
+  type      CommType
+  recipient String
+  subject   String?
+  body      String?  @db.Text
+  status    String
+  metadata  Json?
+  sentAt    DateTime @default(now())
+}
+
+enum CommType {
+  MORNING_BRIEFING
+  NIGHTLY_REPORT
+  HIGH_ALERT
+  SOL_ALERT
+  TASK_REMINDER
+}

@@ -1,5 +1,4 @@
-
-import type {Config} from 'tailwindcss';
+import type { Config } from 'tailwindcss'
 
 export default {
   darkMode: ['class'],
@@ -7,15 +6,29 @@ export default {
     './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
     './src/components/**/*.{js,ts,jsx,tsx,mdx}',
     './src/app/**/*.{js,ts,jsx,tsx,mdx}',
+    './emails/**/*.{js,ts,jsx,tsx,mdx}',
   ],
   theme: {
     extend: {
       fontFamily: {
-        body: ['Inter', 'sans-serif'],
-        headline: ['Inter', 'sans-serif'],
-        code: ['monospace'],
+        sans: ['Inter', 'sans-serif'],
+        display: ['DM Serif Display', 'serif'],
+        mono: ['DM Mono', 'monospace'],
       },
       colors: {
+        // PPL Brand
+        navy: {
+          DEFAULT: '#0A1628',
+          50: '#0d1e35',
+          100: '#111e30',
+          900: '#050d18',
+        },
+        gold: {
+          DEFAULT: '#C9A84C',
+          muted: '#8A6F2E',
+          light: '#E2C97E',
+        },
+        // UI tokens mapped to brand
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
         card: {
@@ -74,27 +87,24 @@ export default {
       },
       keyframes: {
         'accordion-down': {
-          from: {
-            height: '0',
-          },
-          to: {
-            height: 'var(--radix-accordion-content-height)',
-          },
+          from: { height: '0' },
+          to: { height: 'var(--radix-accordion-content-height)' },
         },
         'accordion-up': {
-          from: {
-            height: 'var(--radix-accordion-content-height)',
-          },
-          to: {
-            height: '0',
-          },
+          from: { height: 'var(--radix-accordion-content-height)' },
+          to: { height: '0' },
+        },
+        'fade-in': {
+          from: { opacity: '0', transform: 'translateY(4px)' },
+          to: { opacity: '1', transform: 'translateY(0)' },
         },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up': 'accordion-up 0.2s ease-out',
+        'fade-in': 'fade-in 0.2s ease-out',
       },
     },
   },
   plugins: [require('tailwindcss-animate')],
-} satisfies Config;
+} satisfies Config
