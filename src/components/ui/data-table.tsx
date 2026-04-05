@@ -5,7 +5,8 @@ import { cn } from '@/lib/utils'
 import { ChevronUp, ChevronDown, ChevronsUpDown, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 
-export interface Column<T> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export interface Column<T = any> {
   key: string
   label: string
   sortable?: boolean
@@ -14,7 +15,8 @@ export interface Column<T> {
   render?: (row: T) => React.ReactNode
 }
 
-interface DataTableProps<T extends Record<string, unknown>> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+interface DataTableProps<T extends Record<string, any> = Record<string, unknown>> {
   columns: Column<T>[]
   data: T[]
   loading?: boolean
@@ -25,7 +27,8 @@ interface DataTableProps<T extends Record<string, unknown>> {
   keyField?: string
 }
 
-export function DataTable<T extends Record<string, unknown>>({
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function DataTable<T extends Record<string, any> = Record<string, unknown>>({
   columns,
   data,
   loading = false,

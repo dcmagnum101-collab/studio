@@ -2,11 +2,7 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
-export async function PATCH(_req: Request, { params }: { params: { id: string } }) {
-  return POST(_req, { params })
-}
-
-export async function POST(_req: Request, { params }: { params: { id: string } }) {
+async function resolveFlag(params: { id: string }) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -20,4 +16,12 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
   })
 
   return NextResponse.json({ success: true })
+}
+
+export async function POST(_req: Request, { params }: { params: { id: string } }) {
+  return resolveFlag(params)
+}
+
+export async function PATCH(_req: Request, { params }: { params: { id: string } }) {
+  return resolveFlag(params)
 }

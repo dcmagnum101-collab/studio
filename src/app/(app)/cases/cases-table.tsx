@@ -46,7 +46,7 @@ export function CasesTable({ data }: { data: CaseRow[] }) {
     })
   }, [data, search, filterStatus, filterStage, filterType])
 
-  const columns: Column<CaseRow>[] = [
+  const columns: Column[] = [
     {
       key: 'caseNumber',
       label: 'Case #',
@@ -185,10 +185,10 @@ export function CasesTable({ data }: { data: CaseRow[] }) {
 
       <DataTable
         columns={columns}
-        data={filtered as unknown as Record<string, unknown>[]}
+        data={filtered}
         pageSize={25}
         emptyMessage="No cases match your filters."
-        onRowClick={row => router.push(`/cases/${(row as unknown as CaseRow).id}`)}
+        onRowClick={(row: CaseRow) => router.push(`/cases/${row.id}`)}
       />
     </div>
   )
