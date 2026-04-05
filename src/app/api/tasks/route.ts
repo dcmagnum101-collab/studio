@@ -52,7 +52,7 @@ export async function POST(request: Request) {
       dueDate: new Date(parsed.data.dueDate),
       priority: parsed.data.priority as never,
       category: parsed.data.category as never,
-      assignedToId: parsed.data.assignedToId ?? session.user.id,
+      assignedToId: parsed.data.assignedToId ?? session.user?.id ?? '',
     },
   })
 

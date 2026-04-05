@@ -45,7 +45,7 @@ export default async function AuditPage() {
         unresolvedFlags={JSON.parse(JSON.stringify(data.unresolvedFlags))}
         criticalCount={data.criticalCount}
         highCount={data.highCount}
-        userId={session.user.id}
+        userId={session.user?.id ?? ''}
       />
     </div>
   )

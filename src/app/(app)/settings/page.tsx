@@ -36,7 +36,7 @@ export default async function SettingsPage() {
   const session = await auth()
   if (!session) redirect('/login')
 
-  const data = await getSettingsData(session.user.id)
+  const data = await getSettingsData(session.user?.id ?? '')
 
   return (
     <div className="flex flex-col h-full">
@@ -44,7 +44,7 @@ export default async function SettingsPage() {
       <SettingsClient
         currentUser={JSON.parse(JSON.stringify(data.currentUser))}
         allUsers={JSON.parse(JSON.stringify(data.allUsers))}
-        userRole={session.user.role as string}
+        userRole={(session.user as { role?: string })?.role ?? 'STAFF'}
       />
     </div>
   )

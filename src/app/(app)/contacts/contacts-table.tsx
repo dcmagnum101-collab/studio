@@ -47,7 +47,7 @@ export function ContactsTable({ data }: { data: ContactRow[] }) {
     })
   }, [data, search, filterType])
 
-  const columns: Column<ContactRow>[] = [
+  const columns: Column[] = [
     {
       key: 'fullName',
       label: 'Name',
@@ -131,10 +131,10 @@ export function ContactsTable({ data }: { data: ContactRow[] }) {
       </div>
       <DataTable
         columns={columns}
-        data={filtered as unknown as Record<string, unknown>[]}
+        data={filtered}
         pageSize={30}
         emptyMessage="No contacts found."
-        onRowClick={row => router.push(`/contacts/${(row as unknown as ContactRow).id}`)}
+        onRowClick={(row: ContactRow) => router.push(`/contacts/${row.id}`)}
       />
     </div>
   )

@@ -64,7 +64,7 @@ export function TasksTable({
     window.location.reload()
   }
 
-  const columns: Column<TaskRow>[] = [
+  const columns: Column[] = [
     {
       key: 'status',
       label: '',
@@ -205,7 +205,7 @@ export function TasksTable({
       </div>
       <DataTable
         columns={columns}
-        data={filtered as unknown as Record<string, unknown>[]}
+        data={filtered}
         pageSize={30}
         emptyMessage="No tasks match your filters."
       />

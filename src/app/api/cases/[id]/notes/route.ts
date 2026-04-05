@@ -38,7 +38,7 @@ export async function POST(
     data: {
       caseId: params.id,
       content: parsed.data.content,
-      authorId: session.user.id,
+      authorId: session.user?.id ?? '',
     },
     include: { author: { select: { name: true } } },
   })

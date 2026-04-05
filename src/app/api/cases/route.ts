@@ -62,7 +62,7 @@ export async function POST(request: Request) {
       estimatedValue: parsed.data.estimatedValue,
       priority: (parsed.data.priority ?? 'MEDIUM') as never,
       subType: parsed.data.subType,
-      assignedToId: session.user.id,
+      assignedToId: session.user?.id ?? '',
     },
   })
 

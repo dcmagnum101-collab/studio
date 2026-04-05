@@ -1,6 +1,6 @@
 import { Resend } from 'resend'
 
-export const resend = new Resend(process.env.RESEND_API_KEY)
+export const resend = new Resend(process.env.RESEND_API_KEY ?? 'placeholder_key_not_set')
 
 export interface EmailResult {
   success: boolean

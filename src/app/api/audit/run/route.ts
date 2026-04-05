@@ -10,7 +10,7 @@ export async function POST() {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   try {
-    const { run, flagCount } = await runFullAudit(session.user.id, 'MANUAL')
+    const { run, flagCount } = await runFullAudit(session.user?.id ?? '', 'MANUAL')
     return NextResponse.json({
       success: true,
       runId: run.id,

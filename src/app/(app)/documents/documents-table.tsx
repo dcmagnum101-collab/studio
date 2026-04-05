@@ -49,7 +49,7 @@ export function DocumentsTable({ data }: { data: DocRow[] }) {
     [data, search, filterCategory]
   )
 
-  const columns: Column<DocRow>[] = [
+  const columns: Column[] = [
     {
       key: 'name',
       label: 'Document Name',
@@ -140,7 +140,7 @@ export function DocumentsTable({ data }: { data: DocRow[] }) {
       </div>
       <DataTable
         columns={columns}
-        data={filtered as unknown as Record<string, unknown>[]}
+        data={filtered}
         pageSize={25}
         emptyMessage="No documents found."
       />

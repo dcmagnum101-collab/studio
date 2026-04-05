@@ -11,7 +11,7 @@ async function resolveFlag(params: { id: string }) {
     data: {
       isResolved: true,
       resolvedAt: new Date(),
-      resolvedBy: session.user.id,
+      resolvedBy: session.user?.id ?? '',
     },
   })
 

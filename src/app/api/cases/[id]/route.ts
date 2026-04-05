@@ -63,7 +63,7 @@ export async function PATCH(
         caseId: params.id,
         fromStage: existing.stage as never,
         toStage: parsed.data.stage as never,
-        movedBy: session.user.id,
+        movedBy: session.user?.id ?? '',
       },
     })
   }

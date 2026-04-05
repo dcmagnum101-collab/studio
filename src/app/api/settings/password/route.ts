@@ -18,7 +18,7 @@ export async function PATCH(request: Request) {
   if (!parsed.success) return NextResponse.json({ error: 'Invalid input' }, { status: 400 })
 
   const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
+    where: { id: session.user?.id ?? '' },
     select: { password: true },
   })
 
@@ -36,7 +36,7 @@ export async function PATCH(request: Request) {
 
   const hashed = await bcrypt.hash(parsed.data.next, 12)
   await prisma.user.update({
-    where: { id: session.user.id },
+    where: { id: session.user?.id ?? '' },
     data: { password: hashed },
   })
 
