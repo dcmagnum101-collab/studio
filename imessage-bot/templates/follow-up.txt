@@ -1,0 +1,1 @@
+Hey {{contact_name}}, just following up on my last message. I know things get busy at {{business_name}} — totally understand! If there's a better time to connect, just let me know. Happy to work around your schedule.
