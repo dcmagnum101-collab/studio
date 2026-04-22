@@ -4,8 +4,8 @@ import { redirect } from 'next/navigation'
 import { KpiCard } from '@/components/dashboard/kpi-card'
 import { PipelineStageBadge, SeverityBadge } from '@/components/cases/status-badge'
 import { SolCountdown } from '@/components/cases/sol-countdown'
-import { Topbar } from '@/components/layout/topbar'
 import { PipelineChart } from './pipeline-chart'
+import { DashboardClient } from './dashboard-client'
 import {
   Briefcase,
   DollarSign,
@@ -229,177 +229,144 @@ export default async function DashboardPage() {
         />
       </div>
 
-      {/* Main Grid: Pipeline Chart + SOL Tracker */}
-      <div className="grid grid-cols-1 xl:grid-cols-5 gap-4">
-        {/* Pipeline Bar Chart */}
-        <div className="xl:col-span-3 bg-[#0D1421] border border-[#1a2332] rounded-lg p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-xs font-semibold text-white uppercase tracking-wider">
-              Pipeline by Stage
-            </h2>
-            <span className="text-[10px] text-slate-500">Active cases</span>
-          </div>
-          <PipelineChart data={pipelineChartData} />
-        </div>
-
-        {/* SOL Tracker */}
-        <div className="xl:col-span-2 bg-[#0D1421] border border-[#1a2332] rounded-lg p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-xs font-semibold text-white uppercase tracking-wider">
-              SOL Tracker
-            </h2>
-            <span className="text-[10px] text-slate-500">Next 60 days</span>
-          </div>
-          {data.solCases.length === 0 ? (
-            <p className="text-xs text-slate-500 py-4 text-center">No SOL warnings in 60 days</p>
-          ) : (
-            <div className="space-y-1 overflow-y-auto max-h-64">
-              <div className="grid grid-cols-[auto_1fr_auto_auto] gap-x-2 items-center pb-1 mb-1 border-b border-[#1a2332]">
-                <span className="text-[10px] text-slate-600 uppercase tracking-wider">Case #</span>
-                <span className="text-[10px] text-slate-600 uppercase tracking-wider">Title</span>
-                <span className="text-[10px] text-slate-600 uppercase tracking-wider">SOL Date</span>
-                <span className="text-[10px] text-slate-600 uppercase tracking-wider">Days</span>
-              </div>
-              {data.solCases.map(c => {
-                const days = daysUntil(c.statute)
-                return (
-                  <Link
-                    key={c.id}
-                    href={`/cases/${c.id}`}
-                    className="grid grid-cols-[auto_1fr_auto_auto] gap-x-2 items-center py-1 hover:bg-white/[0.02] rounded transition-colors group"
-                  >
-                    <span className="text-[11px] font-data text-[#C9A84C] group-hover:underline">
-                      {c.caseNumber}
-                    </span>
-                    <span className="text-[11px] text-slate-300 truncate">{c.title}</span>
-                    <span className="text-[11px] font-data text-slate-500">
-                      {formatLA(c.statute, 'MM/dd/yy')}
-                    </span>
-                    <SolCountdown statute={c.statute} showIcon={false} />
-                  </Link>
-                )
-              })}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Bottom Row: Activity Feed + Quick Stats */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        {/* Recent Audit Flags */}
-        <div className="xl:col-span-2 bg-[#0D1421] border border-[#1a2332] rounded-lg p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-xs font-semibold text-white uppercase tracking-wider flex items-center gap-2">
-              <Activity className="w-3.5 h-3.5 text-[#C9A84C]" />
-              Unresolved Audit Flags
-            </h2>
-            <Link
-              href="/audit"
-              className="text-[11px] text-[#C9A84C] hover:underline"
-            >
-              View all
-            </Link>
-          </div>
-          {data.recentFlags.length === 0 ? (
-            <p className="text-xs text-slate-500 py-4 text-center">
-              No unresolved flags — all clear
-            </p>
-          ) : (
-            <div className="space-y-1.5">
-              {data.recentFlags.map(flag => (
-                <div
-                  key={flag.id}
-                  className="flex items-start gap-2.5 py-1.5 border-b border-[#111827] last:border-0"
-                >
-                  <SeverityBadge value={flag.severity} className="shrink-0 mt-0.5" />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[12px] text-white font-medium leading-tight">
-                      {flag.title}
-                    </p>
-                    <p className="text-[11px] text-slate-500 mt-0.5">
-                      <Link
-                        href={`/cases/${flag.caseId}`}
-                        className="text-[#C9A84C] hover:underline font-data"
-                      >
-                        {flag.case.caseNumber}
-                      </Link>{' '}
-                      · {flag.case.title}
-                    </p>
-                  </div>
-                  <span className="text-[10px] text-slate-600 shrink-0 font-data">
-                    {formatLA(flag.createdAt, 'MM/dd')}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Quick Stats Sidebar */}
+      {/* Charts/Kanban toggle section */}
+      <DashboardClient chartsSection={
         <div className="space-y-4">
-          {/* Cases by Type */}
-          <div className="bg-[#0D1421] border border-[#1a2332] rounded-lg p-4">
-            <h2 className="text-xs font-semibold text-white uppercase tracking-wider mb-3">
-              Cases by Type
-            </h2>
-            <div className="space-y-1.5">
-              {typeChartData.sort((a, b) => b.count - a.count).slice(0, 6).map(item => {
-                const maxCount = Math.max(...typeChartData.map(d => d.count))
-                const pct = maxCount > 0 ? (item.count / maxCount) * 100 : 0
-                return (
-                  <div key={item.type} className="flex items-center gap-2">
-                    <span className="text-[11px] text-slate-400 w-32 truncate shrink-0">
-                      {item.type}
-                    </span>
-                    <div className="flex-1 h-1.5 bg-[#111827] rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-[#C9A84C]/60 rounded-full"
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
-                    <span className="text-[11px] font-data text-slate-500 w-4 text-right">
-                      {item.count}
-                    </span>
-                  </div>
-                )
-              })}
+          {/* Main Grid: Pipeline Chart + SOL Tracker */}
+          <div className="grid grid-cols-1 xl:grid-cols-5 gap-4">
+            {/* Pipeline Bar Chart */}
+            <div className="xl:col-span-3 bg-[#0D1421] border border-[#1a2332] rounded-lg p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-xs font-semibold text-white uppercase tracking-wider">
+                  Pipeline by Stage
+                </h2>
+                <span className="text-[10px] text-slate-500">Active cases</span>
+              </div>
+              <PipelineChart data={pipelineChartData} />
             </div>
-          </div>
 
-          {/* Top Attorneys */}
-          <div className="bg-[#0D1421] border border-[#1a2332] rounded-lg p-4">
-            <h2 className="text-xs font-semibold text-white uppercase tracking-wider mb-3">
-              Attorneys by Caseload
-            </h2>
-            <div className="space-y-2">
-              {data.users
-                .filter(u => u.role === 'ATTORNEY' || u.role === 'ADMIN')
-                .sort((a, b) => b._count.assignedCases - a._count.assignedCases)
-                .slice(0, 5)
-                .map(u => (
-                  <div key={u.id} className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-5 h-5 rounded bg-[#C9A84C]/10 flex items-center justify-center">
-                        <span className="text-[9px] font-bold text-[#C9A84C]">
-                          {u.name.charAt(0)}
-                        </span>
-                      </div>
-                      <span className="text-[11px] text-slate-300 truncate max-w-[100px]">
-                        {u.name}
-                      </span>
-                    </div>
-                    <span className="text-[11px] font-data text-slate-500">
-                      {u._count.assignedCases} cases
-                    </span>
+            {/* SOL Tracker */}
+            <div className="xl:col-span-2 bg-[#0D1421] border border-[#1a2332] rounded-lg p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-xs font-semibold text-white uppercase tracking-wider">
+                  SOL Tracker
+                </h2>
+                <span className="text-[10px] text-slate-500">Next 60 days</span>
+              </div>
+              {data.solCases.length === 0 ? (
+                <p className="text-xs text-slate-500 py-4 text-center">No SOL warnings in 60 days</p>
+              ) : (
+                <div className="space-y-1 overflow-y-auto max-h-64">
+                  <div className="grid grid-cols-[auto_1fr_auto_auto] gap-x-2 items-center pb-1 mb-1 border-b border-[#1a2332]">
+                    <span className="text-[10px] text-slate-600 uppercase tracking-wider">Case #</span>
+                    <span className="text-[10px] text-slate-600 uppercase tracking-wider">Title</span>
+                    <span className="text-[10px] text-slate-600 uppercase tracking-wider">SOL Date</span>
+                    <span className="text-[10px] text-slate-600 uppercase tracking-wider">Days</span>
                   </div>
-                ))}
-              {data.users.filter(u => u.role === 'ATTORNEY' || u.role === 'ADMIN').length === 0 && (
-                <p className="text-[11px] text-slate-600">No attorneys found</p>
+                  {data.solCases.map(c => {
+                    const days = daysUntil(c.statute)
+                    return (
+                      <Link
+                        key={c.id}
+                        href={`/cases/${c.id}`}
+                        className="grid grid-cols-[auto_1fr_auto_auto] gap-x-2 items-center py-1 hover:bg-white/[0.02] rounded transition-colors group"
+                      >
+                        <span className="text-[11px] font-data text-[#C9A84C] group-hover:underline">
+                          {c.caseNumber}
+                        </span>
+                        <span className="text-[11px] text-slate-300 truncate">{c.title}</span>
+                        <span className="text-[11px] font-data text-slate-500">
+                          {formatLA(c.statute, 'MM/dd/yy')}
+                        </span>
+                        <SolCountdown statute={c.statute} showIcon={false} />
+                      </Link>
+                    )
+                  })}
+                </div>
               )}
             </div>
           </div>
+
+          {/* Bottom Row: Activity Feed + Quick Stats */}
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+            {/* Recent Audit Flags */}
+            <div className="xl:col-span-2 bg-[#0D1421] border border-[#1a2332] rounded-lg p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-xs font-semibold text-white uppercase tracking-wider flex items-center gap-2">
+                  <Activity className="w-3.5 h-3.5 text-[#C9A84C]" />
+                  Unresolved Audit Flags
+                </h2>
+                <Link href="/audit" className="text-[11px] text-[#C9A84C] hover:underline">
+                  View all
+                </Link>
+              </div>
+              {data.recentFlags.length === 0 ? (
+                <p className="text-xs text-slate-500 py-4 text-center">No unresolved flags — all clear</p>
+              ) : (
+                <div className="space-y-1.5">
+                  {data.recentFlags.map(flag => (
+                    <div key={flag.id} className="flex items-start gap-2.5 py-1.5 border-b border-[#111827] last:border-0">
+                      <SeverityBadge value={flag.severity} className="shrink-0 mt-0.5" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[12px] text-white font-medium leading-tight">{flag.title}</p>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          <Link href={`/cases/${flag.caseId}`} className="text-[#C9A84C] hover:underline font-data">
+                            {flag.case.caseNumber}
+                          </Link>{' '}· {flag.case.title}
+                        </p>
+                      </div>
+                      <span className="text-[10px] text-slate-600 shrink-0 font-data">{formatLA(flag.createdAt, 'MM/dd')}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Quick Stats Sidebar */}
+            <div className="space-y-4">
+              <div className="bg-[#0D1421] border border-[#1a2332] rounded-lg p-4">
+                <h2 className="text-xs font-semibold text-white uppercase tracking-wider mb-3">Cases by Type</h2>
+                <div className="space-y-1.5">
+                  {typeChartData.sort((a, b) => b.count - a.count).slice(0, 6).map(item => {
+                    const maxCount = Math.max(...typeChartData.map(d => d.count))
+                    const pct = maxCount > 0 ? (item.count / maxCount) * 100 : 0
+                    return (
+                      <div key={item.type} className="flex items-center gap-2">
+                        <span className="text-[11px] text-slate-400 w-32 truncate shrink-0">{item.type}</span>
+                        <div className="flex-1 h-1.5 bg-[#111827] rounded-full overflow-hidden">
+                          <div className="h-full bg-[#C9A84C]/60 rounded-full" style={{ width: `${pct}%` }} />
+                        </div>
+                        <span className="text-[11px] font-data text-slate-500 w-4 text-right">{item.count}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <div className="bg-[#0D1421] border border-[#1a2332] rounded-lg p-4">
+                <h2 className="text-xs font-semibold text-white uppercase tracking-wider mb-3">Attorneys by Caseload</h2>
+                <div className="space-y-2">
+                  {data.users
+                    .filter(u => u.role === 'ATTORNEY' || u.role === 'ADMIN')
+                    .sort((a, b) => b._count.assignedCases - a._count.assignedCases)
+                    .slice(0, 5)
+                    .map(u => (
+                      <div key={u.id} className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-5 h-5 rounded bg-[#C9A84C]/10 flex items-center justify-center">
+                            <span className="text-[9px] font-bold text-[#C9A84C]">{u.name.charAt(0)}</span>
+                          </div>
+                          <span className="text-[11px] text-slate-300 truncate max-w-[100px]">{u.name}</span>
+                        </div>
+                        <span className="text-[11px] font-data text-slate-500">{u._count.assignedCases} cases</span>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
+      } />
     </div>
   )
 }

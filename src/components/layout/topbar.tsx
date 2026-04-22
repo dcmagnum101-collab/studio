@@ -1,9 +1,10 @@
 'use client'
 
-import { Bell, Search, User } from 'lucide-react'
+import { Bell, Search, User, Menu } from 'lucide-react'
 import { useSession } from 'next-auth/react'
 import { formatLA } from '@/lib/utils'
 import { TimerWidget } from './timer-widget'
+import { useSidebar } from '@/contexts/sidebar-context'
 
 interface TopbarProps {
   title: string
@@ -12,10 +13,18 @@ interface TopbarProps {
 
 export function Topbar({ title, subtitle }: TopbarProps) {
   const { data: session } = useSession()
+  const { toggle } = useSidebar()
 
   return (
-    <header className="flex items-center justify-between h-12 px-5 border-b border-border bg-card/40 backdrop-blur-sm shrink-0">
+    <header className="flex items-center justify-between h-12 px-4 border-b border-border bg-card/40 backdrop-blur-sm shrink-0">
       <div className="flex items-center gap-3">
+        {/* Hamburger — mobile only */}
+        <button
+          onClick={toggle}
+          className="lg:hidden w-7 h-7 flex items-center justify-center rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+        >
+          <Menu className="w-4 h-4" />
+        </button>
         <div>
           <h1 className="text-sm font-semibold text-foreground leading-none">{title}</h1>
           {subtitle && (

@@ -18,8 +18,10 @@ import {
   Scale,
   LogOut,
   BarChart3,
+  X,
 } from 'lucide-react'
 import { signOut } from 'next-auth/react'
+import { useSidebar } from '@/contexts/sidebar-context'
 
 const NAV_SECTIONS = [
   {
@@ -55,28 +57,31 @@ const NAV_SECTIONS = [
   },
 ]
 
-export function Sidebar() {
+function SidebarContent({ onClose }: { onClose?: () => void }) {
   const pathname = usePathname()
 
   return (
-    <aside className="flex flex-col w-56 shrink-0 h-screen bg-[#060E1B] border-r border-[#111827] overflow-y-auto">
+    <div className="flex flex-col h-full">
       {/* Logo */}
-      <div className="flex items-center gap-3 px-4 py-5 border-b border-[#111827]">
-        <div className="w-8 h-8 rounded bg-gold flex items-center justify-center flex-shrink-0">
-          <Scale className="w-4 h-4 text-[#0A1628]" />
+      <div className="flex items-center justify-between px-4 py-5 border-b border-[#111827]">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded bg-gold flex items-center justify-center flex-shrink-0">
+            <Scale className="w-4 h-4 text-[#0A1628]" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[11px] font-bold text-gold tracking-widest uppercase leading-none">PPL</p>
+            <p className="text-[10px] text-slate-500 truncate mt-0.5 leading-none">Legal Intelligence</p>
+          </div>
         </div>
-        <div className="min-w-0">
-          <p className="text-[11px] font-bold text-gold tracking-widest uppercase leading-none">
-            PPL
-          </p>
-          <p className="text-[10px] text-slate-500 truncate mt-0.5 leading-none">
-            Legal Intelligence
-          </p>
-        </div>
+        {onClose && (
+          <button onClick={onClose} className="lg:hidden text-slate-500 hover:text-slate-200 transition-colors p-1">
+            <X className="w-4 h-4" />
+          </button>
+        )}
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 px-2 py-4 space-y-5">
+      <nav className="flex-1 px-2 py-4 space-y-5 overflow-y-auto">
         {NAV_SECTIONS.map(section => (
           <div key={section.label}>
             <p className="px-2 mb-1 text-[9px] font-bold text-slate-600 tracking-widest uppercase">
@@ -91,6 +96,7 @@ export function Sidebar() {
                   <li key={item.href}>
                     <Link
                       href={item.href}
+                      onClick={onClose}
                       className={cn(
                         'flex items-center gap-2.5 px-2 py-1.5 rounded text-[13px] transition-all group',
                         active
@@ -105,9 +111,7 @@ export function Sidebar() {
                         )}
                       />
                       <span className="truncate">{item.label}</span>
-                      {active && (
-                        <ChevronRight className="w-3 h-3 ml-auto text-gold/60 shrink-0" />
-                      )}
+                      {active && <ChevronRight className="w-3 h-3 ml-auto text-gold/60 shrink-0" />}
                     </Link>
                   </li>
                 )
@@ -127,6 +131,37 @@ export function Sidebar() {
           <span>Sign Out</span>
         </button>
       </div>
-    </aside>
+    </div>
+  )
+}
+
+export function Sidebar() {
+  const { open, close } = useSidebar()
+
+  return (
+    <>
+      {/* Mobile overlay */}
+      {open && (
+        <div
+          className="fixed inset-0 bg-black/60 z-40 lg:hidden"
+          onClick={close}
+        />
+      )}
+
+      {/* Mobile drawer */}
+      <aside
+        className={cn(
+          'fixed inset-y-0 left-0 z-50 w-56 bg-[#060E1B] border-r border-[#111827] transition-transform duration-200 lg:hidden',
+          open ? 'translate-x-0' : '-translate-x-full'
+        )}
+      >
+        <SidebarContent onClose={close} />
+      </aside>
+
+      {/* Desktop sidebar (always visible) */}
+      <aside className="hidden lg:flex flex-col w-56 shrink-0 h-screen bg-[#060E1B] border-r border-[#111827] overflow-y-auto">
+        <SidebarContent />
+      </aside>
+    </>
   )
 }
